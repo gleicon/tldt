@@ -21,7 +21,11 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
   2. `echo "text..." | tldt` runs without panicking and returns non-empty output
   3. `tldt -f article.txt` and `tldt "text..."` both produce output without error
   4. `github.com/didasy/tldr` graph algorithm is selectable and produces output on all test-data/ files
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Go module init, dependency fetch, Makefile replacement, directory scaffolds
+- [ ] 01-02-PLAN.md — Graph summarizer wrapper (internal/summarizer) and CLI entry point (cmd/tldt/main.go)
+- [ ] 01-03-PLAN.md — Four English test-data files and integration tests covering all test-data fixtures
 **UI hint**: no
 
 ### Phase 2: Algorithms
@@ -52,6 +56,6 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/3 | In progress | - |
 | 2. Algorithms | 0/TBD | Not started | - |
 | 3. Polish | 0/TBD | Not started | - |
