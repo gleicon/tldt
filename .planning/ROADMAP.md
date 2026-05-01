@@ -22,9 +22,14 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
   3. `tldt -f article.txt` and `tldt "text..."` both produce output without error
   4. `github.com/didasy/tldr` graph algorithm is selectable and produces output on all test-data/ files
 **Plans**: 3 plans
-Plans:
+
+**Wave 1**
 - [ ] 01-01-PLAN.md — Go module init, dependency fetch, Makefile replacement, directory scaffolds
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Graph summarizer wrapper (internal/summarizer) and CLI entry point (cmd/tldt/main.go)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — Four English test-data files and integration tests covering all test-data fixtures
 **UI hint**: no
 

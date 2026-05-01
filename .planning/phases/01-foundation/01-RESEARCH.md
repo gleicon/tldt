@@ -346,17 +346,19 @@ func main() {
 
 **All other claims were verified or cited — no user confirmation needed beyond the above.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which specific Wikipedia article and YouTube transcript to use for TEST-07?**
    - What we know: Content must be English, Wikipedia article is available under CC-BY-SA, YouTube transcripts are plain text
    - What's unclear: Which article/video gives representative NLP test coverage (varied sentence structures, named entities)
    - Recommendation: Use a mid-length Wikipedia article (e.g., "Extractive summarization") and any public tech talk transcript from YouTube. The exact content is a planner/executor choice; the files just need to exist and meet word-count requirements.
+   - **RESOLVED:** Content provided inline in 01-03-PLAN.md Task 1 action — Wikipedia extractive summarization article and original tech talk transcript prose. Files meet word-count requirements per TEST-07.
 
 2. **Should `-sentences N` be a Phase 1 flag or deferred to Phase 2?**
    - What we know: SUM-01 (`--sentences N`) is assigned to Phase 2. Phase 1 only requires CLI-01 through CLI-04 and SUM-08.
    - What's unclear: The phase description says "produces extractive summaries via the graph baseline algorithm" without mentioning a configurable sentence count.
    - Recommendation: Hardcode `n=5` in Phase 1 as the default; add the flag in Phase 2 with SUM-01. Do not block Phase 1 on this.
+   - **RESOLVED:** Deferred to Phase 2 per SUM-01 traceability; Phase 1 hardcodes `defaultSentences = 5` in cmd/tldt/main.go.
 
 ## Environment Availability
 
