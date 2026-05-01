@@ -48,7 +48,7 @@
 
 ### Project Hygiene
 
-- [ ] **PROJ-01**: Modern go modules (`go.mod` at repo root, drop old GOPATH/src/ structure)
+- [x] **PROJ-01**: Modern go modules (`go.mod` at repo root, drop old GOPATH/src/ structure)
 - [ ] **PROJ-02**: Updated README with: what tldt is, install, usage examples, algorithm explanation, comparison table LexRank vs TextRank
 - [ ] **PROJ-03**: Sentence count cap at 2000 (default) with `--no-cap` override flag for O(n²) safety
 - [ ] **PROJ-04**: Build via `go build ./...`, test via `go test ./...`
@@ -104,7 +104,7 @@
 | TEST-05 | Phase 2 — Algorithms | Pending |
 | TEST-06 | Phase 2 — Algorithms | Pending |
 | TEST-07 | Phase 1 — Foundation | Pending |
-| PROJ-01 | Phase 1 — Foundation | Pending |
+| PROJ-01 | Phase 1 — Foundation | Complete |
 | PROJ-02 | Phase 3 — Polish | Pending |
 | PROJ-03 | Phase 3 — Polish | Pending |
 | PROJ-04 | Phase 3 — Polish | Pending |
