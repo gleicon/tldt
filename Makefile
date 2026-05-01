@@ -1,36 +1,13 @@
-# Copyright 2015resumator authors.  All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
+.PHONY: build test install clean
 
-TARGET=$(DESTDIR)/opt/resumator
-include src/Makefile.defs
+build:
+	go build ./cmd/tldt
 
-all: server
+test:
+	go test ./...
 
-deps:
-	make -C src deps
-
-server:
-	make -C src
-	@cp src/$(NAME) .
+install:
+	go install ./cmd/tldt
 
 clean:
-	make -C src clean
-	@rm -f $(NAME)
-
-install: server
-	install -m 750 -d $(TARGET)
-	install -m 750 $(NAME) $(TARGET)
-	install -m 640 resumator.conf $(TARGET)
-	install -m 750 -d $(TARGET)/ssl
-	install -m 640 ssl/Makefile $(TARGET)/ssl
-	install -m 750 -d $(TARGET)/assets
-	rsync -rupE assets $(TARGET)
-	find $(TARGET)/assets -type f -exec chmod 640 {} \;
-	find $(TARGET)/assets -type d -exec chmod 750 {} \;
-	#chown -R www-data: $(TARGET)
-
-uninstall:
-	rm -rf $(TARGET)
-
-.PHONY: server
+	rm -f tldt
