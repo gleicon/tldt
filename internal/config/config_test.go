@@ -168,14 +168,15 @@ func TestLoad_LevelField(t *testing.T) {
 }
 
 func TestLevelPresets(t *testing.T) {
-	if v := LevelPresets["lite"]; v != 3 {
-		t.Errorf("LevelPresets[\"lite\"] = %d, want 3", v)
+	// aggressive = most compression = fewest sentences
+	if v := LevelPresets["lite"]; v != 10 {
+		t.Errorf("LevelPresets[\"lite\"] = %d, want 10", v)
 	}
 	if v := LevelPresets["standard"]; v != 5 {
 		t.Errorf("LevelPresets[\"standard\"] = %d, want 5", v)
 	}
-	if v := LevelPresets["aggressive"]; v != 10 {
-		t.Errorf("LevelPresets[\"aggressive\"] = %d, want 10", v)
+	if v := LevelPresets["aggressive"]; v != 3 {
+		t.Errorf("LevelPresets[\"aggressive\"] = %d, want 3", v)
 	}
 }
 

@@ -29,10 +29,12 @@ func DefaultConfig() Config {
 }
 
 // LevelPresets maps named compression levels to sentence counts.
+// "aggressive" means most compression (fewest sentences),
+// "lite" means least compression (most sentences).
 var LevelPresets = map[string]int{
-	"lite":       3,
+	"lite":       10,
 	"standard":   5,
-	"aggressive": 10,
+	"aggressive": 3,
 }
 
 // Load reads cfgPath and returns the parsed Config. If the file does not

@@ -16,7 +16,7 @@
 - [ ] **CFG-01**: User can create `~/.tldt.toml` with default values for `algorithm`, `sentences`, `format`, and `level` flags
 - [ ] **CFG-02**: CLI flags always override values from `~/.tldt.toml`
 - [ ] **CFG-03**: Missing or malformed `~/.tldt.toml` is not an error — defaults apply silently
-- [ ] **CFG-04**: User can run `tldt --level lite` (3 sentences), `--level standard` (5 sentences), or `--level aggressive` (10 sentences)
+- [ ] **CFG-04**: User can run `tldt --level aggressive` (3 sentences, most compression), `--level standard` (5 sentences), or `--level lite` (10 sentences, least compression)
 - [ ] **CFG-05**: `--level` can be set as the default in `~/.tldt.toml`; explicit `--sentences N` overrides it
 
 ### AI Integration (AI)
