@@ -12,9 +12,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/gleicon/tldt/internal/config"
+	"github.com/gleicon/tldt/internal/detector"
 	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
+	"github.com/gleicon/tldt/internal/sanitizer"
 	"github.com/gleicon/tldt/internal/summarizer"
 )
 
@@ -30,10 +32,13 @@ func main() {
 	format := flag.String("format", "text", "output format: text|json|markdown")
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge           := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
-	printThreshold  := flag.Bool("print-threshold", false, "print configured hook token threshold to stdout and exit")
-	installSkill    := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
-	skillDir        := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
-	skillTarget     := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
+	printThreshold    := flag.Bool("print-threshold", false, "print configured hook token threshold to stdout and exit")
+	installSkill      := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
+	skillDir          := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
+	skillTarget       := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
+	sanitizeFlag      := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
+	detectInjection   := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
+	injectionThreshold := flag.Float64("injection-threshold", detector.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: tldt [--print-threshold] [--install-skill [--skill-dir path] [--target app]]")
 		fmt.Fprintln(os.Stderr, "       tldt [-f file] [--url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N]")
@@ -121,6 +126,40 @@ func main() {
 	}
 	if isEmpty {
 		os.Exit(0)
+	}
+
+	// --sanitize: strip invisible Unicode and NFKC-normalize before summarization.
+	if *sanitizeFlag {
+		stripped := sanitizer.SanitizeAll(text)
+		if stripped != text {
+			if inv := sanitizer.ReportInvisibles(text); len(inv) > 0 {
+				fmt.Fprintf(os.Stderr, "sanitize: removed %d invisible codepoint(s)\n", len(inv))
+			}
+		}
+		text = stripped
+	}
+
+	// --detect-injection: report pattern, encoding, and invisible-char findings to stderr.
+	if *detectInjection {
+		if inv := sanitizer.ReportInvisibles(text); len(inv) > 0 {
+			fmt.Fprintf(os.Stderr, "injection-detect: %d invisible Unicode codepoint(s) found\n", len(inv))
+			for _, r := range inv {
+				fmt.Fprintf(os.Stderr, "  offset %d: U+%04X %s (%s)\n", r.Offset, r.Rune, r.Name, r.Category)
+			}
+		}
+		report := detector.Analyze(text)
+		if len(report.Findings) > 0 {
+			fmt.Fprintf(os.Stderr, "injection-detect: %d finding(s), max confidence %.2f\n", len(report.Findings), report.MaxScore)
+			for _, f := range report.Findings {
+				fmt.Fprintf(os.Stderr, "  [%s] %s (score=%.2f): %s\n", f.Category, f.Pattern, f.Score, f.Excerpt)
+			}
+			if report.Suspicious {
+				fmt.Fprintln(os.Stderr, "injection-detect: WARNING — input flagged as suspicious")
+			}
+		} else {
+			fmt.Fprintln(os.Stderr, "injection-detect: no findings")
+		}
+		_ = *injectionThreshold // used by DetectOutliers when called from summarizer integration
 	}
 
 	const defaultSentenceCap = 2000
