@@ -286,7 +286,7 @@
 <nav>
   <div class="nav-inner">
     <div style="display:flex;align-items:center;">
-      <span class="nav-logo">tldt</span>
+      <span class="nav-logo">tl;dt</span>
       <span class="nav-sub">/ too long, didn't tokenize</span>
     </div>
     <div class="nav-links">
@@ -331,6 +331,12 @@
       <span class="install-cmd">go install github.com/gleicon/tldt/cmd/tldt@latest</span>
       <button class="copy-btn" onclick="copyInstall(this)">copy</button>
     </div>
+    <p class="reveal" style="font-size:13px;color:var(--text-3);margin-top:12px;text-align:center;">
+      or grab a
+      <a href="https://github.com/gleicon/tldt/releases" target="_blank" rel="noopener"
+         style="color:var(--accent);text-decoration:none;border-bottom:1px solid currentColor;">pre-compiled binary</a>
+      for macOS, Linux, or Windows from GitHub Releases
+    </p>
 
     <!-- live demo terminal -->
     <div class="term reveal" style="max-width:580px;">
@@ -834,13 +840,21 @@
   <div class="container">
     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:24px;margin-bottom:28px">
       <div>
-        <div style="font-size:22px;font-weight:700;color:var(--accent);margin-bottom:5px">tldt</div>
+        <div style="font-size:22px;font-weight:700;color:var(--accent);margin-bottom:5px">tl;dt</div>
         <div style="font-size:12px;color:var(--text-3)">too long, didn't tokenize</div>
       </div>
-      <div class="install-box" style="margin-bottom:0;flex:1;max-width:500px">
-        <span class="install-prompt">$</span>
-        <span class="install-cmd">go install github.com/gleicon/tldt/cmd/tldt@latest</span>
-        <button class="copy-btn" onclick="copyInstall(this)">copy</button>
+      <div style="flex:1;max-width:500px">
+        <div class="install-box" style="margin-bottom:8px">
+          <span class="install-prompt">$</span>
+          <span class="install-cmd">go install github.com/gleicon/tldt/cmd/tldt@latest</span>
+          <button class="copy-btn" onclick="copyInstall(this)">copy</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-3);text-align:center">
+          or download a
+          <a href="https://github.com/gleicon/tldt/releases" target="_blank" rel="noopener"
+             style="color:var(--accent);text-decoration:none;border-bottom:1px solid currentColor;">pre-compiled binary</a>
+          for macOS · Linux · Windows
+        </div>
       </div>
     </div>
     <div class="divider" style="margin-bottom:24px"></div>
