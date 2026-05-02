@@ -12,13 +12,30 @@ const lexrankMaxIter = 1000
 // and power iteration (Erkan & Dragomir 2004).
 type LexRank struct{}
 
+// MatrixSummarizer is an optional interface implemented by LexRank.
+// SummarizeWithMatrix returns the top n sentences and the raw (pre-normalization)
+// IDF-cosine similarity matrix, which callers can use for outlier detection.
+// The matrix has dimensions len(sentences)×len(sentences).
+type MatrixSummarizer interface {
+	SummarizeWithMatrix(text string, n int) ([]string, [][]float64, error)
+}
+
 // Summarize returns the top n sentences from text ranked by eigenvector centrality
 // using IDF-modified cosine similarity. Sentences are returned in document order.
 // Returns nil, nil for empty input. Caps n to sentence count silently (SUM-04).
 func (l *LexRank) Summarize(text string, n int) ([]string, error) {
+	result, _, err := l.SummarizeWithMatrix(text, n)
+	return result, err
+}
+
+// SummarizeWithMatrix runs the full LexRank algorithm and additionally returns
+// the raw IDF-cosine similarity matrix (before row normalization). The matrix
+// can be passed to detector.DetectOutliers for statistical injection detection.
+// Matrix values are in [0, 1] where 1.0 = identical sentence content.
+func (l *LexRank) SummarizeWithMatrix(text string, n int) ([]string, [][]float64, error) {
 	sentences := TokenizeSentences(text)
 	if len(sentences) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if n > len(sentences) {
 		n = len(sentences)
@@ -46,23 +63,28 @@ func (l *LexRank) Summarize(text string, n int) ([]string, error) {
 		vectors[i] = buildTFVector(words, wordIdx, vocabSize)
 	}
 
-	// Build n×n cosine similarity matrix (continuous — no threshold)
+	// Build n×n cosine similarity matrix (continuous — no threshold).
+	// Snapshot raw values before row normalization for outlier detection.
 	n2 := len(sentences)
+	rawMatrix := make([][]float64, n2)
 	matrix := make([][]float64, n2)
 	for i := range matrix {
+		rawMatrix[i] = make([]float64, n2)
 		matrix[i] = make([]float64, n2)
 		for j := range matrix[i] {
-			matrix[i][j] = idfCosine(vectors[i], vectors[j], idf)
+			v := idfCosine(vectors[i], vectors[j], idf)
+			rawMatrix[i][j] = v
+			matrix[i][j] = v
 		}
 	}
 
-	// Row-normalize to stochastic matrix
+	// Row-normalize to stochastic matrix (mutates matrix, not rawMatrix)
 	rowNormalize(matrix)
 
 	// Power iteration to find stationary distribution (eigenvector centrality)
 	scores, _, _ := powerIterate(matrix, lexrankEpsilon, lexrankMaxIter)
 
-	return selectTopN(scores, n, sentences), nil
+	return selectTopN(scores, n, sentences), rawMatrix, nil
 }
 
 // SummarizeExplain implements Explainer. Same algorithm as Summarize but
