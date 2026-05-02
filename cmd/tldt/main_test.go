@@ -759,14 +759,14 @@ func TestMain_ConfigMalformed(t *testing.T) {
 }
 
 func TestMain_LevelLite(t *testing.T) {
-	// --level lite produces exactly 3 sentences (CFG-04)
+	// --level lite produces exactly 10 sentences (CFG-04: lite = least compression)
 	stdout, _, ok := run(t, longText, "--level", "lite")
 	if !ok {
 		t.Fatal("--level lite: binary exited non-zero")
 	}
 	got := countNonEmptyLines(stdout)
-	if got != 3 {
-		t.Errorf("--level lite: want 3 output lines, got %d\nstdout: %q", got, stdout)
+	if got != 10 {
+		t.Errorf("--level lite: want 10 output lines, got %d\nstdout: %q", got, stdout)
 	}
 }
 
@@ -783,14 +783,14 @@ func TestMain_LevelStandard(t *testing.T) {
 }
 
 func TestMain_LevelAggressive(t *testing.T) {
-	// --level aggressive produces exactly 10 sentences (CFG-04)
+	// --level aggressive produces exactly 3 sentences (CFG-04: aggressive = most compression)
 	stdout, _, ok := run(t, longText, "--level", "aggressive")
 	if !ok {
 		t.Fatal("--level aggressive: binary exited non-zero")
 	}
 	got := countNonEmptyLines(stdout)
-	if got != 10 {
-		t.Errorf("--level aggressive: want 10 output lines, got %d\nstdout: %q", got, stdout)
+	if got != 3 {
+		t.Errorf("--level aggressive: want 3 output lines, got %d\nstdout: %q", got, stdout)
 	}
 }
 
@@ -806,7 +806,7 @@ func TestMain_LevelInvalid(t *testing.T) {
 }
 
 func TestMain_LevelOverriddenBySentences(t *testing.T) {
-	// Config sets level="aggressive" (10), CLI --sentences 2 must override (CFG-05)
+	// Config sets level="aggressive" (3), CLI --sentences 2 must override (CFG-05)
 	writeConfig(t, "level = \"aggressive\"\n")
 	stdout, _, ok := run(t, longText, "--sentences", "2")
 	if !ok {
@@ -819,14 +819,14 @@ func TestMain_LevelOverriddenBySentences(t *testing.T) {
 }
 
 func TestMain_ConfigLevelDefault(t *testing.T) {
-	// Config sets level="lite" — running with no flags should produce 3 sentences (CFG-05)
+	// Config sets level="lite" — running with no flags should produce 10 sentences (CFG-05: lite = least compression)
 	writeConfig(t, "level = \"lite\"\n")
 	stdout, _, ok := run(t, longText)
 	if !ok {
 		t.Fatal("config level default: binary exited non-zero")
 	}
 	got := countNonEmptyLines(stdout)
-	if got != 3 {
-		t.Errorf("config level default: want 3 output lines, got %d\nstdout: %q", got, stdout)
+	if got != 10 {
+		t.Errorf("config level default: want 10 output lines, got %d\nstdout: %q", got, stdout)
 	}
 }

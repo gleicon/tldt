@@ -22,7 +22,7 @@ func main() {
 	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
 	sentences := flag.Int("sentences", 5, "number of output sentences")
-	level := flag.String("level", "", "named preset: lite (3)|standard (5)|aggressive (10)")
+	level := flag.String("level", "", "named preset: aggressive (3)|standard (5)|lite (10)")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
@@ -30,10 +30,10 @@ func main() {
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-level lite|standard|aggressive] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-level aggressive|standard|lite] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
-		os.Exit(1)
+		os.Exit(2) // conventional exit code for usage/argument errors (POSIX)
 	}
 	flag.Parse()
 
@@ -75,6 +75,12 @@ func main() {
 	}
 	if flagsSet["format"] {
 		effectiveFormat = *format
+	}
+	// Validate effectiveFormat — covers both CLI flag and config file paths.
+	validFormats := map[string]bool{"text": true, "json": true, "markdown": true}
+	if !validFormats[effectiveFormat] {
+		fmt.Fprintf(os.Stderr, "unknown --format %q: valid values are text, json, markdown\n", effectiveFormat)
+		os.Exit(1)
 	}
 
 	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
