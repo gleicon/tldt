@@ -48,21 +48,22 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 
 - ✓ Basic extractive summarization working — existing (TextRank via JesusIslam/tldr)
 - ✓ Tunable sentence count — existing (via config)
+- ✓ Modern go modules setup — Validated in Phase 1: Foundation (PROJ-01)
+- ✓ CLI binary replaces web server — Validated in Phase 1: Foundation (CLI-01–04)
+- ✓ stdin pipe input (`echo text | tldt`) — Validated in Phase 1: Foundation (CLI-02)
+- ✓ File input (`tldt -f file.txt`) — Validated in Phase 1: Foundation (CLI-03)
+- ✓ Positional text arg (`tldt "text..."`) — Validated in Phase 1: Foundation (CLI-04)
+- ✓ graph algorithm via didasy/tldr — Validated in Phase 1: Foundation (SUM-08)
+- ✓ Comprehensive test suite with real-world test data — Validated in Phase 1: Foundation (TEST-07)
 
 ### Active
 
-- [ ] CLI binary replaces web server
 - [ ] LexRank algorithm implemented natively
-- [ ] TextRank algorithm (evaluate JesusIslam/tldr or didasy/tldr vs native)
-- [ ] `--algorithm` flag to choose LexRank or TextRank
-- [ ] stdin pipe input (`echo text | tldt`)
-- [ ] File input (`tldt -f file.txt`)
-- [ ] Positional text arg (`tldt "text..."`)
+- [ ] TextRank algorithm implemented natively
+- [ ] `--algorithm` flag to choose lexrank|textrank|graph
 - [ ] `--sentences N` flag (default 5)
 - [ ] `--paragraphs N` flag (groups sentences into paragraphs)
 - [ ] Token count estimate output (before/after compression ratio)
-- [ ] Comprehensive test suite with real-world test data
-- [ ] Modern go modules setup
 - [ ] Updated README with usage examples and algorithm explanation
 
 ### Out of Scope
@@ -99,4 +100,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-01 after initialization*
+*Last updated: 2026-05-01 after Phase 1 Foundation complete*
