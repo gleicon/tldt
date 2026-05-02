@@ -3,6 +3,7 @@ module github.com/gleicon/tldt
 go 1.26.2
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/didasy/tldr v0.7.0
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
 )
