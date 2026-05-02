@@ -12,3 +12,10 @@ func Summarize(text string, n int) ([]string, error) {
 	bag := tldr.New()
 	return bag.Summarize(text, n)
 }
+
+// Graph wraps the package-level Summarize() to satisfy the Summarizer interface.
+type Graph struct{}
+
+func (g *Graph) Summarize(text string, n int) ([]string, error) {
+	return Summarize(text, n)
+}
