@@ -1,8 +1,8 @@
 ---
 phase: 03-polish
 verified: 2026-05-02T12:00:00Z
-status: human_needed
-score: 12/13 must-haves verified
+status: passed
+score: 13/13 must-haves verified
 overrides_applied: 0
 human_verification:
   - test: "Run `tldt -f article.txt` in an interactive terminal (not piped)"
