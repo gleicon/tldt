@@ -1,134 +1,126 @@
 # tldt — Too Long, Didn't Tokenize
 
-A CLI tool that summarizes long-form text using graph-based extractive algorithms, so you can paste a fraction of the tokens into an AI coding agent without losing the semantic core.
+Pipe long text in, get a short summary out. No LLM calls. No API keys. No token costs.
 
-## What it does
+```
+cat transcript.txt | tldt
+~48,000 → ~2,100 tokens saved (96% reduction)
+```
 
-tldt uses LexRank and TextRank to select the most representative sentences from a document — the actual sentences, not generated paraphrases. Feed it a YouTube transcript, a long article, or a wall of documentation, and it returns 5 (or N) sentences that best capture the document.
+Uses LexRank and TextRank — graph-based extractive summarization that picks the most
+representative sentences from the original text. Output is always exact quotes, never paraphrased.
 
-The token savings are the point: cut a 12,000-token transcript down to ~600 tokens before pasting it into Claude or GPT. No LLM required to summarize; no API calls; no network.
+---
 
 ## Install
-
-Prerequisite: Go 1.21+
 
 ```bash
 go install github.com/gleicon/tldt/cmd/tldt@latest
 ```
 
+Or build from source:
+
+```bash
+git clone https://github.com/gleicon/tldt
+cd tldt
+make install
+```
+
+---
+
 ## Usage
 
-### Pipe from stdin
-
 ```bash
+# stdin pipe
 cat article.txt | tldt
-```
 
-### File input
-
-```bash
+# file
 tldt -f article.txt
+
+# inline text
+tldt "paste your text here"
+
+# show token savings on stderr
+tldt -f article.txt --verbose
 ```
 
-### Positional argument
-
-```bash
-tldt "Paste your long text here..."
-```
-
-### YouTube transcript pipeline
-
-```bash
-yt-dlp --skip-download --write-auto-sub --sub-format vtt -o transcript youtube.com/watch?v=XXXX
-cat transcript.vtt | tldt --sentences 10
-```
+---
 
 ## Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-f` | — | Input file path |
-| `--algorithm` | `lexrank` | Summarization algorithm: `lexrank`, `textrank`, `graph` |
+| `-f <file>` | — | Read from file |
+| `--algorithm` | `lexrank` | `lexrank`, `textrank`, or `graph` |
 | `--sentences` | `5` | Number of output sentences |
-| `--paragraphs` | `0` | Group output into N paragraphs (0 = off) |
-| `--format` | `text` | Output format: `text`, `json`, `markdown` |
-| `--no-cap` | false | Disable 2000-sentence cap (caution: O(n²) on large input) |
-| `--explain` | false | Print algorithm diagnostics to stderr (debug) |
+| `--paragraphs` | `0` | Group sentences into N paragraphs |
+| `--format` | `text` | `text`, `json`, or `markdown` |
+| `--verbose` | off | Print token stats to stderr |
+| `--no-cap` | off | Disable 2000-sentence cap (O(n²) warning) |
+| `--explain` | off | Print per-sentence scores to stderr (debug) |
+
+---
 
 ## Output formats
 
-### text (default)
-
-Plain sentences, one per line. Pipe-safe.
-
+**Text** (default — pipe-safe, stdout only):
 ```
-The study found a 40% improvement in latency across all test cases.
-Researchers attribute this to the new prefetch strategy introduced in v3.
+The researchers found a 40% improvement in efficiency...
+Further tests confirmed the results held across platforms...
 ```
 
-### json
-
-Structured output with compression metadata:
-
+**JSON** (`--format json`):
 ```json
 {
-  "summary": ["The study found a 40% improvement...", "Researchers attribute this..."],
+  "summary": ["sentence one", "sentence two"],
   "algorithm": "lexrank",
-  "sentences_in": 48,
-  "sentences_out": 2,
-  "chars_in": 14200,
-  "chars_out": 183,
-  "tokens_estimated_in": 3550,
-  "tokens_estimated_out": 45,
-  "compression_ratio": 0.987
+  "sentences_in": 142,
+  "sentences_out": 5,
+  "chars_in": 9840,
+  "chars_out": 431,
+  "tokens_estimated_in": 2460,
+  "tokens_estimated_out": 107,
+  "compression_ratio": 0.956
 }
 ```
 
-### markdown
-
-Blockquote with metadata header:
-
+**Markdown** (`--format markdown`):
 ```markdown
-<!-- tldt | algorithm: lexrank | sentences: 2 | compression: 87% -->
-> The study found a 40% improvement in latency across all test cases.
->
-> Researchers attribute this to the new prefetch strategy introduced in v3.
+<!-- tldt | algorithm: lexrank | sentences: 5 | compression: 95% -->
+> The researchers found a 40% improvement...
 ```
 
-## Algorithms
-
-### LexRank (default)
-
-Graph-based algorithm using TF-IDF cosine similarity. Each sentence is a node; edge weights are cosine similarity between TF-IDF vectors. Sentences are ranked by eigenvector centrality — sentences most similar to the most other sentences rank highest. Best for long articles and dense technical content.
-
-### TextRank
-
-Graph-based algorithm using word-overlap similarity (Jaccard-style). Ranks sentences by PageRank-style iteration with a damping factor. Often favors shorter, more distinct sentences. Best for conversational text and transcripts.
-
-### graph
-
-Delegates to `github.com/didasy/tldr` as a baseline comparison implementation.
-
-## Algorithm comparison
-
-| Property | LexRank | TextRank |
-|----------|---------|----------|
-| Similarity metric | TF-IDF cosine | Word overlap |
-| Ranking method | Eigenvector centrality | PageRank damping |
-| Best for | Long articles, dense technical content | Conversational text, transcripts |
-| Deterministic | Yes | Yes |
-
-## Build and test
-
-```bash
-go build ./...
-go test ./...
-```
+---
 
 ## Token savings
 
-Token estimates use the `chars/4` heuristic and are always written to stderr, never stdout, so they don't break pipes. When running interactively you'll see a line like:
+Token estimates use `chars / 4`. Stats go to stderr — they never appear on stdout and never break pipes. Enable with `--verbose`:
 
+```bash
+tldt -f long-doc.txt --verbose
+# stderr: ~12,400 → ~534 tokens (96% reduction)
 ```
-~3,550 -> ~45 tokens (87% reduction)
+
+Stats are suppressed by default so scripts that redirect stderr stay clean.
+
+---
+
+## Algorithms
+
+| Algorithm | How it works | Best for |
+|-----------|-------------|----------|
+| `lexrank` | TF-IDF cosine similarity + power iteration | Articles, reports, dense prose |
+| `textrank` | Word overlap + PageRank damping | Transcripts, conversational text |
+| `graph` | Bag-of-words (didasy/tldr baseline) | Quick baseline comparison |
+
+---
+
+## Build & test
+
+```bash
+make build        # compile to ./tldt
+make test         # run all tests
+make install      # install to GOPATH/bin
+make deps         # tidy + verify modules
+make clean        # remove binary
 ```
