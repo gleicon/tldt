@@ -1,0 +1,26 @@
+Today I want to talk about how we think about text summarization at scale.
+When you have a million documents and you need to surface the key points, you cannot afford to call an LLM for every single document.
+The cost and latency make that approach impractical at any significant volume.
+So we looked at classic extractive methods, specifically LexRank and TextRank, and we were surprised by how well they perform.
+These are deterministic algorithms with no GPU requirement and no API key.
+You can run them on a laptop and summarize a thousand documents a minute.
+The core idea behind both algorithms is the same: model the document as a graph.
+Each sentence becomes a node.
+If two sentences are similar, you draw an edge between them.
+Then you run PageRank over that graph.
+The sentences that are most similar to the most other sentences bubble up to the top.
+Those are your summary sentences.
+LexRank uses TF-IDF cosine similarity to measure sentence relatedness.
+TextRank uses a simpler word overlap measure.
+In practice, for most documents, the results are nearly identical.
+Where they differ is on highly technical text with specialized vocabulary.
+LexRank handles jargon better because TF-IDF naturally downweights common words and upweights rare ones.
+TextRank can over-weight sentences that repeat common words.
+For our use case, scientific abstracts and engineering design documents, LexRank was the clear winner.
+We wrote our implementation in Go because our data pipeline is already Go.
+The implementation took about three hundred lines total for both algorithms.
+Unit testing was straightforward because the algorithms are deterministic.
+Same input always produces the same output.
+That property makes testing and debugging much easier than working with probabilistic models.
+We open-sourced the implementation and it has been running in production for six months without issues.
+If you need fast, free, offline text summarization, I strongly recommend looking at these graph-based methods before reaching for a large language model.

@@ -1,0 +1,19 @@
+Extractive summarization is a technique in natural language processing that creates a summary by selecting and extracting sentences or passages directly from the source document. Unlike abstractive summarization, which generates new text, extractive methods preserve the original wording and meaning by identifying the most important spans of text.
+
+The task of extractive summarization has been studied since the 1950s. Early systems used simple heuristics such as word frequency and sentence position to determine importance. A sentence that appears near the beginning of a document, or that contains frequently used words, was considered more likely to be summary-worthy.
+
+Graph-based methods, introduced in the early 2000s, represented a significant advance. In these approaches, a document is modeled as a graph where nodes represent sentences and edges represent similarity between sentences. The importance of each sentence is then computed using a variant of PageRank, the algorithm originally developed to rank web pages by Google. Sentences that are similar to many other sentences in the document receive higher scores, because they are considered to capture the central themes.
+
+LexRank, published by Erkan and Radev in 2004, is one of the most cited graph-based extractive summarization algorithms. LexRank computes sentence similarity using TF-IDF weighted cosine similarity, then applies a modified PageRank over the sentence similarity graph. The algorithm is unsupervised, requiring no training data, and produces results competitive with supervised methods on standard benchmarks.
+
+TextRank, introduced by Mihalcea and Tarau in 2004, is another influential graph-based method. Like LexRank, it builds a graph of sentence similarities and applies a PageRank variant. TextRank uses a simpler similarity metric based on word overlap rather than TF-IDF, making it faster to compute while still producing high-quality summaries.
+
+Both LexRank and TextRank select the top-scoring sentences and then reorder them to match their original position in the document. This document-order preservation ensures that the summary reads naturally and maintains the logical flow of the original text.
+
+Evaluation of extractive summarization systems typically uses the ROUGE metric, which measures the overlap of n-grams between the system-generated summary and human-written reference summaries. ROUGE-1 measures unigram overlap, ROUGE-2 measures bigram overlap, and ROUGE-L measures the longest common subsequence.
+
+Modern neural approaches such as BERT-based sentence embeddings and transformer models have pushed the state of the art, but graph-based methods remain popular for their efficiency, interpretability, and lack of dependency on large labeled training sets. For many practical applications, a well-implemented LexRank or TextRank system provides a strong, fast baseline.
+
+Extractive summarization has applications in news article condensation, meeting transcript summarization, legal document review, and academic research assistance. The technique is particularly useful when preserving the original author's phrasing is important, such as in legal and medical contexts where paraphrasing could alter meaning.
+
+The main limitation of extractive methods is their inability to synthesize information across sentences. If the key insight of a document requires combining information from multiple disconnected paragraphs, extractive summarization may miss it. Abstractive methods address this by generating new sentences, but at the cost of potentially introducing factual errors.
