@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-02-PLAN.md — ready to run plan 01-03
-last_updated: "2026-05-01T22:38:00Z"
+status: ready
+stopped_at: Completed 01-03-PLAN.md — Phase 1 Foundation complete
+last_updated: "2026-05-01T23:10:00Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,35 +21,35 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** Summarize long text (transcripts, articles, docs) into concise extractive summaries without consuming LLM tokens — pipe-safe CLI using LexRank/TextRank.
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Phase 2 — Algorithms (Phase 1 complete)
 
 ## Current Position
 
-Phase: 1 of 3 (Foundation)
-Plan: 2 of 3 in current phase
-Status: Ready to execute plan 01-03
+Phase: 1 of 3 (Foundation) — COMPLETE
+Plan: 3 of 3 in current phase — COMPLETE
+Status: Phase 1 complete; ready to start Phase 2 (Algorithms)
 Last activity: 2026-05-01
 
-Progress: [██████░░░░] 67%
+Progress: [██████████] 100% (Phase 1)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 2
+- Total plans completed: 3
 - Average duration: 5 min
-- Total execution time: ~0.18 hours
+- Total execution time: ~0.25 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 2/3 | 11 min | 5 min |
+| 01-foundation | 3/3 | ~16 min | 5 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (3 min), 01-02 (8 min)
-- Trend: establishing baseline
+- Last 5 plans: 01-01 (3 min), 01-02 (8 min), 01-03 (~5 min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -67,6 +67,8 @@ Recent decisions affecting current work:
 - 01-01: Create stub cmd/tldt/main.go with didasy/tldr import so go mod tidy retains the dependency
 - 01-02: Create new tldr.Bag per Summarize() call (Bag is not thread-safe; keeps wrapper stateless)
 - 01-02: resolveInput() precedence: stdin pipe > -f flag > positional args (Unix convention)
+- 01-03: Use runtime.Caller(0) in integration_test.go for path-independent test-data resolution
+- 01-03: edge_short.txt holds exactly 3 sentences to probe didasy/tldr silent-cap behavior precisely
 
 ### Pending Todos
 
@@ -87,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-01T22:38:00Z
-Stopped at: Completed 01-02-PLAN.md — ready to run plan 01-03
+Last session: 2026-05-01T23:10:00Z
+Stopped at: Completed 01-03-PLAN.md — Phase 1 Foundation complete
 Resume file: None

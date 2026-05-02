@@ -6,7 +6,7 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 
 ## Phases
 
-- [ ] **Phase 1: Foundation** - Modernize to go modules, clean CLI skeleton, baseline graph algorithm, test data
+- [x] **Phase 1: Foundation** - Modernize to go modules, clean CLI skeleton, baseline graph algorithm, test data
 - [ ] **Phase 2: Algorithms** - Implement LexRank and TextRank natively, expose algorithm/sentence/paragraph flags, full test suite
 - [ ] **Phase 3: Polish** - TTY detection, output formats (JSON/markdown), pipe safety, O(n²) cap, README
 
@@ -30,7 +30,7 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 - [x] 01-02-PLAN.md — Graph summarizer wrapper (internal/summarizer) and CLI entry point (cmd/tldt/main.go)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 01-03-PLAN.md — Four English test-data files and integration tests covering all test-data fixtures
+- [x] 01-03-PLAN.md — Four English test-data files and integration tests covering all test-data fixtures
 **UI hint**: no
 
 ### Phase 2: Algorithms
@@ -61,6 +61,6 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In Progress|  |
+| 1. Foundation | 3/3 | Complete | 2026-05-01 |
 | 2. Algorithms | 0/TBD | Not started | - |
 | 3. Polish | 0/TBD | Not started | - |
