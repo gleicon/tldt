@@ -120,7 +120,17 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
   2. `tldt --url https://example.com/article | wc -l` produces only summary text on stdout — no headers, no HTML, no decoration
   3. `tldt --url https://httpstat.us/404` exits non-zero and prints a descriptive error to stderr
   4. `tldt --url https://httpstat.us/301` follows the redirect transparently and still produces a summary
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
+- [ ] 04-02-PLAN.md — Wire --url flag into main.go; fix 5 existing resolveInputBytes call sites; add 2 URL integration tests
+
+**Wave 1**
+- [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-02-PLAN.md — --url flag wiring in main.go; main_test.go fixes and new URL integration tests
 **UI hint**: no
 
 ### Phase 5: Configuration
@@ -151,6 +161,6 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. URL Input | 0/? | Not started | - |
+| 4. URL Input | 0/2 | Not started | - |
 | 5. Configuration | 0/? | Not started | - |
 | 6. AI Integration | 0/? | Not started | - |
