@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Extensions
-status: ready_to_execute
-stopped_at: phase 6 planned
-last_updated: "2026-05-02T21:00:00.000Z"
-last_activity: 2026-05-02 -- Phase 6 (AI Integration) planned, 4 plans in 3 waves
+status: complete
+stopped_at: milestone complete
+last_updated: "2026-05-02T22:30:00.000Z"
+last_activity: 2026-05-02 -- Phase 7 (Injection Defense) complete; all 9 SEC requirements verified; 292 tests
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 67
+  total_phases: 4
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-02)
 
 **Core value:** Summarize long text (transcripts, articles, docs) into concise extractive summaries without consuming LLM tokens — pipe-safe CLI using LexRank/TextRank.
-**Current focus:** Milestone v2.0 Extensions — URL input, config file, compression levels, AI skill, auto-trigger
+**Current focus:** Milestone v2.0 Extensions — COMPLETE
 
 ## Current Position
 
-Phase: 6 — AI Integration — READY TO EXECUTE
-Next: Execute Phase 6
-Status: Phase 6 planned (4 plans in 3 waves, verification passed)
-Last activity: 2026-05-02 — Phase 6 planned (Config+HookConfig, skill/hook templates, installer package, main.go wiring)
+Phase: 7 — Injection Defense — COMPLETE
+Status: All v2.0 phases complete (4/4, 11/11 plans)
+Last activity: 2026-05-02 — Phase 7 complete (sanitizer, detector, MatrixSummarizer wiring, README, plans, verification)
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████████] 100%
 
 ## Accumulated Context
 
@@ -52,6 +51,11 @@ Progress: [███░░░░░░░] 33%
 
 - v2.0: Clipboard auto-read deferred — --url covers remote input; clipboard adds complexity for marginal gain
 - v2.0: REQUIREMENTS use INP/CFG/AI prefix scheme continuing from v1 CLI/SUM/TOK/OUT/TEST/PROJ
+- 07: DetectOutliers takes precomputed simMatrix — LexRank exposes via MatrixSummarizer interface; no circular import
+- 07: --detect-injection is advisory only — never blocks summarization or modifies stdout
+- 07: golang.org/x/text upgraded to v0.36 for NFKC (was already transitive dep via go-readability)
+- 07: NFKC does NOT collapse cross-script homoglyphs — documented limitation; UTS#39 needed for that
+- 07: Outlier detection uses pre-normalization cosine matrix (not stochastic rows)
 
 ### Pending Todos
 
@@ -59,7 +63,7 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Phase 6 human UAT still pending (non-blocking): test /tldt skill and auto-trigger hook in live Claude Code session
 
 ## Deferred Items (updated)
 
@@ -69,9 +73,10 @@ None.
 | v3+ | --url authentication / cookie support | Deferred | v2.0 |
 | v3+ | TOML validation/lint command | Deferred | v2.0 |
 | v3+ | MCP server mode | Deferred | v2.0 |
+| v3+ | UTS#39 confusables database (cross-script homoglyphs) | Deferred | Phase 7 |
 
 ## Session Continuity
 
-Last session: 2026-05-02T15:00:00.000Z
-Stopped at: Milestone v2.0 initialized, proceeding to roadmap
+Last session: 2026-05-02T22:30:00.000Z
+Stopped at: Milestone v2.0 complete — all 4 phases, 11 plans, 292 tests
 Resume file: None
