@@ -58,11 +58,6 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 
 ### Active
 
-- [ ] Updated README with usage examples and algorithm explanation
-- [ ] TTY detection, pipe-safe stdout
-- [ ] JSON/markdown output formats
-- [ ] O(n²) sentence cap for large inputs
-
 ### Validated in Phase 2: Algorithms
 
 - ✓ LexRank algorithm implemented natively (SUM-04, SUM-05, SUM-06)
@@ -72,6 +67,15 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - ✓ `--paragraphs N` flag (SUM-03)
 - ✓ Token count estimate output to stderr (SUM-08 evolved)
 
+### Validated in Phase 3: Polish (v1.0 complete)
+
+- ✓ TTY detection, pipe-safe stdout
+- ✓ JSON/markdown/text output formats (`--format`)
+- ✓ O(n²) sentence cap for large inputs
+- ✓ Ensemble algorithm (LexRank + TextRank combined, `--algorithm ensemble`)
+- ✓ ROUGE-1/2/L evaluation mode (`--rouge <reference_file>`)
+- ✓ README updated with all features
+
 ### Out of Scope
 
 - HTTP server / web API — dropped entirely
@@ -79,6 +83,25 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - Authentication / rate limiting — not applicable
 - LLM integration — antithetical to tool's purpose
 - Abstractive summarization — LexRank/TextRank are extractive only
+
+## Current Milestone: v2.0 Extensions
+
+**Goal:** Expand tldt's reach — fetch URLs, persist user defaults via config, add compression presets, and integrate as an AI assistant skill with auto-trigger support.
+
+**Target features:**
+- `--url <url>` — fetch a webpage, strip HTML, summarize
+- `~/.tldt.toml` — persist default flags (algorithm, sentences, format, level)
+- `--level lite|standard|aggressive` — compression presets
+- Claude Code skill + MCP integration — summarize selected text on demand
+- Auto-trigger hook — fire when pasted/input text exceeds token threshold
+
+### Active (v2.0)
+
+- [ ] `--url` flag: fetch URL, strip boilerplate, summarize (INP-01, INP-02)
+- [ ] `~/.tldt.toml` config with flag defaults (CFG-01, CFG-02, CFG-03)
+- [ ] `--level lite|standard|aggressive` compression presets (CFG-04, CFG-05)
+- [ ] Claude Code / MCP AI skill installable file (AI-01, AI-02)
+- [ ] Auto-trigger hook fires above configurable token threshold (AI-03, AI-04)
 
 ## Key Decisions
 

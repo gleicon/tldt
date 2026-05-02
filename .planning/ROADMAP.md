@@ -94,3 +94,63 @@ Plans:
 | 1. Foundation | 3/3 | Complete | 2026-05-01 |
 | 2. Algorithms | 4/4 | Complete | 2026-05-01 |
 | 3. Polish | 4/4 | Complete | 2026-05-02 |
+
+---
+
+## Milestone v2.0: Extensions
+
+### Overview
+
+v2.0 expands tldt's reach in three focused phases: URL input adds a new content source without touching the core summarization pipeline; Configuration persists user defaults and introduces compression presets as a friendlier interface over raw `--sentences`; AI Integration ships tldt as an installable Claude Code skill with an auto-trigger hook. Each phase is independently deliverable and depends on the previous.
+
+### Phases
+
+- [ ] **Phase 4: URL Input** - User can pass a URL to tldt and receive an extractive summary of the fetched page
+- [ ] **Phase 5: Configuration** - User preferences persist across invocations via ~/.tldt.toml; compression presets simplify common sentence counts
+- [ ] **Phase 6: AI Integration** - tldt ships as an installable Claude Code skill file with an auto-trigger hook that fires when input exceeds a token threshold
+
+## Phase Details
+
+### Phase 4: URL Input
+**Goal**: Users can summarize a live webpage by passing its URL to tldt — no manual copy-paste required.
+**Depends on**: Phase 3
+**Requirements**: INP-01, INP-02
+**Success Criteria** (what must be TRUE):
+  1. `tldt --url https://example.com/article` fetches the page, strips HTML boilerplate, and prints an extractive summary to stdout
+  2. `tldt --url https://example.com/article | wc -l` produces only summary text on stdout — no headers, no HTML, no decoration
+  3. `tldt --url https://httpstat.us/404` exits non-zero and prints a descriptive error to stderr
+  4. `tldt --url https://httpstat.us/301` follows the redirect transparently and still produces a summary
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 5: Configuration
+**Goal**: Users can persist their preferred flags in ~/.tldt.toml and use named compression presets instead of raw sentence counts.
+**Depends on**: Phase 4
+**Requirements**: CFG-01, CFG-02, CFG-03, CFG-04, CFG-05
+**Success Criteria** (what must be TRUE):
+  1. After writing `algorithm = "ensemble"` and `sentences = 7` to `~/.tldt.toml`, running `tldt -f article.txt` (no extra flags) uses those values
+  2. `tldt --sentences 3 -f article.txt` overrides a `sentences = 7` entry in `~/.tldt.toml` and returns exactly 3 sentences
+  3. Deleting or corrupting `~/.tldt.toml` does not cause an error — the tool silently falls back to built-in defaults
+  4. `tldt --level aggressive -f article.txt` returns 10 sentences; `--level lite` returns 3; `--level standard` returns 5
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 6: AI Integration
+**Goal**: tldt is installable as a Claude Code skill and fires automatically when pasted or file-sourced text exceeds a configurable token threshold.
+**Depends on**: Phase 5
+**Requirements**: AI-01, AI-02, AI-03, AI-04
+**Success Criteria** (what must be TRUE):
+  1. A user can copy the shipped skill file into their Claude Code skills directory and invoke tldt on selected text from within a Claude Code session — the summary appears inline in the conversation
+  2. The skill passes text to tldt via stdin and the returned summary replaces the raw input in the conversation context
+  3. With the auto-trigger hook installed and threshold set to 2000 tokens, pasting a 3000-token block causes tldt to summarize it automatically before it enters the AI context
+  4. After auto-trigger fires, the tool reports the token savings (e.g. `~3,200 -> ~480 tokens (85% reduction)`) before inserting the summary
+**Plans**: TBD
+**UI hint**: no
+
+## v2.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 4. URL Input | 0/? | Not started | - |
+| 5. Configuration | 0/? | Not started | - |
+| 6. AI Integration | 0/? | Not started | - |
