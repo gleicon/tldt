@@ -20,13 +20,17 @@ func wordOverlapSim(s1, s2 []string) float64 {
 	if len(s1) <= 1 || len(s2) <= 1 {
 		return 0.0
 	}
-	set := make(map[string]bool, len(s1))
+	set1 := make(map[string]bool, len(s1))
 	for _, w := range s1 {
-		set[w] = true
+		set1[w] = true
+	}
+	set2 := make(map[string]bool, len(s2))
+	for _, w := range s2 {
+		set2[w] = true
 	}
 	common := 0
-	for _, w := range s2 {
-		if set[w] {
+	for w := range set1 {
+		if set2[w] {
 			common++
 		}
 	}
