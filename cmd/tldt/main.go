@@ -33,7 +33,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-level aggressive|standard|lite] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
-		os.Exit(1)
+		os.Exit(2) // conventional exit code for usage/argument errors (POSIX)
 	}
 	flag.Parse()
 
