@@ -107,7 +107,8 @@ func trSelectTopN(scores []float64, n int, sentences []string) []string {
 	sort.SliceStable(indices, func(a, b int) bool {
 		return scores[indices[a]] > scores[indices[b]]
 	})
-	top := indices[:n]
+	top := make([]int, n)
+	copy(top, indices[:n])
 	sort.Ints(top)
 	result := make([]string, n)
 	for i, idx := range top {
