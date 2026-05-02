@@ -130,5 +130,5 @@ go test ./...
 Token estimates use the `chars/4` heuristic and are always written to stderr, never stdout, so they don't break pipes. When running interactively you'll see a line like:
 
 ```
-tokens: ~3,550 -> ~45 (87% reduction)
+~3,550 -> ~45 tokens (87% reduction)
 ```
