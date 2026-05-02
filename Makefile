@@ -1,4 +1,4 @@
-.PHONY: build test test-uat install clean deps lint run help
+.PHONY: build test test-uat install install-skill clean deps lint run help
 
 BINARY := tldt
 CMD     := ./cmd/tldt
@@ -45,6 +45,10 @@ test-race:
 ## install: install binary to GOPATH/bin
 install:
 	go install $(CMD)
+
+## install-skill: install tldt Claude Code skill and UserPromptSubmit hook
+install-skill: build
+	./$(BINARY) --install-skill
 
 ## deps: tidy and verify modules
 deps:
