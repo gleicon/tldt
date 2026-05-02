@@ -58,13 +58,19 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 
 ### Active
 
-- [ ] LexRank algorithm implemented natively
-- [ ] TextRank algorithm implemented natively
-- [ ] `--algorithm` flag to choose lexrank|textrank|graph
-- [ ] `--sentences N` flag (default 5)
-- [ ] `--paragraphs N` flag (groups sentences into paragraphs)
-- [ ] Token count estimate output (before/after compression ratio)
 - [ ] Updated README with usage examples and algorithm explanation
+- [ ] TTY detection, pipe-safe stdout
+- [ ] JSON/markdown output formats
+- [ ] O(n²) sentence cap for large inputs
+
+### Validated in Phase 2: Algorithms
+
+- ✓ LexRank algorithm implemented natively (SUM-04, SUM-05, SUM-06)
+- ✓ TextRank algorithm implemented natively (SUM-04, SUM-05, SUM-07)
+- ✓ `--algorithm` flag to choose lexrank|textrank|graph (SUM-01, SUM-02)
+- ✓ `--sentences N` flag (SUM-03)
+- ✓ `--paragraphs N` flag (SUM-03)
+- ✓ Token count estimate output to stderr (SUM-08 evolved)
 
 ### Out of Scope
 
@@ -100,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-01 after Phase 1 Foundation complete*
+*Last updated: 2026-05-01 after Phase 2 Algorithms complete*
