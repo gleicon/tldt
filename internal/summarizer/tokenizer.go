@@ -45,7 +45,7 @@ func TokenizeSentences(text string) []string {
 func normalizeWord(word string) string {
 	word = strings.ToLower(word)
 	var prev rune
-	return strings.Map(func(r rune) rune {
+	mapped := strings.Map(func(r rune) rune {
 		if r == '-' && (unicode.IsDigit(prev) || unicode.IsLetter(prev)) {
 			prev = r
 			return r
@@ -56,6 +56,7 @@ func normalizeWord(word string) string {
 		prev = r
 		return r
 	}, word)
+	return strings.TrimRight(mapped, "-")
 }
 
 // tokenizeWords returns the normalized, non-empty words for a sentence.
