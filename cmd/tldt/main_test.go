@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,7 +150,7 @@ func TestValidateInput_ValidUnicode(t *testing.T) {
 // ── resolveInputBytes ─────────────────────────────────────────────────────────
 
 func TestResolveInputBytes_PositionalArgs(t *testing.T) {
-	got, err := resolveInputBytes([]string{"hello", "world"}, "")
+	got, err := resolveInputBytes([]string{"hello", "world"}, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +161,7 @@ func TestResolveInputBytes_PositionalArgs(t *testing.T) {
 
 func TestResolveInputBytes_FilePath(t *testing.T) {
 	path := writeTempFile(t, "file content here")
-	got, err := resolveInputBytes([]string{}, path)
+	got, err := resolveInputBytes([]string{}, path, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -168,14 +171,14 @@ func TestResolveInputBytes_FilePath(t *testing.T) {
 }
 
 func TestResolveInputBytes_FileNotFound(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt")
+	_, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt", "")
 	if err == nil {
 		t.Error("missing file: want error, got nil")
 	}
 }
 
 func TestResolveInputBytes_NoInput(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "")
+	_, err := resolveInputBytes([]string{}, "", "")
 	if err == nil {
 		t.Error("no input: want error, got nil")
 	}
@@ -202,7 +205,7 @@ func TestResolveInputBytes_Stdin(t *testing.T) {
 	}
 	w.Close()
 
-	got, err := resolveInputBytes([]string{}, "")
+	got, err := resolveInputBytes([]string{}, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -574,5 +577,42 @@ func TestMain_NoInput_ExitsNonZero(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "no input") {
 		t.Errorf("no input: stderr %q does not mention 'no input'", stderr)
+	}
+}
+
+// ── --url flag integration tests ──────────────────────────────────────────────
+
+func TestMain_URLFlag_ServesHTML(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><article>
+			<p>The fox is clever and quick in the forest.</p>
+			<p>Dogs are loyal and brave companions to their owners.</p>
+			<p>Scientists study animal behavior carefully over many years.</p>
+			<p>Research shows that animals communicate in complex ways.</p>
+			<p>Ecosystems depend on balanced predator and prey relationships.</p>
+		</article></body></html>`)
+	}))
+	defer ts.Close()
+
+	stdout, _, ok := run(t, "", "--url", ts.URL, "--sentences", "2")
+	if !ok {
+		t.Fatal("--url: binary exited non-zero for valid HTML page")
+	}
+	if strings.TrimSpace(stdout) == "" {
+		t.Error("--url: expected non-empty summary on stdout, got empty string")
+	}
+}
+
+func TestMain_URLFlag_404(t *testing.T) {
+	ts := httptest.NewServer(http.NotFoundHandler())
+	defer ts.Close()
+
+	_, stderr, ok := run(t, "", "--url", ts.URL)
+	if ok {
+		t.Error("--url 404: expected non-zero exit code, got exit 0")
+	}
+	if !strings.Contains(stderr, "404") {
+		t.Errorf("--url 404: expected '404' in stderr, got %q", stderr)
 	}
 }

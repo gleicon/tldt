@@ -8,14 +8,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
+	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/summarizer"
 )
 
 func main() {
 	filePath := flag.String("f", "", "input file path")
+	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
 	sentences := flag.Int("sentences", 5, "number of output sentences")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
@@ -25,14 +28,14 @@ func main() {
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	flag.Parse()
 
-	rawBytes, err := resolveInputBytes(flag.Args(), *filePath)
+	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -195,8 +198,16 @@ func groupIntoParagraphs(sentences []string, n int) string {
 	return b.String()
 }
 
-// resolveInputBytes reads raw input bytes from stdin pipe, -f file, or positional args.
-func resolveInputBytes(args []string, filePath string) ([]byte, error) {
+// resolveInputBytes reads raw input bytes from --url, stdin pipe, -f file, or positional args.
+func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, error) {
+	// --url branch: highest priority — most explicit input source (INP-01, INP-02)
+	if urlStr != "" {
+		text, err := fetcher.Fetch(urlStr, 30*time.Second, 5<<20) // 5MB cap
+		if err != nil {
+			return nil, fmt.Errorf("fetching URL: %w", err)
+		}
+		return []byte(text), nil
+	}
 	stat, err := os.Stdin.Stat()
 	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
