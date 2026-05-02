@@ -67,10 +67,24 @@ Plans:
 **Requirements**: CLI-05, CLI-06, CLI-07, CLI-08, OUT-01, OUT-02, OUT-03, PROJ-02, PROJ-03, PROJ-04
 **Success Criteria** (what must be TRUE):
   1. `cat article.txt | tldt | wc -l` captures only summary lines — no stats, no decoration on stdout
-  2. Running `tldt -f article.txt` in a terminal shows `~12,400 → ~1,380 tokens (89% reduction)` on stderr
+  2. Running `tldt -f article.txt` in a terminal shows `~12,400 -> ~1,380 tokens (89% reduction)` on stderr
   3. `tldt --format json -f article.txt` outputs valid JSON with all required fields (summary, algorithm, compression_ratio, etc.)
   4. `tldt` given empty input exits 0 with no output; binary/non-text input prints an error to stderr and exits non-zero
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — TTY gate, input validation (empty/binary), sentence cap, stats format fix
+- [ ] 03-02-PLAN.md — internal/formatter package (FormatText, FormatJSON, FormatMarkdown) with unit tests
+- [ ] 03-03-PLAN.md — Wire --format flag into main.go, formatter dispatch, JSON stats suppression
+- [ ] 03-04-PLAN.md — README rewrite for tldt v1
+
+**Wave 1** *(parallel — no shared files)*
+- [ ] 03-01-PLAN.md — TTY gate, input validation, sentence cap, stats format fix (cmd/tldt/main.go)
+- [ ] 03-02-PLAN.md — internal/formatter package with all three format functions and unit tests
+- [ ] 03-04-PLAN.md — README rewrite
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-03-PLAN.md — Wire --format flag into main.go using formatter package
 **UI hint**: no
 
 ## Progress
@@ -79,4 +93,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-05-01 |
 | 2. Algorithms | 4/4 | Complete | 2026-05-01 |
-| 3. Polish | 0/TBD | Not started | - |
+| 3. Polish | 0/4 | Not started | - |
