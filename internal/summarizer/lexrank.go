@@ -176,9 +176,9 @@ func powerIterate(matrix [][]float64, epsilon float64, maxIter int) []float64 {
 	}
 	for iter := 0; iter < maxIter; iter++ {
 		next := make([]float64, n)
-		for i := range next {
-			for j := range p {
-				next[i] += matrix[j][i] * p[j]
+		for i := range p {
+			for j := range next {
+				next[j] += matrix[i][j] * p[i]
 			}
 		}
 		diff := 0.0
