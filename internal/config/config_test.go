@@ -199,3 +199,53 @@ func TestConfigPath(t *testing.T) {
 		t.Errorf("ConfigPath() = %q, want path ending in \".tldt.toml\"", path)
 	}
 }
+
+func TestHookConfig(t *testing.T) {
+	// Default threshold
+	d := DefaultConfig()
+	if d.Hook.Threshold != 2000 {
+		t.Errorf("DefaultConfig().Hook.Threshold = %d, want 2000", d.Hook.Threshold)
+	}
+
+	// TOML [hook] section loads correctly
+	f, err := os.CreateTemp("", "tldt-hook-test-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(f.Name()) })
+	_, _ = f.WriteString("[hook]\nthreshold = 1500\n")
+	f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.Hook.Threshold != 1500 {
+		t.Errorf("Load([hook] threshold=1500): Hook.Threshold = %d, want 1500", cfg.Hook.Threshold)
+	}
+
+	// Zero threshold guard
+	f2, err := os.CreateTemp("", "tldt-hook-zero-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(f2.Name()) })
+	_, _ = f2.WriteString("[hook]\nthreshold = 0\n")
+	f2.Close()
+
+	cfg2 := Load(f2.Name())
+	if cfg2.Hook.Threshold != 2000 {
+		t.Errorf("Load([hook] threshold=0): Hook.Threshold = %d, want 2000 (guard)", cfg2.Hook.Threshold)
+	}
+
+	// Negative threshold guard
+	f3, err := os.CreateTemp("", "tldt-hook-neg-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(f3.Name()) })
+	_, _ = f3.WriteString("[hook]\nthreshold = -5\n")
+	f3.Close()
+
+	cfg3 := Load(f3.Name())
+	if cfg3.Hook.Threshold != 2000 {
+		t.Errorf("Load([hook] threshold=-5): Hook.Threshold = %d, want 2000 (guard)", cfg3.Hook.Threshold)
+	}
+}
