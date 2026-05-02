@@ -142,7 +142,23 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
   2. `tldt --sentences 3 -f article.txt` overrides a `sentences = 7` entry in `~/.tldt.toml` and returns exactly 3 sentences
   3. Deleting or corrupting `~/.tldt.toml` does not cause an error — the tool silently falls back to built-in defaults
   4. `tldt --level aggressive -f article.txt` returns 10 sentences; `--level lite` returns 3; `--level standard` returns 5
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — internal/config package (Config struct, Load, DefaultConfig, LevelPresets) + unit tests
+- [ ] 05-02-PLAN.md — Wire config + --level flag into main.go; flag.Visit override logic; integration tests
+
+**Wave 1**
+- [ ] 05-01-PLAN.md — BurntSushi/toml dependency + internal/config package with Config, Load, DefaultConfig, LevelPresets, ConfigPath + 10 unit tests
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-02-PLAN.md — Wire config loading into main.go, add --level flag, flag.Visit override detection, replace raw flag dereferences with effective vars, 11 integration tests
+
+**Cross-cutting constraints:**
+- `Load()` NEVER returns an error — absorbs missing and malformed TOML silently (CFG-03)
+- `flag.Visit` (NOT `flag.VisitAll`) detects explicitly-set CLI flags for override precedence (CFG-02)
+- Level preset resolution happens BEFORE --sentences override check (CFG-05)
+- All config tests use `t.Setenv("HOME", t.TempDir())` for isolation — no real ~/.tldt.toml access
 **UI hint**: no
 
 ### Phase 6: AI Integration
@@ -162,5 +178,5 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 4. URL Input | 2/2 | Complete | 2026-05-02 |
-| 5. Configuration | 0/? | Not started | - |
+| 5. Configuration | 0/2 | Planning complete | - |
 | 6. AI Integration | 0/? | Not started | - |
