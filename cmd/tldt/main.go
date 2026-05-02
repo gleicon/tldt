@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/summarizer"
 )
 
@@ -20,8 +21,9 @@ func main() {
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
+	format := flag.String("format", "text", "output format: text|json|markdown")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -95,16 +97,39 @@ func main() {
 		reduction = int(float64(tokIn-tokOut) / float64(tokIn) * 100)
 	}
 	isTTY := stdoutIsTerminal()
-	if isTTY {
+	if isTTY && *format != "json" {
 		fmt.Fprintf(os.Stderr, "~%s -> ~%s tokens (%d%% reduction)\n",
 			formatTokens(tokIn), formatTokens(tokOut), reduction)
 	}
 
-	// Output: one sentence per line (D-08) or grouped into paragraphs (D-05)
-	if *paragraphs > 0 {
-		fmt.Println(groupIntoParagraphs(result, *paragraphs))
-	} else {
-		fmt.Println(strings.Join(result, "\n"))
+	// Build metadata for structured formats
+	meta := formatter.SummaryMeta{
+		Algorithm:          *algorithm,
+		SentencesIn:        len(summarizer.TokenizeSentences(text)),
+		SentencesOut:       len(result),
+		CharsIn:            charsIn,
+		CharsOut:           charsOut,
+		TokensEstimatedIn:  tokIn,
+		TokensEstimatedOut: tokOut,
+		CompressionRatio:   float64(tokIn-tokOut) / float64(tokIn+1), // +1 guards divide-by-zero
+	}
+
+	switch *format {
+	case "json":
+		out, err := formatter.FormatJSON(result, meta)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "format error:", err)
+			os.Exit(1)
+		}
+		fmt.Println(out)
+	case "markdown":
+		fmt.Print(formatter.FormatMarkdown(result, meta))
+	default: // "text" and anything unrecognised
+		if *paragraphs > 0 {
+			fmt.Println(groupIntoParagraphs(result, *paragraphs))
+		} else {
+			fmt.Println(strings.Join(result, "\n"))
+		}
 	}
 }
 
