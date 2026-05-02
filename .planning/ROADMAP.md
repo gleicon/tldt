@@ -73,15 +73,15 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — TTY gate, input validation (empty/binary), sentence cap, stats format fix
-- [ ] 03-02-PLAN.md — internal/formatter package (FormatText, FormatJSON, FormatMarkdown) with unit tests
+- [x] 03-01-PLAN.md — TTY gate, input validation (empty/binary), sentence cap, stats format fix
+- [x] 03-02-PLAN.md — internal/formatter package (FormatText, FormatJSON, FormatMarkdown) with unit tests
 - [ ] 03-03-PLAN.md — Wire --format flag into main.go, formatter dispatch, JSON stats suppression
-- [ ] 03-04-PLAN.md — README rewrite for tldt v1
+- [x] 03-04-PLAN.md — README rewrite for tldt v1
 
 **Wave 1** *(parallel — no shared files)*
-- [ ] 03-01-PLAN.md — TTY gate, input validation, sentence cap, stats format fix (cmd/tldt/main.go)
-- [ ] 03-02-PLAN.md — internal/formatter package with all three format functions and unit tests
-- [ ] 03-04-PLAN.md — README rewrite
+- [x] 03-01-PLAN.md — TTY gate, input validation, sentence cap, stats format fix (cmd/tldt/main.go)
+- [x] 03-02-PLAN.md — internal/formatter package with all three format functions and unit tests
+- [x] 03-04-PLAN.md — README rewrite
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-03-PLAN.md — Wire --format flag into main.go using formatter package
@@ -93,4 +93,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-05-01 |
 | 2. Algorithms | 4/4 | Complete | 2026-05-01 |
-| 3. Polish | 0/4 | Not started | - |
+| 3. Polish | 3/4 | In progress | - |
