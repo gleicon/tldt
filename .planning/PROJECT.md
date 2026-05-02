@@ -76,6 +76,20 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - ✓ ROUGE-1/2/L evaluation mode (`--rouge <reference_file>`)
 - ✓ README updated with all features
 
+### Validated in Phase 4: URL Input
+
+- ✓ `--url <url>` fetches page, strips HTML via go-readability, summarizes (INP-01, INP-02)
+- ✓ internal/fetcher package with custom http.Client + io.LimitReader (5MB cap)
+- ✓ All URL tests use httptest.NewServer — no live network calls
+
+### Validated in Phase 5: Configuration
+
+- ✓ `~/.tldt.toml` persists default algorithm, sentences, format, level (CFG-01, CFG-02, CFG-03)
+- ✓ `--level lite|standard|aggressive` presets (3/5/10 sentences) (CFG-04)
+- ✓ `flag.Visit` override detection — CLI always wins over config (CFG-02, CFG-05)
+- ✓ Missing/malformed config silently falls back to built-in defaults (CFG-03)
+- ✓ 222 total tests pass (201 pre-phase-5)
+
 ### Out of Scope
 
 - HTTP server / web API — dropped entirely
@@ -97,9 +111,9 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 
 ### Active (v2.0)
 
-- [ ] `--url` flag: fetch URL, strip boilerplate, summarize (INP-01, INP-02)
-- [ ] `~/.tldt.toml` config with flag defaults (CFG-01, CFG-02, CFG-03)
-- [ ] `--level lite|standard|aggressive` compression presets (CFG-04, CFG-05)
+- [x] `--url` flag: fetch URL, strip boilerplate, summarize (INP-01, INP-02) — Validated in Phase 4: URL Input
+- [x] `~/.tldt.toml` config with flag defaults (CFG-01, CFG-02, CFG-03) — Validated in Phase 5: Configuration
+- [x] `--level lite|standard|aggressive` compression presets (CFG-04, CFG-05) — Validated in Phase 5: Configuration
 - [ ] Claude Code / MCP AI skill installable file (AI-01, AI-02)
 - [ ] Auto-trigger hook fires above configurable token threshold (AI-03, AI-04)
 
@@ -129,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-01 after Phase 2 Algorithms complete*
+*Last updated: 2026-05-02 after Phase 5 Configuration complete*
