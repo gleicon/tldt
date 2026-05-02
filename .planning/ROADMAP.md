@@ -170,7 +170,30 @@ Plans:
   2. The skill passes text to tldt via stdin and the returned summary replaces the raw input in the conversation context
   3. With the auto-trigger hook installed and threshold set to 2000 tokens, pasting a 3000-token block causes tldt to summarize it automatically before it enters the AI context
   4. After auto-trigger fires, the tool reports the token savings (e.g. `~3,200 -> ~480 tokens (85% reduction)`) before inserting the summary
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Extend internal/config with HookConfig struct (Hook.Threshold, default 2000) + unit tests
+- [ ] 06-02-PLAN.md — Create SKILL.md and tldt-hook.sh templates in internal/installer/ for go:embed
+- [ ] 06-03-PLAN.md — internal/installer package (embed.go, installer.go, installer_test.go)
+- [ ] 06-04-PLAN.md — Wire --print-threshold and --install-skill flags into main.go; add Makefile install-skill target
+
+**Wave 1** *(parallel — no shared files)*
+- [ ] 06-01-PLAN.md — HookConfig + Hook.Threshold in internal/config/config.go + 5 unit tests
+- [ ] 06-02-PLAN.md — internal/installer/skills/tldt/SKILL.md + internal/installer/hooks/tldt-hook.sh templates
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 06-03-PLAN.md — internal/installer package: embed.go (go:embed) + installer.go + installer_test.go (8 tests)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 06-04-PLAN.md — Wire --print-threshold, --install-skill, --skill-dir, --target flags into main.go + Makefile install-skill target
+
+**Cross-cutting constraints:**
+- go:embed paths must be relative to the source file; templates live in internal/installer/skills/ and internal/installer/hooks/ (NOT repo root)
+- Hook script MUST call `tldt --verbose` to capture token stats (stats suppressed by default when stdout is pipe)
+- Hook script parses .prompt field from JSON stdin using jq with python3 fallback (control char safety)
+- PatchSettingsJSON uses read-merge-write with atomic temp-file rename and idempotency guard
+- Settings.json hook entry uses absolute expanded path for the hook command (subdirectory hook bug workaround)
 **UI hint**: no
 
 ## v2.0 Progress
@@ -179,4 +202,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 4. URL Input | 2/2 | Complete | 2026-05-02 |
 | 5. Configuration | 2/2 | Complete | 2026-05-02 |
-| 6. AI Integration | 0/? | Not started | - |
+| 6. AI Integration | 0/4 | Not started | - |
