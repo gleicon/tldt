@@ -107,6 +107,22 @@ func TestLoad_PartialConfig(t *testing.T) {
 	}
 }
 
+func TestLoad_ZeroSentences(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-test-zero-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(f.Name()) })
+	if _, err := f.WriteString("sentences = 0\n"); err != nil {
+		t.Fatalf("writing temp file: %v", err)
+	}
+	f.Close()
+	cfg := Load(f.Name())
+	if cfg.Sentences <= 0 {
+		t.Errorf("Load(sentences=0): Sentences = %d, want > 0", cfg.Sentences)
+	}
+}
+
 func TestLoad_UnknownKeys(t *testing.T) {
 	f, err := os.CreateTemp("", "tldt-test-unknown-*.toml")
 	if err != nil {

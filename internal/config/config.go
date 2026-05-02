@@ -44,6 +44,10 @@ func Load(cfgPath string) Config {
 	if err != nil {
 		return DefaultConfig()
 	}
+	// Guard: zero/negative sentences in config file falls back to default
+	if cfg.Sentences <= 0 {
+		cfg.Sentences = DefaultConfig().Sentences
+	}
 	return cfg
 }
 
