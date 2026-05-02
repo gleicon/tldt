@@ -76,6 +76,12 @@ func main() {
 	if flagsSet["format"] {
 		effectiveFormat = *format
 	}
+	// Validate effectiveFormat — covers both CLI flag and config file paths.
+	validFormats := map[string]bool{"text": true, "json": true, "markdown": true}
+	if !validFormats[effectiveFormat] {
+		fmt.Fprintf(os.Stderr, "unknown --format %q: valid values are text, json, markdown\n", effectiveFormat)
+		os.Exit(1)
+	}
 
 	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
