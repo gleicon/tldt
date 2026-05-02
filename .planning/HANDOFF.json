@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-02T14:56:58Z",
+  "phase": "03",
+  "phase_name": "polish",
+  "phase_dir": ".planning/phases/03-polish",
+  "plan": 4,
+  "task": 4,
+  "total_tasks": 4,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "ensemble algorithm (average LexRank+TextRank scores)", "status": "done", "commit": "6dfece6"},
+    {"id": 2, "name": "ROUGE evaluation mode (--rouge <reference_file>)", "status": "done", "commit": "6dfece6"},
+    {"id": 3, "name": "comprehensive test suite expansion (192 tests, 86% coverage)", "status": "done", "commit": "6dfece6"},
+    {"id": 4, "name": "README documentation update", "status": "done", "commit": "501c311"}
+  ],
+  "remaining_tasks": [],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "ensemble uses simple average of LexRank+TextRank score vectors (no normalization)",
+      "rationale": "both algorithms produce stationary distributions via power iteration that sum to ~1, so simple element-wise average is valid",
+      "phase": "03"
+    },
+    {
+      "decision": "--rouge flag reads reference file, prints ROUGE-1/2/L scores to stderr, never affects stdout",
+      "rationale": "consistent with existing stats/explain/verbose approach — stdout must remain pipe-safe",
+      "phase": "03"
+    },
+    {
+      "decision": "subprocess coverage via go build -cover + GOCOVERDIR (two-pass Makefile)",
+      "rationale": "-coverprofile flag interferes with GOCOVERDIR subprocess collection; two passes required: unit coverage first, then subprocess binary coverage",
+      "phase": "03"
+    },
+    {
+      "decision": "removed dead code: ngramF1 sysTotal==0 check, custom max() helper in rouge.go",
+      "rationale": "sysTotal==0 is unreachable (if ngramCounts returns non-empty, len(sys)>=n so sysTotal>=1); Go 1.26 has builtin max",
+      "phase": "03"
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "v3 work: AI assistant skill integration, compression levels, or auto-trigger on long pastes — see .planning/STATE.md deferred items",
+  "context_notes": "Project v1.0 milestone 100% complete. 192 tests, 86% unit coverage (all packages except main() entry point at near-100%). Two irreducible coverage gaps: main() itself (Go tooling limitation — covered via subprocess at 85.7%) and io.ReadAll(stdin) error path (practically unreachable). README covers all features including ensemble and ROUGE. Deferred v2/v3 items logged in STATE.md."
+}
