@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Extensions
-status: planning
-stopped_at: milestone initialized
-last_updated: "2026-05-02T15:00:00.000Z"
-last_activity: 2026-05-02 -- Milestone v2.0 started, defining roadmap
+status: ready_to_execute
+stopped_at: phase 4 planned
+last_updated: "2026-05-02T00:00:00.000Z"
+last_activity: 2026-05-02 -- Phase 4 (URL Input) planned, 2 plans ready
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: Not started (defining roadmap)
-Plan: —
-Status: Defining requirements / roadmap
-Last activity: 2026-05-02 — Milestone v2.0 started
+Phase: 4 — URL Input
+Plan: Ready to execute (2 plans, 2 waves)
+Status: Ready to execute
+Last activity: 2026-05-02 — Phase 4 planned
 
 Progress: [░░░░░░░░░░] 0%
 

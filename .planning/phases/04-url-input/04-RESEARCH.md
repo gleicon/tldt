@@ -521,7 +521,7 @@ rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **go-readability deprecation — use archived or migrate to v2?**
    - What we know: `github.com/go-shiori/go-readability` archived 2025-12-30; `codeberg.org/readeck/go-readability/v2` is the successor

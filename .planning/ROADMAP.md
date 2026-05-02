@@ -122,9 +122,15 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
   4. `tldt --url https://httpstat.us/301` follows the redirect transparently and still produces a summary
 **Plans**: 2 plans
 
-Plans:
+**Wave 1**
 - [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 04-02-PLAN.md — Wire --url flag into main.go; fix 5 existing resolveInputBytes call sites; add 2 URL integration tests
+
+**Cross-cutting constraints:**
+- `--url` is highest-priority branch in `resolveInputBytes(urlStr, file, args)` — both plans must honor this precedence
+- All tests use `httptest.NewServer` — no real network calls permitted
 
 **Wave 1**
 - [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
