@@ -860,17 +860,17 @@ func TestPowerIterate_UniformMatrix(t *testing.T) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should LexRank use a damping factor or rely on the row-normalization alone?**
    - What we know: The original LexRank paper uses power iteration on a row-stochastic matrix without an explicit damping factor (unlike PageRank on the web). Damping is an option but not required.
    - What's unclear: Whether test fixtures have isolated sentences (zero similarity to all others) that would cause non-convergence without damping.
-   - Recommendation: Start without explicit damping (pure power iteration on normalized matrix); add uniform damping `d=0.85` if convergence tests show issues. The dangling-row fix handles most edge cases.
+   - RESOLVED: Start without explicit damping (pure power iteration on normalized matrix); add uniform damping `d=0.85` if convergence tests show issues. The dangling-row fix handles most edge cases.
 
 2. **Should TextRank stop-word removal be included?**
    - What we know: The original Mihalcea & Tarau 2004 paper does not apply stop-word removal for sentence extraction (only for keyword extraction).
    - What's unclear: Whether common English stop words ("the", "a", "is") inflate similarity scores between unrelated sentences sharing only function words.
-   - Recommendation: Skip stop-word removal in Phase 2. If integration test results show poor quality, add a simple hard-coded stop-word set as a constant in `textrank.go`.
+   - RESOLVED: Skip stop-word removal in Phase 2. If integration test results show poor quality, add a simple hard-coded stop-word set as a constant in `textrank.go`.
 
 ---
 
