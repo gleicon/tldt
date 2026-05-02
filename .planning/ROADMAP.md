@@ -145,14 +145,14 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — internal/config package (Config struct, Load, DefaultConfig, LevelPresets) + unit tests
-- [ ] 05-02-PLAN.md — Wire config + --level flag into main.go; flag.Visit override logic; integration tests
+- [x] 05-01-PLAN.md — internal/config package (Config struct, Load, DefaultConfig, LevelPresets) + unit tests
+- [x] 05-02-PLAN.md — Wire config + --level flag into main.go; flag.Visit override logic; integration tests
 
 **Wave 1**
-- [ ] 05-01-PLAN.md — BurntSushi/toml dependency + internal/config package with Config, Load, DefaultConfig, LevelPresets, ConfigPath + 10 unit tests
+- [x] 05-01-PLAN.md — BurntSushi/toml dependency + internal/config package with Config, Load, DefaultConfig, LevelPresets, ConfigPath + 10 unit tests
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — Wire config loading into main.go, add --level flag, flag.Visit override detection, replace raw flag dereferences with effective vars, 11 integration tests
+- [x] 05-02-PLAN.md — Wire config loading into main.go, add --level flag, flag.Visit override detection, replace raw flag dereferences with effective vars, 11 integration tests
 
 **Cross-cutting constraints:**
 - `Load()` NEVER returns an error — absorbs missing and malformed TOML silently (CFG-03)
@@ -178,5 +178,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 4. URL Input | 2/2 | Complete | 2026-05-02 |
-| 5. Configuration | 0/2 | Planning complete | - |
+| 5. Configuration | 2/2 | Complete | 2026-05-02 |
 | 6. AI Integration | 0/? | Not started | - |
