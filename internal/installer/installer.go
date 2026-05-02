@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Options controls Install() behavior.
@@ -242,7 +241,3 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 	return nil
 }
 
-// containsString is a helper used by tests.
-func containsString(s, sub string) bool {
-	return strings.Contains(s, sub)
-}

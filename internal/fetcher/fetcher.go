@@ -1,8 +1,5 @@
-// Package fetcher fetches a URL and extracts the main article text content.
-//
-// TODO: migrate from archived github.com/go-shiori/go-readability to
-// codeberg.org/readeck/go-readability/v2 when a future phase updates
-// dependencies. The archived version is fully functional for Phase 4.
+// Package fetcher fetches a URL and extracts the main article text content
+// using the readability algorithm to strip boilerplate HTML.
 package fetcher
 
 import (

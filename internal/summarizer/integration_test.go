@@ -34,7 +34,7 @@ func readTestFile(t *testing.T, name string) string {
 
 func TestSummarize_WikipediaEn(t *testing.T) {
 	text := readTestFile(t, "wikipedia_en.txt")
-	result, err := Summarize(text, 5)
+	result, err := (&Graph{}).Summarize(text, 5)
 	if err != nil {
 		t.Fatalf("Summarize(wikipedia_en.txt) returned error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestSummarize_WikipediaEn(t *testing.T) {
 
 func TestSummarize_YoutubeTranscript(t *testing.T) {
 	text := readTestFile(t, "youtube_transcript.txt")
-	result, err := Summarize(text, 5)
+	result, err := (&Graph{}).Summarize(text, 5)
 	if err != nil {
 		t.Fatalf("Summarize(youtube_transcript.txt) returned error: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestSummarize_YoutubeTranscript(t *testing.T) {
 
 func TestSummarize_LongformDoc(t *testing.T) {
 	text := readTestFile(t, "longform_3000.txt")
-	result, err := Summarize(text, 5)
+	result, err := (&Graph{}).Summarize(text, 5)
 	if err != nil {
 		t.Fatalf("Summarize(longform_3000.txt) returned error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestSummarize_EdgeShort_SilentCap(t *testing.T) {
 	// edge_short.txt has exactly 3 sentences.
 	// Requesting 5 should return <=3 without error (silent cap per didasy/tldr behavior).
 	text := readTestFile(t, "edge_short.txt")
-	result, err := Summarize(text, 5)
+	result, err := (&Graph{}).Summarize(text, 5)
 	if err != nil {
 		t.Fatalf("Summarize(edge_short.txt) returned unexpected error: %v", err)
 	}

@@ -23,7 +23,7 @@ This is the second sentence.
 This is the third and final sentence.`
 
 func TestSummarize_ReturnsNonEmpty(t *testing.T) {
-	result, err := Summarize(tenSentenceText, 3)
+	result, err := (&Graph{}).Summarize(tenSentenceText, 3)
 	if err != nil {
 		t.Fatalf("Summarize returned unexpected error: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestSummarize_ReturnsNonEmpty(t *testing.T) {
 }
 
 func TestSummarize_RespectsNLimit(t *testing.T) {
-	result, err := Summarize(tenSentenceText, 2)
+	result, err := (&Graph{}).Summarize(tenSentenceText, 2)
 	if err != nil {
 		t.Fatalf("Summarize returned unexpected error: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestSummarize_RespectsNLimit(t *testing.T) {
 
 func TestSummarize_SilentCapOnShortInput(t *testing.T) {
 	// threeSentenceText has 3 sentences; requesting 10 should return <=3, no error
-	result, err := Summarize(threeSentenceText, 10)
+	result, err := (&Graph{}).Summarize(threeSentenceText, 10)
 	if err != nil {
 		t.Fatalf("Summarize returned unexpected error for n > sentence count: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestSummarize_SilentCapOnShortInput(t *testing.T) {
 }
 
 func TestSummarize_ResultContainsRealSentences(t *testing.T) {
-	result, err := Summarize(threeSentenceText, 3)
+	result, err := (&Graph{}).Summarize(threeSentenceText, 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

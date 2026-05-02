@@ -317,14 +317,6 @@ func DetectEncoding(text string) []Finding {
 	return findings
 }
 
-// min returns the smaller of two ints (Go 1.21+ has builtin min, but this keeps compat).
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // --- Outlier detection ---
 
 // DetectOutliers computes per-sentence outlier scores from the LexRank similarity

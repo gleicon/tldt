@@ -278,7 +278,7 @@ func main() {
 		if *paragraphs > 0 {
 			fmt.Println(groupIntoParagraphs(result, *paragraphs))
 		} else {
-			fmt.Println(strings.Join(result, "\n"))
+			fmt.Println(formatter.FormatText(result))
 		}
 	}
 }
