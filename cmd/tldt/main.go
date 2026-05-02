@@ -85,6 +85,9 @@ func formatTokens(n int) string {
 }
 
 func groupIntoParagraphs(sentences []string, n int) string {
+	if n <= 0 || len(sentences) == 0 {
+		return strings.Join(sentences, "\n")
+	}
 	if n > len(sentences) {
 		n = len(sentences) // D-06: silent cap
 	}
