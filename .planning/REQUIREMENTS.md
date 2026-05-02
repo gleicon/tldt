@@ -4,27 +4,39 @@
 
 ## v2.0 Requirements — Extensions
 
-**Milestone goal:** Expand tldt's reach — fetch URLs, persist user defaults, add compression presets, and integrate as an AI assistant skill with auto-trigger support.
+**Milestone goal:** Expand tldt's reach — fetch URLs, persist user defaults, add compression presets, integrate as an AI assistant skill with auto-trigger support, and defend against prompt injection in untrusted text.
 
 ### Input Sources (INP)
 
-- [ ] **INP-01**: User can run `tldt --url <url>` to fetch a webpage, strip boilerplate HTML, and receive an extractive summary on stdout
-- [ ] **INP-02**: URL fetcher handles HTTP redirects; returns non-zero exit code with error to stderr on fetch failure
+- [x] **INP-01**: User can run `tldt --url <url>` to fetch a webpage, strip boilerplate HTML, and receive an extractive summary on stdout
+- [x] **INP-02**: URL fetcher handles HTTP redirects; returns non-zero exit code with error to stderr on fetch failure
 
 ### Configuration (CFG)
 
-- [ ] **CFG-01**: User can create `~/.tldt.toml` with default values for `algorithm`, `sentences`, `format`, and `level` flags
-- [ ] **CFG-02**: CLI flags always override values from `~/.tldt.toml`
-- [ ] **CFG-03**: Missing or malformed `~/.tldt.toml` is not an error — defaults apply silently
-- [ ] **CFG-04**: User can run `tldt --level aggressive` (3 sentences, most compression), `--level standard` (5 sentences), or `--level lite` (10 sentences, least compression)
-- [ ] **CFG-05**: `--level` can be set as the default in `~/.tldt.toml`; explicit `--sentences N` overrides it
+- [x] **CFG-01**: User can create `~/.tldt.toml` with default values for `algorithm`, `sentences`, `format`, and `level` flags
+- [x] **CFG-02**: CLI flags always override values from `~/.tldt.toml`
+- [x] **CFG-03**: Missing or malformed `~/.tldt.toml` is not an error — defaults apply silently
+- [x] **CFG-04**: User can run `tldt --level aggressive` (3 sentences, most compression), `--level standard` (5 sentences), or `--level lite` (10 sentences, least compression)
+- [x] **CFG-05**: `--level` can be set as the default in `~/.tldt.toml`; explicit `--sentences N` overrides it
 
 ### AI Integration (AI)
 
-- [ ] **AI-01**: User can install a Claude Code skill file that invokes the local `tldt` binary on selected or pasted text
-- [ ] **AI-02**: AI skill passes text to `tldt` via stdin and returns the summary inline in the conversation
-- [ ] **AI-03**: Auto-trigger hook fires when input text or a file exceeds a configurable token count threshold
-- [ ] **AI-04**: Auto-trigger summarizes the oversized input and reports token savings before inserting the summary into the AI context
+- [x] **AI-01**: User can install a Claude Code skill file that invokes the local `tldt` binary on selected or pasted text
+- [x] **AI-02**: AI skill passes text to `tldt` via stdin and returns the summary inline in the conversation
+- [x] **AI-03**: Auto-trigger hook fires when input text or a file exceeds a configurable token count threshold
+- [x] **AI-04**: Auto-trigger summarizes the oversized input and reports token savings before inserting the summary into the AI context
+
+### Security / Injection Defense (SEC)
+
+- [x] **SEC-01**: `--sanitize` strips invisible Unicode (Cf category, bidi controls U+202A–U+202E, zero-width U+200B–U+200F, PUA, Tags block U+E0000–U+E01FF) before summarization
+- [x] **SEC-02**: `--sanitize` applies NFKC normalization (collapses fullwidth, ligatures, compatibility variants)
+- [x] **SEC-03**: `--sanitize` reports count of removed codepoints to stderr; stdout unchanged if nothing removed
+- [x] **SEC-04**: `--detect-injection` detects direct instruction overrides, role injection, delimiter injection, jailbreaks, and exfiltration requests via multi-word regex patterns
+- [x] **SEC-05**: `--detect-injection` detects encoding anomalies: base64 payloads (entropy-gated), `\x`-escaped hex sequences, raw hex strings, abnormal control character density
+- [x] **SEC-06**: `--detect-injection` with `--algorithm lexrank` reports statistically off-topic sentences using the LexRank cosine similarity matrix (outlier_score = 1 - mean neighbor similarity)
+- [x] **SEC-07**: All detection output goes to stderr only; detection never blocks or modifies stdout summarization output
+- [x] **SEC-08**: `--injection-threshold <float>` configures the outlier score cutoff (default: 0.85); higher = fewer false positives
+- [x] **SEC-09**: Sanitizer and detector packages are independently importable with no dependency on cmd/tldt
 
 ---
 
@@ -32,17 +44,26 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INP-01 | Phase 4: URL Input | Pending |
-| INP-02 | Phase 4: URL Input | Pending |
-| CFG-01 | Phase 5: Configuration | Pending |
-| CFG-02 | Phase 5: Configuration | Pending |
-| CFG-03 | Phase 5: Configuration | Pending |
-| CFG-04 | Phase 5: Configuration | Pending |
-| CFG-05 | Phase 5: Configuration | Pending |
-| AI-01 | Phase 6: AI Integration | Pending |
-| AI-02 | Phase 6: AI Integration | Pending |
-| AI-03 | Phase 6: AI Integration | Pending |
-| AI-04 | Phase 6: AI Integration | Pending |
+| INP-01 | Phase 4: URL Input | Complete |
+| INP-02 | Phase 4: URL Input | Complete |
+| CFG-01 | Phase 5: Configuration | Complete |
+| CFG-02 | Phase 5: Configuration | Complete |
+| CFG-03 | Phase 5: Configuration | Complete |
+| CFG-04 | Phase 5: Configuration | Complete |
+| CFG-05 | Phase 5: Configuration | Complete |
+| AI-01 | Phase 6: AI Integration | Complete |
+| AI-02 | Phase 6: AI Integration | Complete |
+| AI-03 | Phase 6: AI Integration | Complete |
+| AI-04 | Phase 6: AI Integration | Complete |
+| SEC-01 | Phase 7: Injection Defense | Complete |
+| SEC-02 | Phase 7: Injection Defense | Complete |
+| SEC-03 | Phase 7: Injection Defense | Complete |
+| SEC-04 | Phase 7: Injection Defense | Complete |
+| SEC-05 | Phase 7: Injection Defense | Complete |
+| SEC-06 | Phase 7: Injection Defense | Complete |
+| SEC-07 | Phase 7: Injection Defense | Complete |
+| SEC-08 | Phase 7: Injection Defense | Complete |
+| SEC-09 | Phase 7: Injection Defense | Complete |
 
 ---
 

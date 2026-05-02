@@ -173,20 +173,20 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Extend internal/config with HookConfig struct (Hook.Threshold, default 2000) + unit tests
-- [ ] 06-02-PLAN.md — Create SKILL.md and tldt-hook.sh templates in internal/installer/ for go:embed
-- [ ] 06-03-PLAN.md — internal/installer package (embed.go, installer.go, installer_test.go)
-- [ ] 06-04-PLAN.md — Wire --print-threshold and --install-skill flags into main.go; add Makefile install-skill target
+- [x] 06-01-PLAN.md — Extend internal/config with HookConfig struct (Hook.Threshold, default 2000) + unit tests
+- [x] 06-02-PLAN.md — Create SKILL.md and tldt-hook.sh templates in internal/installer/ for go:embed
+- [x] 06-03-PLAN.md — internal/installer package (embed.go, installer.go, installer_test.go)
+- [x] 06-04-PLAN.md — Wire --print-threshold and --install-skill flags into main.go; add Makefile install-skill target
 
 **Wave 1** *(parallel — no shared files)*
-- [ ] 06-01-PLAN.md — HookConfig + Hook.Threshold in internal/config/config.go + 5 unit tests
-- [ ] 06-02-PLAN.md — internal/installer/skills/tldt/SKILL.md + internal/installer/hooks/tldt-hook.sh templates
+- [x] 06-01-PLAN.md — HookConfig + Hook.Threshold in internal/config/config.go + 5 unit tests
+- [x] 06-02-PLAN.md — internal/installer/skills/tldt/SKILL.md + internal/installer/hooks/tldt-hook.sh templates
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 06-03-PLAN.md — internal/installer package: embed.go (go:embed) + installer.go + installer_test.go (8 tests)
+- [x] 06-03-PLAN.md — internal/installer package: embed.go (go:embed) + installer.go + installer_test.go (8 tests)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 06-04-PLAN.md — Wire --print-threshold, --install-skill, --skill-dir, --target flags into main.go + Makefile install-skill target
+- [x] 06-04-PLAN.md — Wire --print-threshold, --install-skill, --skill-dir, --target flags into main.go + Makefile install-skill target
 
 **Cross-cutting constraints:**
 - go:embed paths must be relative to the source file; templates live in internal/installer/skills/ and internal/installer/hooks/ (NOT repo root)
@@ -196,10 +196,37 @@ Plans:
 - Settings.json hook entry uses absolute expanded path for the hook command (subdirectory hook bug workaround)
 **UI hint**: no
 
+### Phase 7: Injection Defense
+**Goal**: tldt can detect and sanitize prompt injection patterns in untrusted text before it enters an AI context, with advisory-only output to stderr that never breaks pipes.
+**Depends on**: Phase 6
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09
+**Success Criteria** (what must be TRUE):
+  1. `cat untrusted.txt | tldt --sanitize` strips invisible Unicode (Cf category, bidi controls, zero-width, PUA, Tags block) and NFKC-normalizes before summarization; stdout is unaffected if no invisible chars found
+  2. `cat untrusted.txt | tldt --detect-injection` reports pattern matches (direct-override, role-injection, delimiter, jailbreak, exfiltration) and encoding anomalies (base64, hex-escape, hex-string, ctrl-char-density) to stderr; stdout always contains only the summary
+  3. Detection output never appears on stdout — detection is advisory and never blocks summarization
+  4. `--detect-injection` with `--algorithm lexrank` also reports statistically off-topic sentences using the LexRank cosine similarity matrix (outlier score = 1 - mean neighbor similarity)
+  5. `--injection-threshold 0.90` adjusts the outlier sensitivity; default is 0.85
+**Plans**: 3 plans (retroactive — implemented before formal plan)
+
+**Wave 1** *(parallel — no shared files)*
+- [x] 07-01-PLAN.md — internal/sanitizer package: StripInvisible, NormalizeUnicode, SanitizeAll, ReportInvisibles + 31 tests
+- [x] 07-02-PLAN.md — internal/detector package: DetectPatterns (6 categories, 16 regexes), DetectEncoding (base64/hex/ctrl), DetectOutliers (cosine outlier), Analyze + 28 tests
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 07-03-PLAN.md — Wire --sanitize, --detect-injection, --injection-threshold into main.go; expose LexRank similarity matrix via MatrixSummarizer interface; wire DetectOutliers; README injection defense section
+
+**Cross-cutting constraints:**
+- Detection is ALWAYS advisory — never modifies stdout, never blocks summarization
+- DetectOutliers uses pre-normalization cosine similarity matrix (not stochastic/row-normalized values)
+- NFKC normalization does NOT collapse cross-script homoglyphs (Cyrillic 'а' ≠ Latin 'a') — documented limitation
+- Pattern regexes use multi-word phrases to minimize false positives on common single words
+**UI hint**: no
+
 ## v2.0 Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 4. URL Input | 2/2 | Complete | 2026-05-02 |
 | 5. Configuration | 2/2 | Complete | 2026-05-02 |
-| 6. AI Integration | 0/4 | Not started | - |
+| 6. AI Integration | 4/4 | Complete | 2026-05-02 |
+| 7. Injection Defense | 3/3 | Complete | 2026-05-02 |
