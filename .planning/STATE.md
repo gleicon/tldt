@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Extensions
-status: ready_to_execute
-stopped_at: phase 4 planned
-last_updated: "2026-05-02T00:00:00.000Z"
-last_activity: 2026-05-02 -- Phase 4 (URL Input) planned, 2 plans ready
+status: phase_complete
+stopped_at: phase 4 complete
+last_updated: "2026-05-02T18:40:00.000Z"
+last_activity: 2026-05-02 -- Phase 4 (URL Input) complete, 201 tests passing
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 33
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 4 — URL Input
-Plan: Ready to execute (2 plans, 2 waves)
-Status: Ready to execute
-Last activity: 2026-05-02 — Phase 4 planned
+Phase: 4 — URL Input — COMPLETE
+Next: Phase 5 — Configuration
+Status: Phase 4 complete, ready for Phase 5
+Last activity: 2026-05-02 — Phase 4 complete (201 tests, 9/9 UAT automated)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Accumulated Context
 
@@ -44,6 +44,9 @@ Progress: [░░░░░░░░░░] 0%
 - 01-02: resolveInput() precedence: stdin pipe > -f flag > positional args (Unix convention)
 - 03: ensemble uses simple average of LexRank+TextRank score vectors (no normalization needed)
 - 03: --rouge flag reads reference file, prints ROUGE-1/2/L scores to stderr only
+- 04: --url branch is highest priority in resolveInputBytes (URL > stdin > file > positional)
+- 04: fetcher uses readability.FromReader NOT FromURL — preserves custom http.Client + io.LimitReader
+- 04: external test services (httpstat.us, Wikipedia) are unreliable; all URL tests use httptest.NewServer
 
 ### v2.0 Decisions
 

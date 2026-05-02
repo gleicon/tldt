@@ -105,7 +105,7 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 
 ### Phases
 
-- [ ] **Phase 4: URL Input** - User can pass a URL to tldt and receive an extractive summary of the fetched page
+- [x] **Phase 4: URL Input** - User can pass a URL to tldt and receive an extractive summary of the fetched page
 - [ ] **Phase 5: Configuration** - User preferences persist across invocations via ~/.tldt.toml; compression presets simplify common sentence counts
 - [ ] **Phase 6: AI Integration** - tldt ships as an installable Claude Code skill file with an auto-trigger hook that fires when input exceeds a token threshold
 
@@ -123,20 +123,14 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 **Plans**: 2 plans
 
 **Wave 1**
-- [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
+- [x] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 04-02-PLAN.md — Wire --url flag into main.go; fix 5 existing resolveInputBytes call sites; add 2 URL integration tests
+- [x] 04-02-PLAN.md — Wire --url flag into main.go; fix 5 existing resolveInputBytes call sites; add 4 URL integration tests
 
 **Cross-cutting constraints:**
 - `--url` is highest-priority branch in `resolveInputBytes(urlStr, file, args)` — both plans must honor this precedence
 - All tests use `httptest.NewServer` — no real network calls permitted
-
-**Wave 1**
-- [ ] 04-01-PLAN.md — go-readability dependency + internal/fetcher package (Fetch function + 5 unit tests)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 04-02-PLAN.md — --url flag wiring in main.go; main_test.go fixes and new URL integration tests
 **UI hint**: no
 
 ### Phase 5: Configuration
@@ -167,6 +161,6 @@ v2.0 expands tldt's reach in three focused phases: URL input adds a new content 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. URL Input | 0/2 | Not started | - |
+| 4. URL Input | 2/2 | Complete | 2026-05-02 |
 | 5. Configuration | 0/? | Not started | - |
 | 6. AI Integration | 0/? | Not started | - |
