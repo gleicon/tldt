@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gleicon/tldt/internal/config"
 	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/summarizer"
@@ -21,6 +22,7 @@ func main() {
 	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
 	sentences := flag.Int("sentences", 5, "number of output sentences")
+	level := flag.String("level", "", "named preset: lite (3)|standard (5)|aggressive (10)")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
@@ -28,12 +30,52 @@ func main() {
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-level lite|standard|aggressive] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	flag.Parse()
+
+	// Load config file — silent fallback to defaults on any error (CFG-03).
+	cfgPath, _ := config.ConfigPath()
+	cfg := config.Load(cfgPath)
+
+	// Detect which flags the user explicitly provided (CFG-02).
+	// flag.Visit (NOT flag.VisitAll) visits only explicitly-set flags.
+	flagsSet := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
+
+	// Resolve effective parameters: config -> level preset -> explicit flags.
+	effectiveAlgorithm := cfg.Algorithm
+	effectiveSentences := cfg.Sentences
+	effectiveFormat := cfg.Format
+	effectiveLevel := cfg.Level
+
+	// --level flag overrides config level (CFG-04).
+	if flagsSet["level"] {
+		effectiveLevel = *level
+	}
+	// Validate --level value if set (Pitfall 5 from research).
+	if effectiveLevel != "" {
+		if n, ok := config.LevelPresets[effectiveLevel]; ok {
+			effectiveSentences = n
+		} else {
+			fmt.Fprintf(os.Stderr, "unknown --level %q: valid values are lite, standard, aggressive\n", effectiveLevel)
+			os.Exit(1)
+		}
+	}
+	// Explicit --sentences always wins over level preset (CFG-02, CFG-05).
+	if flagsSet["sentences"] {
+		effectiveSentences = *sentences
+	}
+	// Explicit --algorithm and --format override config values (CFG-02).
+	if flagsSet["algorithm"] {
+		effectiveAlgorithm = *algorithm
+	}
+	if flagsSet["format"] {
+		effectiveFormat = *format
+	}
 
 	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
@@ -54,7 +96,7 @@ func main() {
 		text = applySentenceCap(text, defaultSentenceCap)
 	}
 
-	s, err := summarizer.New(*algorithm)
+	s, err := summarizer.New(effectiveAlgorithm)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -66,7 +108,7 @@ func main() {
 		if ex, ok := s.(summarizer.Explainer); ok {
 			var info *summarizer.ExplainInfo
 			var err2 error
-			result, info, err2 = ex.SummarizeExplain(text, *sentences)
+			result, info, err2 = ex.SummarizeExplain(text, effectiveSentences)
 			if err2 != nil {
 				fmt.Fprintln(os.Stderr, "summarization failed:", err2)
 				os.Exit(1)
@@ -76,9 +118,9 @@ func main() {
 			}
 		} else {
 			// Graph or future algorithms without Explainer: fall back to normal summarize
-			fmt.Fprintf(os.Stderr, "note: --explain not supported for algorithm %q; running without diagnostics\n", *algorithm)
+			fmt.Fprintf(os.Stderr, "note: --explain not supported for algorithm %q; running without diagnostics\n", effectiveAlgorithm)
 			var err2 error
-			result, err2 = s.Summarize(text, *sentences)
+			result, err2 = s.Summarize(text, effectiveSentences)
 			if err2 != nil {
 				fmt.Fprintln(os.Stderr, "summarization failed:", err2)
 				os.Exit(1)
@@ -86,7 +128,7 @@ func main() {
 		}
 	} else {
 		var err2 error
-		result, err2 = s.Summarize(text, *sentences)
+		result, err2 = s.Summarize(text, effectiveSentences)
 		if err2 != nil {
 			fmt.Fprintln(os.Stderr, "summarization failed:", err2)
 			os.Exit(1)
@@ -115,14 +157,14 @@ func main() {
 	if tokIn > 0 {
 		reduction = int(float64(tokIn-tokOut) / float64(tokIn) * 100)
 	}
-	if *verbose && *format != "json" {
+	if *verbose && effectiveFormat != "json" {
 		fmt.Fprintf(os.Stderr, "~%s -> ~%s tokens (%d%% reduction)\n",
 			formatTokens(tokIn), formatTokens(tokOut), reduction)
 	}
 
 	// Build metadata for structured formats
 	meta := formatter.SummaryMeta{
-		Algorithm:          *algorithm,
+		Algorithm:          effectiveAlgorithm,
 		SentencesIn:        len(summarizer.TokenizeSentences(text)),
 		SentencesOut:       len(result),
 		CharsIn:            charsIn,
@@ -132,7 +174,7 @@ func main() {
 		CompressionRatio:   float64(tokIn-tokOut) / float64(tokIn+1), // +1 guards divide-by-zero
 	}
 
-	switch *format {
+	switch effectiveFormat {
 	case "json":
 		out, err := formatter.FormatJSON(result, meta)
 		if err != nil {

@@ -659,3 +659,174 @@ func TestMain_URLFlag_NonHTML(t *testing.T) {
 		t.Errorf("--url non-HTML: expected 'unsupported content type' in stderr, got %q", stderr)
 	}
 }
+
+// ── config file and --level flag integration tests ────────────────────────────
+
+// longText has 12 sentences — enough for --level aggressive (10) tests.
+const longText = "The fox is clever and quick in the forest. " +
+	"Dogs are loyal and brave companions to humans. " +
+	"Scientists study animal behavior carefully over many years. " +
+	"Research shows that animals communicate in complex ways. " +
+	"Ecosystems depend on balanced predator and prey relationships. " +
+	"Migration patterns change with the seasons across continents. " +
+	"Marine biologists track whale populations using acoustic sensors. " +
+	"Forest conservation efforts have increased biodiversity in protected areas. " +
+	"Climate change affects animal habitats around the world significantly. " +
+	"Genetic studies reveal evolutionary relationships between species groups. " +
+	"Urban wildlife adapts to human environments in surprising ways. " +
+	"Behavioral ecology combines field observation with statistical modeling."
+
+// writeConfig writes a TOML config file into a fresh temp HOME directory and
+// sets HOME so the subprocess inherits it.
+func writeConfig(t *testing.T, content string) {
+	t.Helper()
+	tmpHome := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpHome, ".tldt.toml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", tmpHome)
+}
+
+// countNonEmptyLines returns the number of non-empty lines in s.
+func countNonEmptyLines(s string) int {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	count := 0
+	for _, l := range lines {
+		if strings.TrimSpace(l) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func TestMain_ConfigFileDefaults(t *testing.T) {
+	// algorithm="ensemble" sentences=3 — verify config values are used when no CLI flags override
+	writeConfig(t, "algorithm = \"ensemble\"\nsentences = 3\n")
+	stdout, _, ok := run(t, longText)
+	if !ok {
+		t.Fatal("config file defaults: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 3 {
+		t.Errorf("config file defaults: want 3 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_ConfigOverrideSentences(t *testing.T) {
+	// Config sets sentences=7, CLI --sentences 2 must override (CFG-02)
+	writeConfig(t, "sentences = 7\n")
+	stdout, _, ok := run(t, shortText, "--sentences", "2")
+	if !ok {
+		t.Fatal("config override sentences: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 2 {
+		t.Errorf("config override sentences: want 2 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_ConfigOverrideAlgorithm(t *testing.T) {
+	// Config sets algorithm="textrank", CLI --algorithm lexrank must override (CFG-02)
+	writeConfig(t, "algorithm = \"textrank\"\n")
+	_, _, ok := run(t, shortText, "--algorithm", "lexrank", "--sentences", "2")
+	if !ok {
+		t.Fatal("config override algorithm: binary exited non-zero")
+	}
+}
+
+func TestMain_ConfigMissing(t *testing.T) {
+	// No .tldt.toml in HOME — should silently use built-in defaults (CFG-03)
+	t.Setenv("HOME", t.TempDir())
+	stdout, _, ok := run(t, shortText, "--sentences", "2")
+	if !ok {
+		t.Fatal("config missing: binary exited non-zero")
+	}
+	if strings.TrimSpace(stdout) == "" {
+		t.Error("config missing: expected non-empty output")
+	}
+}
+
+func TestMain_ConfigMalformed(t *testing.T) {
+	// Malformed TOML in .tldt.toml — should silently use built-in defaults (CFG-03)
+	writeConfig(t, "algorithm = bad toml [[[")
+	stdout, _, ok := run(t, shortText, "--sentences", "2")
+	if !ok {
+		t.Fatal("config malformed: binary exited non-zero")
+	}
+	if strings.TrimSpace(stdout) == "" {
+		t.Error("config malformed: expected non-empty output")
+	}
+}
+
+func TestMain_LevelLite(t *testing.T) {
+	// --level lite produces exactly 3 sentences (CFG-04)
+	stdout, _, ok := run(t, longText, "--level", "lite")
+	if !ok {
+		t.Fatal("--level lite: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 3 {
+		t.Errorf("--level lite: want 3 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_LevelStandard(t *testing.T) {
+	// --level standard produces exactly 5 sentences (CFG-04)
+	stdout, _, ok := run(t, longText, "--level", "standard")
+	if !ok {
+		t.Fatal("--level standard: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 5 {
+		t.Errorf("--level standard: want 5 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_LevelAggressive(t *testing.T) {
+	// --level aggressive produces exactly 10 sentences (CFG-04)
+	stdout, _, ok := run(t, longText, "--level", "aggressive")
+	if !ok {
+		t.Fatal("--level aggressive: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 10 {
+		t.Errorf("--level aggressive: want 10 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_LevelInvalid(t *testing.T) {
+	// --level bogus must exit non-zero with descriptive error (T-05-06)
+	_, stderr, ok := run(t, shortText, "--level", "bogus")
+	if ok {
+		t.Error("--level bogus: want non-zero exit")
+	}
+	if !strings.Contains(stderr, "unknown --level") {
+		t.Errorf("--level bogus: stderr %q does not contain 'unknown --level'", stderr)
+	}
+}
+
+func TestMain_LevelOverriddenBySentences(t *testing.T) {
+	// Config sets level="aggressive" (10), CLI --sentences 2 must override (CFG-05)
+	writeConfig(t, "level = \"aggressive\"\n")
+	stdout, _, ok := run(t, longText, "--sentences", "2")
+	if !ok {
+		t.Fatal("level overridden by sentences: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 2 {
+		t.Errorf("level overridden by sentences: want 2 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
+
+func TestMain_ConfigLevelDefault(t *testing.T) {
+	// Config sets level="lite" — running with no flags should produce 3 sentences (CFG-05)
+	writeConfig(t, "level = \"lite\"\n")
+	stdout, _, ok := run(t, longText)
+	if !ok {
+		t.Fatal("config level default: binary exited non-zero")
+	}
+	got := countNonEmptyLines(stdout)
+	if got != 3 {
+		t.Errorf("config level default: want 3 output lines, got %d\nstdout: %q", got, stdout)
+	}
+}
