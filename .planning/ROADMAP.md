@@ -42,7 +42,23 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
   2. `tldt --algorithm textrank --sentences 5 -f article.txt` returns a different (but valid) 5-sentence summary
   3. `go test ./...` passes all unit tests including TF-IDF vectors, cosine similarity, and power iteration convergence
   4. Running the same input twice always produces identical output (deterministic)
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
+- [ ] 02-02-PLAN.md — LexRank algorithm (TF-IDF, cosine similarity, power iteration) with unit tests
+- [ ] 02-03-PLAN.md — TextRank algorithm (word overlap, damped PageRank iteration) with unit tests
+- [ ] 02-04-PLAN.md — CLI flag wiring (--algorithm, --sentences, --paragraphs), token stats, integration tests
+
+**Wave 1**
+- [ ] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 02-02-PLAN.md — LexRank algorithm with TF-IDF, cosine similarity, power iteration, and full unit tests
+- [ ] 02-03-PLAN.md — TextRank algorithm with word overlap similarity, damped power iteration, and full unit tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 02-04-PLAN.md — CLI flags, token stats to stderr, paragraph grouping, integration tests for all algorithms
 **UI hint**: no
 
 ### Phase 3: Polish
@@ -62,5 +78,5 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-05-01 |
-| 2. Algorithms | 0/TBD | Not started | - |
+| 2. Algorithms | 0/4 | In progress | - |
 | 3. Polish | 0/TBD | Not started | - |
