@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Roadmap created — ready to run /gsd-plan-phase 1
-last_updated: "2026-05-01T22:21:32.596Z"
+stopped_at: Completed 01-02-PLAN.md — ready to run plan 01-03
+last_updated: "2026-05-01T22:38:00Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,29 +26,29 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 1 of 3 (Foundation)
-Plan: 1 of 3 in current phase
-Status: Ready to execute
+Plan: 2 of 3 in current phase
+Status: Ready to execute plan 01-03
 Last activity: 2026-05-01
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1
-- Average duration: 3 min
-- Total execution time: ~0.05 hours
+- Total plans completed: 2
+- Average duration: 5 min
+- Total execution time: ~0.18 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 1/3 | 3 min | 3 min |
+| 01-foundation | 2/3 | 11 min | 5 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (3 min)
+- Last 5 plans: 01-01 (3 min), 01-02 (8 min)
 - Trend: establishing baseline
 
 *Updated after each plan completion*
@@ -65,6 +65,8 @@ Recent decisions affecting current work:
 - Init: stdout gets ONLY summary text when piped; stats always go to stderr
 - 01-01: Exclude legacy src/ files with //go:build ignore rather than deleting them (preserves history)
 - 01-01: Create stub cmd/tldt/main.go with didasy/tldr import so go mod tidy retains the dependency
+- 01-02: Create new tldr.Bag per Summarize() call (Bag is not thread-safe; keeps wrapper stateless)
+- 01-02: resolveInput() precedence: stdin pipe > -f flag > positional args (Unix convention)
 
 ### Pending Todos
 
@@ -85,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-01T22:21:32.593Z
-Stopped at: Completed 01-01-PLAN.md — ready to run plan 01-02
+Last session: 2026-05-01T22:38:00Z
+Stopped at: Completed 01-02-PLAN.md — ready to run plan 01-03
 Resume file: None

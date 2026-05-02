@@ -27,7 +27,7 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 - [x] 01-01-PLAN.md — Go module init, dependency fetch, Makefile replacement, directory scaffolds
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01-02-PLAN.md — Graph summarizer wrapper (internal/summarizer) and CLI entry point (cmd/tldt/main.go)
+- [x] 01-02-PLAN.md — Graph summarizer wrapper (internal/summarizer) and CLI entry point (cmd/tldt/main.go)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — Four English test-data files and integration tests covering all test-data fixtures
@@ -61,6 +61,6 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In Progress|  |
+| 1. Foundation | 2/3 | In Progress|  |
 | 2. Algorithms | 0/TBD | Not started | - |
 | 3. Polish | 0/TBD | Not started | - |
