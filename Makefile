@@ -80,6 +80,14 @@ test-uat:
 bench:
 	go test -bench=. -benchmem ./...
 
+## release: tag a release (usage: make release VERSION=v1.0.0)
+release:
+	@test -n "$(VERSION)" || (echo "usage: make release VERSION=vX.Y.Z" && exit 1)
+	@git diff --quiet HEAD || (echo "uncommitted changes — commit first" && exit 1)
+	@echo "Tagging $(VERSION)..."
+	git tag -a $(VERSION) -m "Release $(VERSION)"
+	@echo "Push with: git push origin $(VERSION)"
+
 ## help: list targets
 help:
 	@grep -E '^## ' Makefile | sed 's/## /  /'
