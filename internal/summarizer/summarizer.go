@@ -10,7 +10,7 @@ type Summarizer interface {
 }
 
 // New returns a Summarizer for the named algorithm.
-// Valid names: "lexrank", "textrank", "graph".
+// Valid names: "lexrank", "textrank", "graph", "ensemble".
 func New(algo string) (Summarizer, error) {
 	switch algo {
 	case "lexrank":
@@ -19,6 +19,8 @@ func New(algo string) (Summarizer, error) {
 		return &TextRank{}, nil
 	case "graph":
 		return &Graph{}, nil
+	case "ensemble":
+		return &Ensemble{}, nil
 	default:
 		return nil, fmt.Errorf("unknown algorithm: %s", algo)
 	}

@@ -16,15 +16,16 @@ import (
 
 func main() {
 	filePath := flag.String("f", "", "input file path")
-	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph")
+	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
 	sentences := flag.Int("sentences", 5, "number of output sentences")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
 	format := flag.String("format", "text", "output format: text|json|markdown")
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
+	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -87,6 +88,20 @@ func main() {
 			fmt.Fprintln(os.Stderr, "summarization failed:", err2)
 			os.Exit(1)
 		}
+	}
+
+	// ROUGE evaluation against reference file (if --rouge provided)
+	if *rouge != "" {
+		refData, err := os.ReadFile(*rouge)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "rouge: cannot read reference file:", err)
+			os.Exit(1)
+		}
+		refSents := summarizer.TokenizeSentences(string(refData))
+		scores := summarizer.EvalROUGE(result, refSents)
+		fmt.Fprintf(os.Stderr, "rouge-1  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGE1.Precision, scores.ROUGE1.Recall, scores.ROUGE1.F1)
+		fmt.Fprintf(os.Stderr, "rouge-2  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGE2.Precision, scores.ROUGE2.Recall, scores.ROUGE2.F1)
+		fmt.Fprintf(os.Stderr, "rouge-l  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGEL.Precision, scores.ROUGEL.Recall, scores.ROUGEL.F1)
 	}
 
 	// Token stats to stderr (TOK-01, TOK-02, TOK-03, D-09, D-10)

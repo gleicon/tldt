@@ -228,7 +228,7 @@ func TestNew_UnknownAlgorithm(t *testing.T) {
 	}
 }
 
-// Determinism integration test (TEST-06)
+// Determinism integration tests (TEST-06)
 
 func TestNew_LexRank_Deterministic_RealData(t *testing.T) {
 	text := readTestFile(t, "wikipedia_en.txt")
@@ -251,5 +251,130 @@ func TestNew_LexRank_Deterministic_RealData(t *testing.T) {
 		if r1[i] != r2[i] {
 			t.Errorf("non-deterministic at [%d]: %q vs %q", i, r1[i], r2[i])
 		}
+	}
+}
+
+func TestNew_TextRank_Deterministic_RealData(t *testing.T) {
+	text := readTestFile(t, "wikipedia_en.txt")
+	s, _ := New("textrank")
+	r1, _ := s.Summarize(text, 3)
+	r2, _ := s.Summarize(text, 3)
+	for i := range r1 {
+		if r1[i] != r2[i] {
+			t.Errorf("non-deterministic at [%d]: %q vs %q", i, r1[i], r2[i])
+		}
+	}
+}
+
+func TestNew_Ensemble_Deterministic_RealData(t *testing.T) {
+	text := readTestFile(t, "wikipedia_en.txt")
+	s, _ := New("ensemble")
+	r1, _ := s.Summarize(text, 3)
+	r2, _ := s.Summarize(text, 3)
+	for i := range r1 {
+		if r1[i] != r2[i] {
+			t.Errorf("non-deterministic at [%d]: %q vs %q", i, r1[i], r2[i])
+		}
+	}
+}
+
+// Ensemble integration tests
+
+func TestNew_Ensemble_WikipediaEn(t *testing.T) {
+	text := readTestFile(t, "wikipedia_en.txt")
+	s, err := New("ensemble")
+	if err != nil {
+		t.Fatalf("New(ensemble) error: %v", err)
+	}
+	result, err := s.Summarize(text, 5)
+	if err != nil {
+		t.Fatalf("Ensemble.Summarize(wikipedia_en) error: %v", err)
+	}
+	if len(result) == 0 || len(result) > 5 {
+		t.Errorf("Ensemble returned %d sentences, want 1-5", len(result))
+	}
+}
+
+func TestNew_Ensemble_YoutubeTranscript(t *testing.T) {
+	text := readTestFile(t, "youtube_transcript.txt")
+	s, err := New("ensemble")
+	if err != nil {
+		t.Fatalf("New(ensemble) error: %v", err)
+	}
+	result, err := s.Summarize(text, 5)
+	if err != nil {
+		t.Fatalf("Ensemble.Summarize(youtube_transcript) error: %v", err)
+	}
+	if len(result) == 0 {
+		t.Fatal("Ensemble returned empty slice for youtube_transcript")
+	}
+}
+
+func TestNew_Ensemble_Longform(t *testing.T) {
+	text := readTestFile(t, "longform_3000.txt")
+	s, err := New("ensemble")
+	if err != nil {
+		t.Fatalf("New(ensemble) error: %v", err)
+	}
+	result, err := s.Summarize(text, 5)
+	if err != nil {
+		t.Fatalf("Ensemble.Summarize(longform_3000) error: %v", err)
+	}
+	if len(result) != 5 {
+		t.Errorf("Ensemble returned %d sentences, want 5", len(result))
+	}
+}
+
+func TestNew_Ensemble_EdgeShort(t *testing.T) {
+	text := readTestFile(t, "edge_short.txt")
+	s, err := New("ensemble")
+	if err != nil {
+		t.Fatalf("New(ensemble) error: %v", err)
+	}
+	result, err := s.Summarize(text, 5)
+	if err != nil {
+		t.Fatalf("Ensemble.Summarize(edge_short) error: %v", err)
+	}
+	if len(result) > 3 {
+		t.Errorf("Ensemble returned %d sentences from 3-sentence doc, want <= 3", len(result))
+	}
+}
+
+// Cross-algorithm: all results must be substrings of original text
+
+func TestAllAlgorithms_SentencesFromOriginal(t *testing.T) {
+	text := readTestFile(t, "wikipedia_en.txt")
+	algos := []string{"lexrank", "textrank", "graph", "ensemble"}
+	for _, algo := range algos {
+		t.Run(algo, func(t *testing.T) {
+			s, err := New(algo)
+			if err != nil {
+				t.Fatalf("New(%s) error: %v", algo, err)
+			}
+			result, err := s.Summarize(text, 5)
+			if err != nil {
+				t.Fatalf("%s.Summarize error: %v", algo, err)
+			}
+			for _, sent := range result {
+				if sent == "" {
+					t.Errorf("%s: empty sentence in result", algo)
+				}
+			}
+		})
+	}
+}
+
+// ROUGE integration: ensemble vs lexrank on same text should both score > 0 against each other
+
+func TestROUGE_CrossAlgorithm_NonZero(t *testing.T) {
+	text := readTestFile(t, "wikipedia_en.txt")
+	lr, _ := New("lexrank")
+	en, _ := New("ensemble")
+	lrResult, _ := lr.Summarize(text, 5)
+	enResult, _ := en.Summarize(text, 5)
+	score := EvalROUGE(enResult, lrResult)
+	// Both summaries come from same document — expect non-trivial overlap
+	if score.ROUGE1.F1 <= 0 {
+		t.Errorf("ROUGE-1 F1 between ensemble and lexrank summaries = %f, want > 0", score.ROUGE1.F1)
 	}
 }

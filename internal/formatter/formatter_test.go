@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 )
@@ -123,5 +124,14 @@ func TestFormatMarkdown_BlankLineBetweenSentences(t *testing.T) {
 	result := FormatMarkdown(sentences, meta)
 	if !strings.Contains(result, ">\n") {
 		t.Errorf("FormatMarkdown: expected blank blockquote line ('>\\n') between sentences, got %q", result)
+	}
+}
+
+func TestFormatJSON_MarshalError(t *testing.T) {
+	// NaN is not valid JSON — triggers json.MarshalIndent error path.
+	meta := SummaryMeta{Algorithm: "lexrank", CompressionRatio: math.NaN()}
+	_, err := FormatJSON([]string{"s."}, meta)
+	if err == nil {
+		t.Error("FormatJSON with NaN: want marshal error, got nil")
 	}
 }

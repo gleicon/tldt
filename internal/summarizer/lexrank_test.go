@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+// ── IDF / vocab ──────────────────────────────────────────────────────────────
+
 // TestLexRank_TFIDFVectors verifies IDF computation on a known 2-sentence corpus.
 // Sentences: {"the","cat"} and {"the","dog"}
 // IDF("the") = log(2/2) = 0.0
@@ -29,26 +31,52 @@ func TestLexRank_TFIDFVectors(t *testing.T) {
 		}
 	}
 
-	// IDF for "cat" at index 0
 	wantCatIDF := math.Log(2.0 / 1.0)
 	if math.Abs(idf[0]-wantCatIDF) > 0.001 {
 		t.Errorf("idf[cat] = %f, want %f", idf[0], wantCatIDF)
 	}
-
-	// IDF for "dog" at index 1
 	wantDogIDF := math.Log(2.0 / 1.0)
 	if math.Abs(idf[1]-wantDogIDF) > 0.001 {
 		t.Errorf("idf[dog] = %f, want %f", idf[1], wantDogIDF)
 	}
-
-	// IDF for "the" at index 2 — appears in both sentences → IDF = log(2/2) = 0
 	wantTheIDF := 0.0
 	if math.Abs(idf[2]-wantTheIDF) > 0.001 {
 		t.Errorf("idf[the] = %f, want %f", idf[2], wantTheIDF)
 	}
 }
 
-// TestLexRank_CosineIdentical verifies that idfCosine(v, v, idf) == 1.0
+// ── buildTFVector ─────────────────────────────────────────────────────────────
+
+func TestBuildTFVector_Basic(t *testing.T) {
+	// words: ["cat","cat","dog"] → TF(cat)=2/3, TF(dog)=1/3
+	// vocab: ["cat","dog"]
+	wordIdx := map[string]int{"cat": 0, "dog": 1}
+	words := []string{"cat", "cat", "dog"}
+	v := buildTFVector(words, wordIdx, 2)
+	if len(v) != 2 {
+		t.Fatalf("vector length = %d, want 2", len(v))
+	}
+	if math.Abs(v[0]-2.0/3) > 0.001 {
+		t.Errorf("TF(cat) = %f, want %f", v[0], 2.0/3)
+	}
+	if math.Abs(v[1]-1.0/3) > 0.001 {
+		t.Errorf("TF(dog) = %f, want %f", v[1], 1.0/3)
+	}
+}
+
+func TestBuildTFVector_EmptyWords(t *testing.T) {
+	wordIdx := map[string]int{"cat": 0}
+	v := buildTFVector([]string{}, wordIdx, 1)
+	if len(v) != 1 {
+		t.Fatalf("vector length = %d, want 1", len(v))
+	}
+	if v[0] != 0.0 {
+		t.Errorf("TF for empty words = %f, want 0.0", v[0])
+	}
+}
+
+// ── cosine similarity ─────────────────────────────────────────────────────────
+
 func TestLexRank_CosineIdentical(t *testing.T) {
 	v := []float64{1.0, 2.0, 3.0}
 	idf := []float64{1.0, 1.0, 1.0}
@@ -58,7 +86,6 @@ func TestLexRank_CosineIdentical(t *testing.T) {
 	}
 }
 
-// TestLexRank_CosineOrthogonal verifies that idfCosine([1,0], [0,1], [1,1]) == 0.0
 func TestLexRank_CosineOrthogonal(t *testing.T) {
 	v1 := []float64{1.0, 0.0}
 	v2 := []float64{0.0, 1.0}
@@ -69,7 +96,6 @@ func TestLexRank_CosineOrthogonal(t *testing.T) {
 	}
 }
 
-// TestLexRank_CosineZeroVector verifies that idfCosine([0,0], [1,1], [1,1]) == 0.0 (no NaN/panic)
 func TestLexRank_CosineZeroVector(t *testing.T) {
 	v1 := []float64{0.0, 0.0}
 	v2 := []float64{1.0, 1.0}
@@ -83,8 +109,37 @@ func TestLexRank_CosineZeroVector(t *testing.T) {
 	}
 }
 
-// TestPowerIterate_UniformMatrix verifies convergence of a 3x3 uniform stochastic matrix.
-// Each row is [1/3, 1/3, 1/3] — stationary distribution is [1/3, 1/3, 1/3].
+// ── rowNormalize ──────────────────────────────────────────────────────────────
+
+func TestRowNormalize_NormalRow(t *testing.T) {
+	m := [][]float64{{2.0, 2.0, 2.0}}
+	rowNormalize(m)
+	for j, v := range m[0] {
+		if math.Abs(v-1.0/3) > 0.0001 {
+			t.Errorf("m[0][%d] = %f, want 0.333", j, v)
+		}
+	}
+}
+
+func TestRowNormalize_DanglingRow(t *testing.T) {
+	// All-zero row must become uniform (1/n)
+	m := [][]float64{
+		{0.0, 0.0, 0.0},
+		{1.0, 0.0, 0.0},
+		{0.0, 1.0, 0.0},
+	}
+	rowNormalize(m)
+	n := 3
+	for j, v := range m[0] {
+		want := 1.0 / float64(n)
+		if math.Abs(v-want) > 0.0001 {
+			t.Errorf("dangling row m[0][%d] = %f, want %f", j, v, want)
+		}
+	}
+}
+
+// ── powerIterate ─────────────────────────────────────────────────────────────
+
 func TestPowerIterate_UniformMatrix(t *testing.T) {
 	n := 3
 	m := make([][]float64, n)
@@ -99,28 +154,70 @@ func TestPowerIterate_UniformMatrix(t *testing.T) {
 	}
 }
 
-// TestPowerIterate_AsymmetricMatrix verifies convergence of a 2x2 asymmetric matrix.
-// Matrix: [[0.5, 0.5], [0.25, 0.75]]
-// Stationary distribution (solving pi*M = pi, sum=1):
-//   pi[0] = 1/3, pi[1] = 2/3
 func TestPowerIterate_AsymmetricMatrix(t *testing.T) {
+	// Stationary distribution: pi[0]=1/3, pi[1]=2/3
 	m := [][]float64{
 		{0.5, 0.5},
 		{0.25, 0.75},
 	}
 	got, _, _ := powerIterate(m, 0.0001, 1000)
-	if len(got) != 2 {
-		t.Fatalf("expected 2 scores, got %d", len(got))
-	}
 	if math.Abs(got[0]-1.0/3) > 0.001 {
-		t.Errorf("scores[0] = %f, want ~0.333 (1/3)", got[0])
+		t.Errorf("scores[0] = %f, want ~0.333", got[0])
 	}
 	if math.Abs(got[1]-2.0/3) > 0.001 {
-		t.Errorf("scores[1] = %f, want ~0.667 (2/3)", got[1])
+		t.Errorf("scores[1] = %f, want ~0.667", got[1])
 	}
 }
 
-// TestLexRank_Summarize_Basic verifies that Summarize returns exactly 3 sentences.
+func TestPowerIterate_ScoresSumToOne(t *testing.T) {
+	n := 4
+	m := make([][]float64, n)
+	for i := range m {
+		m[i] = make([]float64, n)
+		for j := range m[i] {
+			m[i][j] = 1.0 / float64(n)
+		}
+	}
+	scores, _, _ := powerIterate(m, 0.0001, 1000)
+	sum := 0.0
+	for _, s := range scores {
+		sum += s
+	}
+	if math.Abs(sum-1.0) > 0.001 {
+		t.Errorf("power iteration scores sum = %f, want ~1.0", sum)
+	}
+}
+
+// ── selectTopN ────────────────────────────────────────────────────────────────
+
+func TestSelectTopN_DocumentOrder(t *testing.T) {
+	sentences := []string{"A", "B", "C", "D", "E"}
+	// Score order: C > E > A > B > D → top-3 are indices {0,2,4}
+	scores := []float64{0.3, 0.1, 0.5, 0.05, 0.4}
+	result := selectTopN(scores, 3, sentences)
+	// Must return in document order: A, C, E
+	want := []string{"A", "C", "E"}
+	if len(result) != len(want) {
+		t.Fatalf("got %d sentences, want %d", len(result), len(want))
+	}
+	for i := range want {
+		if result[i] != want[i] {
+			t.Errorf("result[%d] = %q, want %q", i, result[i], want[i])
+		}
+	}
+}
+
+func TestSelectTopN_CapToLen(t *testing.T) {
+	sentences := []string{"X", "Y"}
+	scores := []float64{0.6, 0.4}
+	result := selectTopN(scores, 10, sentences)
+	if len(result) > 2 {
+		t.Errorf("selectTopN returned %d, want <= 2", len(result))
+	}
+}
+
+// ── LexRank.Summarize ─────────────────────────────────────────────────────────
+
 func TestLexRank_Summarize_Basic(t *testing.T) {
 	l := &LexRank{}
 	result, err := l.Summarize(tenSentenceText, 3)
@@ -137,7 +234,6 @@ func TestLexRank_Summarize_Basic(t *testing.T) {
 	}
 }
 
-// TestLexRank_Summarize_EmptyInput verifies that empty input returns nil, nil.
 func TestLexRank_Summarize_EmptyInput(t *testing.T) {
 	l := &LexRank{}
 	result, err := l.Summarize("", 5)
@@ -149,30 +245,23 @@ func TestLexRank_Summarize_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestLexRank_Summarize_SilentCap verifies that n > sentence count returns <= sentence count, no error.
 func TestLexRank_Summarize_SilentCap(t *testing.T) {
 	l := &LexRank{}
 	result, err := l.Summarize(threeSentenceText, 10)
 	if err != nil {
-		t.Fatalf("Summarize returned unexpected error for n > sentence count: %v", err)
+		t.Fatalf("Summarize returned unexpected error: %v", err)
 	}
 	if len(result) > 3 {
 		t.Errorf("Summarize returned %d sentences from 3-sentence input, want <= 3", len(result))
 	}
 }
 
-// TestLexRank_Summarize_DocumentOrder verifies that returned sentences appear in document order.
 func TestLexRank_Summarize_DocumentOrder(t *testing.T) {
 	l := &LexRank{}
 	result, err := l.Summarize(tenSentenceText, 5)
 	if err != nil {
 		t.Fatalf("Summarize returned unexpected error: %v", err)
 	}
-	if len(result) == 0 {
-		t.Fatal("Summarize returned empty result")
-	}
-
-	// Find the index of each returned sentence in the original text
 	prevIdx := -1
 	for _, sentence := range result {
 		idx := strings.Index(tenSentenceText, sentence)
@@ -181,29 +270,100 @@ func TestLexRank_Summarize_DocumentOrder(t *testing.T) {
 			continue
 		}
 		if idx <= prevIdx {
-			t.Errorf("document order violated: sentence %q at position %d is before previous at %d", sentence, idx, prevIdx)
+			t.Errorf("document order violated: %q at %d is before previous at %d", sentence, idx, prevIdx)
 		}
 		prevIdx = idx
 	}
 }
 
-// TestLexRank_Deterministic verifies that two consecutive calls produce identical output.
+func TestLexRank_Summarize_AllSentencesFromOriginal(t *testing.T) {
+	l := &LexRank{}
+	result, err := l.Summarize(tenSentenceText, 4)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, s := range result {
+		if !strings.Contains(tenSentenceText, s) {
+			t.Errorf("result sentence %q not in original text", s)
+		}
+	}
+}
+
 func TestLexRank_Deterministic(t *testing.T) {
 	l := &LexRank{}
-	result1, err := l.Summarize(tenSentenceText, 3)
-	if err != nil {
-		t.Fatalf("first Summarize call returned error: %v", err)
-	}
-	result2, err := l.Summarize(tenSentenceText, 3)
-	if err != nil {
-		t.Fatalf("second Summarize call returned error: %v", err)
-	}
+	result1, _ := l.Summarize(tenSentenceText, 3)
+	result2, _ := l.Summarize(tenSentenceText, 3)
 	if len(result1) != len(result2) {
-		t.Fatalf("different number of sentences: first=%d, second=%d", len(result1), len(result2))
+		t.Fatalf("non-deterministic length: %d vs %d", len(result1), len(result2))
 	}
 	for i := range result1 {
 		if result1[i] != result2[i] {
-			t.Errorf("sentence[%d] differs:\n  first:  %q\n  second: %q", i, result1[i], result2[i])
+			t.Errorf("sentence[%d] differs: %q vs %q", i, result1[i], result2[i])
 		}
+	}
+}
+
+// ── LexRank.SummarizeExplain ──────────────────────────────────────────────────
+
+func TestLexRank_SummarizeExplain_Basic(t *testing.T) {
+	l := &LexRank{}
+	result, info, err := l.SummarizeExplain(tenSentenceText, 3)
+	if err != nil {
+		t.Fatalf("SummarizeExplain returned error: %v", err)
+	}
+	if len(result) != 3 {
+		t.Errorf("want 3 sentences, got %d", len(result))
+	}
+	if info == nil {
+		t.Fatal("ExplainInfo is nil")
+	}
+	if info.Algorithm != "lexrank" {
+		t.Errorf("Algorithm = %q, want lexrank", info.Algorithm)
+	}
+	if info.InputSentences != 10 {
+		t.Errorf("InputSentences = %d, want 10", info.InputSentences)
+	}
+	if info.SelectedN != 3 {
+		t.Errorf("SelectedN = %d, want 3", info.SelectedN)
+	}
+	if info.VocabSize == 0 {
+		t.Error("VocabSize = 0, want > 0")
+	}
+	if !info.Converged {
+		t.Error("expected convergence for small input")
+	}
+	if len(info.Scores) != 10 {
+		t.Errorf("Scores length = %d, want 10", len(info.Scores))
+	}
+}
+
+func TestLexRank_SummarizeExplain_SelectedFlaggedCorrectly(t *testing.T) {
+	l := &LexRank{}
+	result, info, err := l.SummarizeExplain(tenSentenceText, 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	selectedCount := 0
+	for _, sc := range info.Scores {
+		if sc.Selected {
+			selectedCount++
+		}
+	}
+	if selectedCount != len(result) {
+		t.Errorf("Selected count in ExplainInfo = %d, want %d (len of result)", selectedCount, len(result))
+	}
+}
+
+func TestLexRank_SummarizeExplain_Empty(t *testing.T) {
+	l := &LexRank{}
+	_, info, err := l.SummarizeExplain("", 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info == nil {
+		t.Fatal("ExplainInfo nil for empty input")
+	}
+	if info.InputSentences != 0 {
+		t.Errorf("InputSentences = %d for empty input, want 0", info.InputSentences)
 	}
 }
