@@ -91,7 +91,7 @@ func TestPowerIterate_UniformMatrix(t *testing.T) {
 	for i := range m {
 		m[i] = []float64{1.0 / 3, 1.0 / 3, 1.0 / 3}
 	}
-	got := powerIterate(m, 0.0001, 1000)
+	got, _, _ := powerIterate(m, 0.0001, 1000)
 	for i, v := range got {
 		if math.Abs(v-1.0/3) > 0.001 {
 			t.Errorf("scores[%d] = %f, want ~0.333", i, v)
@@ -108,7 +108,7 @@ func TestPowerIterate_AsymmetricMatrix(t *testing.T) {
 		{0.5, 0.5},
 		{0.25, 0.75},
 	}
-	got := powerIterate(m, 0.0001, 1000)
+	got, _, _ := powerIterate(m, 0.0001, 1000)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 scores, got %d", len(got))
 	}

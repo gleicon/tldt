@@ -63,8 +63,8 @@ func trRowNormalize(matrix [][]float64) {
 }
 
 // powerIterateDamped performs damped PageRank-style power iteration.
-// Returns sentence importance scores after convergence or maxIter iterations.
-func powerIterateDamped(matrix [][]float64, damping, epsilon float64, maxIter int) []float64 {
+// Returns (scores, iterations, converged) after convergence or maxIter iterations.
+func powerIterateDamped(matrix [][]float64, damping, epsilon float64, maxIter int) ([]float64, int, bool) {
 	n := len(matrix)
 	scores := make([]float64, n)
 	for i := range scores {
@@ -91,10 +91,10 @@ func powerIterateDamped(matrix [][]float64, damping, epsilon float64, maxIter in
 		}
 		copy(scores, next)
 		if diff < epsilon {
-			break
+			return scores, iter + 1, true
 		}
 	}
-	return scores
+	return scores, maxIter, false
 }
 
 // trSelectTopN selects the top-n sentences by score and returns them in document order.
@@ -115,6 +115,101 @@ func trSelectTopN(scores []float64, n int, sentences []string) []string {
 		result[i] = sentences[idx]
 	}
 	return result
+}
+
+// SummarizeExplain implements Explainer. Same algorithm as Summarize but
+// also collects and returns diagnostic information for --explain output.
+func (t *TextRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo, error) {
+	sentences := TokenizeSentences(text)
+	info := &ExplainInfo{
+		Algorithm:     "textrank",
+		InputSentences: len(sentences),
+		DampingFactor: textRankDamping,
+	}
+	if len(sentences) == 0 {
+		return nil, info, nil
+	}
+	if n > len(sentences) {
+		n = len(sentences)
+	}
+	info.SelectedN = n
+
+	words := make([][]string, len(sentences))
+	for i, s := range sentences {
+		words[i] = tokenizeWords(s)
+	}
+
+	size := len(sentences)
+	matrix := make([][]float64, size)
+	for i := range matrix {
+		matrix[i] = make([]float64, size)
+		for j := range matrix[i] {
+			if i != j {
+				matrix[i][j] = wordOverlapSim(words[i], words[j])
+			}
+		}
+	}
+
+	// Collect similarity stats before row-normalizing
+	totalPairs := size * (size - 1)
+	info.SimilarityPairs = totalPairs
+	for i := range matrix {
+		for j := range matrix[i] {
+			if i == j {
+				continue
+			}
+			v := matrix[i][j]
+			if v > 0 {
+				info.SimilarityNonZero++
+				if v > info.SimilarityMax {
+					info.SimilarityMax = v
+				}
+				info.SimilarityMean += v
+			}
+		}
+	}
+	if info.SimilarityNonZero > 0 {
+		info.SimilarityMean /= float64(info.SimilarityNonZero)
+	}
+
+	trRowNormalize(matrix)
+	scores, iters, converged := powerIterateDamped(matrix, textRankDamping, textRankEpsilon, textRankMaxIter)
+	info.Iterations = iters
+	info.Converged = converged
+
+	result := trSelectTopN(scores, n, sentences)
+
+	selectedSet := make(map[string]bool, len(result))
+	for _, s := range result {
+		selectedSet[s] = true
+	}
+	type ranked struct {
+		idx   int
+		score float64
+	}
+	rankedList := make([]ranked, len(scores))
+	for i, s := range scores {
+		rankedList[i] = ranked{i, s}
+	}
+	sort.SliceStable(rankedList, func(a, b int) bool {
+		return rankedList[a].score > rankedList[b].score
+	})
+	rankOf := make([]int, len(scores))
+	for r, rv := range rankedList {
+		rankOf[rv.idx] = r + 1
+	}
+	info.Scores = make([]SentenceScore, len(sentences))
+	for i, s := range sentences {
+		info.Scores[i] = SentenceScore{
+			Index:    i,
+			Score:    scores[i],
+			Selected: selectedSet[s],
+			Rank:     rankOf[i],
+			Preview:  s,
+		}
+	}
+
+	return result, info, nil
 }
 
 // Summarize implements the Summarizer interface using TextRank.
@@ -148,6 +243,6 @@ func (t *TextRank) Summarize(text string, n int) ([]string, error) {
 	}
 
 	trRowNormalize(matrix)
-	scores := powerIterateDamped(matrix, textRankDamping, textRankEpsilon, textRankMaxIter)
+	scores, _, _ := powerIterateDamped(matrix, textRankDamping, textRankEpsilon, textRankMaxIter)
 	return trSelectTopN(scores, n, sentences), nil
 }

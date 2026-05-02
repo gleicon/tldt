@@ -55,7 +55,7 @@ func TestPowerIterateDamped_UniformMatrix(t *testing.T) {
 			matrix[i][j] = 1.0 / float64(n)
 		}
 	}
-	scores := powerIterateDamped(matrix, 0.85, 0.0001, 1000)
+	scores, _, _ := powerIterateDamped(matrix, 0.85, 0.0001, 1000)
 	if len(scores) != n {
 		t.Fatalf("expected %d scores, got %d", n, len(scores))
 	}

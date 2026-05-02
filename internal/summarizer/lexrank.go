@@ -60,9 +60,102 @@ func (l *LexRank) Summarize(text string, n int) ([]string, error) {
 	rowNormalize(matrix)
 
 	// Power iteration to find stationary distribution (eigenvector centrality)
-	scores := powerIterate(matrix, lexrankEpsilon, lexrankMaxIter)
+	scores, _, _ := powerIterate(matrix, lexrankEpsilon, lexrankMaxIter)
 
 	return selectTopN(scores, n, sentences), nil
+}
+
+// SummarizeExplain implements Explainer. Same algorithm as Summarize but
+// also collects and returns diagnostic information for --explain output.
+func (l *LexRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo, error) {
+	sentences := TokenizeSentences(text)
+	info := &ExplainInfo{Algorithm: "lexrank", InputSentences: len(sentences)}
+	if len(sentences) == 0 {
+		return nil, info, nil
+	}
+	if n > len(sentences) {
+		n = len(sentences)
+	}
+	info.SelectedN = n
+
+	wordLists := make([][]string, len(sentences))
+	for i, s := range sentences {
+		wordLists[i] = tokenizeWords(s)
+	}
+
+	vocab, idf := buildVocabAndIDF(wordLists)
+	info.VocabSize = len(vocab)
+	if len(idf) > 0 {
+		info.IDFMin, info.IDFMax = idf[0], idf[0]
+		for _, v := range idf {
+			if v < info.IDFMin {
+				info.IDFMin = v
+			}
+			if v > info.IDFMax {
+				info.IDFMax = v
+			}
+		}
+	}
+
+	wordIdx := make(map[string]int, len(vocab))
+	for i, w := range vocab {
+		wordIdx[w] = i
+	}
+	vocabSize := len(vocab)
+	vectors := make([][]float64, len(sentences))
+	for i, words := range wordLists {
+		vectors[i] = buildTFVector(words, wordIdx, vocabSize)
+	}
+
+	n2 := len(sentences)
+	matrix := make([][]float64, n2)
+	for i := range matrix {
+		matrix[i] = make([]float64, n2)
+		for j := range matrix[i] {
+			matrix[i][j] = idfCosine(vectors[i], vectors[j], idf)
+		}
+	}
+	rowNormalize(matrix)
+
+	scores, iters, converged := powerIterate(matrix, lexrankEpsilon, lexrankMaxIter)
+	info.Iterations = iters
+	info.Converged = converged
+
+	result := selectTopN(scores, n, sentences)
+
+	// Build per-sentence score list with rank and selection flag
+	selectedSet := make(map[string]bool, len(result))
+	for _, s := range result {
+		selectedSet[s] = true
+	}
+	type ranked struct {
+		idx   int
+		score float64
+	}
+	rankedList := make([]ranked, len(scores))
+	for i, s := range scores {
+		rankedList[i] = ranked{i, s}
+	}
+	// Sort by score descending to assign rank
+	sort.SliceStable(rankedList, func(a, b int) bool {
+		return rankedList[a].score > rankedList[b].score
+	})
+	rankOf := make([]int, len(scores))
+	for r, rv := range rankedList {
+		rankOf[rv.idx] = r + 1
+	}
+	info.Scores = make([]SentenceScore, len(sentences))
+	for i, s := range sentences {
+		info.Scores[i] = SentenceScore{
+			Index:    i,
+			Score:    scores[i],
+			Selected: selectedSet[s],
+			Rank:     rankOf[i],
+			Preview:  s,
+		}
+	}
+
+	return result, info, nil
 }
 
 // buildVocabAndIDF computes the sorted vocabulary and parallel IDF weights
@@ -166,9 +259,10 @@ func rowNormalize(matrix [][]float64) {
 
 // powerIterate returns the stationary distribution of a row-stochastic matrix
 // using the power method. Converges when L1 difference < epsilon or maxIter reached.
+// Returns (scores, iterations, converged).
 //
 // Source: standard power method; matches didasy/tldr DEFAULT_TOLERANCE=0.0001
-func powerIterate(matrix [][]float64, epsilon float64, maxIter int) []float64 {
+func powerIterate(matrix [][]float64, epsilon float64, maxIter int) ([]float64, int, bool) {
 	n := len(matrix)
 	p := make([]float64, n)
 	for i := range p {
@@ -187,10 +281,10 @@ func powerIterate(matrix [][]float64, epsilon float64, maxIter int) []float64 {
 		}
 		p = next
 		if diff < epsilon {
-			break
+			return p, iter + 1, true
 		}
 	}
-	return p
+	return p, maxIter, false
 }
 
 // scored is a pair of sentence index and its centrality score.

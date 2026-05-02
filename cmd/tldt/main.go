@@ -16,8 +16,9 @@ func main() {
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph")
 	sentences := flag.Int("sentences", 5, "number of output sentences")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
+	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -37,10 +38,36 @@ func main() {
 	}
 
 	charsIn := len(text)
-	result, err := s.Summarize(text, *sentences)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "summarization failed:", err)
-		os.Exit(1)
+	var result []string
+	if *explain {
+		if ex, ok := s.(summarizer.Explainer); ok {
+			var info *summarizer.ExplainInfo
+			var err2 error
+			result, info, err2 = ex.SummarizeExplain(text, *sentences)
+			if err2 != nil {
+				fmt.Fprintln(os.Stderr, "summarization failed:", err2)
+				os.Exit(1)
+			}
+			if info != nil {
+				fmt.Fprint(os.Stderr, info.Format())
+			}
+		} else {
+			// Graph or future algorithms without Explainer: fall back to normal summarize
+			fmt.Fprintf(os.Stderr, "note: --explain not supported for algorithm %q; running without diagnostics\n", *algorithm)
+			var err2 error
+			result, err2 = s.Summarize(text, *sentences)
+			if err2 != nil {
+				fmt.Fprintln(os.Stderr, "summarization failed:", err2)
+				os.Exit(1)
+			}
+		}
+	} else {
+		var err2 error
+		result, err2 = s.Summarize(text, *sentences)
+		if err2 != nil {
+			fmt.Fprintln(os.Stderr, "summarization failed:", err2)
+			os.Exit(1)
+		}
 	}
 
 	// Token stats to stderr (TOK-01, TOK-02, TOK-03, D-09, D-10)
