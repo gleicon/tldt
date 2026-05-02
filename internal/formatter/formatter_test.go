@@ -106,9 +106,9 @@ func TestFormatMarkdown_BlockquotePrefix(t *testing.T) {
 	sentences := []string{"First sentence.", "Second sentence."}
 	result := FormatMarkdown(sentences, meta)
 	lines := strings.Split(result, "\n")
-	// Lines after the header should start with "> "
+	// Lines after the header should start with "> " (sentence) or be ">" (blank separator) or empty
 	for _, line := range lines[1:] {
-		if line == "" {
+		if line == "" || line == ">" {
 			continue
 		}
 		if !strings.HasPrefix(line, "> ") {
