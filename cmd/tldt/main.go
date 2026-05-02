@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gleicon/tldt/internal/summarizer"
 )
@@ -17,18 +19,32 @@ func main() {
 	sentences := flag.Int("sentences", 5, "number of output sentences")
 	paragraphs := flag.Int("paragraphs", 0, "group sentences into N paragraphs (0 = off)")
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
+	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	flag.Parse()
 
-	text, err := resolveInput(flag.Args(), *filePath)
+	rawBytes, err := resolveInputBytes(flag.Args(), *filePath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	text, isEmpty, err := validateInput(rawBytes)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if isEmpty {
+		os.Exit(0)
+	}
+
+	const defaultSentenceCap = 2000
+	if !*noCap {
+		text = applySentenceCap(text, defaultSentenceCap)
 	}
 
 	s, err := summarizer.New(*algorithm)
@@ -78,8 +94,11 @@ func main() {
 	if tokIn > 0 {
 		reduction = int(float64(tokIn-tokOut) / float64(tokIn) * 100)
 	}
-	fmt.Fprintf(os.Stderr, "tokens: %s -> %s (%d%% reduction)\n",
-		formatTokens(tokIn), formatTokens(tokOut), reduction)
+	isTTY := stdoutIsTerminal()
+	if isTTY {
+		fmt.Fprintf(os.Stderr, "~%s -> ~%s tokens (%d%% reduction)\n",
+			formatTokens(tokIn), formatTokens(tokOut), reduction)
+	}
 
 	// Output: one sentence per line (D-08) or grouped into paragraphs (D-05)
 	if *paragraphs > 0 {
@@ -164,4 +183,65 @@ func resolveInput(args []string, filePath string) (string, error) {
 		return strings.Join(args, " "), nil
 	}
 	return "", fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
+}
+
+// resolveInputBytes is like resolveInput but returns raw bytes for validation.
+func resolveInputBytes(args []string, filePath string) ([]byte, error) {
+	stat, err := os.Stdin.Stat()
+	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("reading stdin: %w", err)
+		}
+		return data, nil
+	}
+	if filePath != "" {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("reading file %q: %w", filePath, err)
+		}
+		return data, nil
+	}
+	if len(args) > 0 {
+		return []byte(strings.Join(args, " ")), nil
+	}
+	return nil, fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
+}
+
+// stdoutIsTerminal reports whether stdout is connected to a terminal (not piped/redirected).
+// Uses the same os.ModeCharDevice check as resolveInput for stdin.
+func stdoutIsTerminal() bool {
+	stat, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+// validateInput checks raw input bytes for binary content and whitespace-only input.
+// Returns (text, isEmpty, error).
+// isEmpty==true means the caller must exit 0 with no output.
+// error != nil means binary input detected; caller must print error to stderr and exit 1.
+func validateInput(data []byte) (string, bool, error) {
+	if bytes.IndexByte(data, 0) >= 0 {
+		return "", false, fmt.Errorf("binary input: NUL byte found")
+	}
+	if !utf8.Valid(data) {
+		return "", false, fmt.Errorf("binary input: invalid UTF-8 encoding")
+	}
+	text := string(data)
+	if strings.TrimSpace(text) == "" {
+		return "", true, nil
+	}
+	return text, false, nil
+}
+
+// applySentenceCap limits text to at most cap sentences to prevent O(n^2) hang.
+// Returns text unchanged if sentence count is within cap.
+func applySentenceCap(text string, cap int) string {
+	sents := summarizer.TokenizeSentences(text)
+	if len(sents) <= cap {
+		return text
+	}
+	return strings.Join(sents[:cap], " ")
 }
