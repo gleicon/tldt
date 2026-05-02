@@ -78,7 +78,7 @@ func main() {
 	if tokIn > 0 {
 		reduction = int(float64(tokIn-tokOut) / float64(tokIn) * 100)
 	}
-	fmt.Fprintf(os.Stderr, "~%s \u2192 ~%s tokens (%d%% reduction)\n",
+	fmt.Fprintf(os.Stderr, "tokens: %s -> %s (%d%% reduction)\n",
 		formatTokens(tokIn), formatTokens(tokOut), reduction)
 
 	// Output: one sentence per line (D-08) or grouped into paragraphs (D-05)
