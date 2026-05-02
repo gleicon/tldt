@@ -14,6 +14,7 @@ import (
 	"github.com/gleicon/tldt/internal/config"
 	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/formatter"
+	"github.com/gleicon/tldt/internal/installer"
 	"github.com/gleicon/tldt/internal/summarizer"
 )
 
@@ -28,12 +29,18 @@ func main() {
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
 	format := flag.String("format", "text", "output format: text|json|markdown")
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
-	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
+	rouge           := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
+	printThreshold  := flag.Bool("print-threshold", false, "print configured hook token threshold to stdout and exit")
+	installSkill    := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
+	skillDir        := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
+	skillTarget     := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [-level aggressive|standard|lite] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [-rouge ref.txt] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [--print-threshold] [--install-skill [--skill-dir path] [--target app]]")
+		fmt.Fprintln(os.Stderr, "       tldt [-f file] [--url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N]")
+		fmt.Fprintln(os.Stderr, "       tldt [-level aggressive|standard|lite] [-paragraphs N] [-format text|json|markdown]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
-		os.Exit(2) // conventional exit code for usage/argument errors (POSIX)
+		os.Exit(2) // POSIX convention
 	}
 	flag.Parse()
 
@@ -45,6 +52,25 @@ func main() {
 	// flag.Visit (NOT flag.VisitAll) visits only explicitly-set flags.
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
+
+	// --print-threshold: print configured hook token threshold to stdout and exit (D-10, D-12)
+	// Prints bare integer only — no label — so hook script can capture it directly.
+	if *printThreshold {
+		fmt.Println(cfg.Hook.Threshold)
+		os.Exit(0)
+	}
+
+	// --install-skill: write skill + hook templates and patch settings.json, then exit (D-13, D-16)
+	if *installSkill {
+		if err := installer.Install(installer.Options{
+			SkillDir: *skillDir,
+			Target:   *skillTarget,
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, "install-skill:", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	// Resolve effective parameters: config -> level preset -> explicit flags.
 	effectiveAlgorithm := cfg.Algorithm
