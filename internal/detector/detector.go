@@ -382,14 +382,15 @@ func DetectOutliers(sentences []string, simMatrix [][]float64, threshold float64
 
 // --- Combined analysis ---
 
-// Analyze runs pattern and encoding detectors against text and returns a combined Report.
-// Outlier detection requires a precomputed similarity matrix and is handled separately
-// (DetectOutliers) because it requires the sentence tokenizer and LexRank matrix.
+// Analyze runs pattern, encoding, and confusable-homoglyph detectors against text
+// and returns a combined Report. Outlier detection requires a precomputed similarity
+// matrix and is handled separately (DetectOutliers) because it requires the LexRank matrix.
 func Analyze(text string) Report {
 	var allFindings []Finding
 
 	allFindings = append(allFindings, DetectPatterns(text)...)
 	allFindings = append(allFindings, DetectEncoding(text)...)
+	allFindings = append(allFindings, DetectConfusables(text)...)
 
 	var maxScore float64
 	for _, f := range allFindings {

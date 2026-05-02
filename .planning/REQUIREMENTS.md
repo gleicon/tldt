@@ -37,6 +37,7 @@
 - [x] **SEC-07**: All detection output goes to stderr only; detection never blocks or modifies stdout summarization output
 - [x] **SEC-08**: `--injection-threshold <float>` configures the outlier score cutoff (default: 0.85); higher = fewer false positives
 - [x] **SEC-09**: Sanitizer and detector packages are independently importable with no dependency on cmd/tldt
+- [x] **SEC-10**: `--detect-injection` detects cross-script homoglyph substitution (e.g., Cyrillic `а` for Latin `a`) using UTS#39 confusables.txt (Unicode 17.0, embedded in binary)
 
 ---
 
@@ -62,6 +63,9 @@
 | SEC-05 | Phase 7: Injection Defense | Complete |
 | SEC-06 | Phase 7: Injection Defense | Complete |
 | SEC-07 | Phase 7: Injection Defense | Complete |
+| SEC-08 | Phase 7: Injection Defense | Complete |
+| SEC-09 | Phase 7: Injection Defense | Complete |
+| SEC-10 | Phase 7: Injection Defense | Complete |
 | SEC-08 | Phase 7: Injection Defense | Complete |
 | SEC-09 | Phase 7: Injection Defense | Complete |
 

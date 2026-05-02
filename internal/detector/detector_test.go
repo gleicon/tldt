@@ -408,3 +408,113 @@ func TestAnalyze_EmptyInput(t *testing.T) {
 		t.Error("Analyze(empty): Suspicious=true, want false")
 	}
 }
+
+// --- DetectConfusables tests ---
+
+func TestDetectConfusables_CyrillicA(t *testing.T) {
+	// Cyrillic small letter a (U+0430) looks identical to Latin a (U+0061)
+	input := "аdmin" // first char is Cyrillic а, not Latin a
+	findings := DetectConfusables(input)
+	if len(findings) == 0 {
+		t.Fatal("DetectConfusables: want finding for Cyrillic а, got none")
+	}
+	if findings[0].Pattern != "confusable-homoglyph" {
+		t.Errorf("pattern = %q, want confusable-homoglyph", findings[0].Pattern)
+	}
+	if findings[0].Score != 0.80 {
+		t.Errorf("score = %.2f, want 0.80", findings[0].Score)
+	}
+}
+
+func TestDetectConfusables_GreekOmicron(t *testing.T) {
+	// Greek small letter omicron (U+03BF) looks like Latin o (U+006F)
+	input := "οbject" // first char is Greek ο
+	findings := DetectConfusables(input)
+	if len(findings) == 0 {
+		t.Fatal("DetectConfusables: want finding for Greek ο, got none")
+	}
+}
+
+func TestDetectConfusables_PureLatin(t *testing.T) {
+	// Pure ASCII — no confusables
+	input := "admin object system"
+	findings := DetectConfusables(input)
+	if len(findings) != 0 {
+		t.Errorf("DetectConfusables(pure ASCII): want 0 findings, got %d", len(findings))
+	}
+}
+
+func TestDetectConfusables_EmptyString(t *testing.T) {
+	findings := DetectConfusables("")
+	if len(findings) != 0 {
+		t.Errorf("DetectConfusables(empty): want 0 findings, got %d", len(findings))
+	}
+}
+
+func TestDetectConfusables_MultipleHomoglyphs(t *testing.T) {
+	// Mix of Cyrillic chars that look like Latin
+	// а=U+0430, е=U+0435, о=U+043E — all look like Latin a, e, o
+	input := "аdmin еnd оbject"
+	findings := DetectConfusables(input)
+	if len(findings) < 3 {
+		t.Errorf("DetectConfusables: want ≥3 findings, got %d", len(findings))
+	}
+}
+
+func TestAnalyze_IncludesConfusables(t *testing.T) {
+	// Cyrillic а in otherwise normal text — Analyze should surface it
+	input := "аdmin access granted"
+	report := Analyze(input)
+	found := false
+	for _, f := range report.Findings {
+		if f.Pattern == "confusable-homoglyph" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Analyze: want confusable-homoglyph finding, got none")
+	}
+}
+
+func TestDetectConfusables_Offset(t *testing.T) {
+	// Verify offset points to the confusable rune, not offset 0 always
+	input := "hello аdmin" // Cyrillic а is at byte offset 6
+	findings := DetectConfusables(input)
+	if len(findings) == 0 {
+		t.Fatal("want finding, got none")
+	}
+	if findings[0].Offset != 6 {
+		t.Errorf("offset = %d, want 6", findings[0].Offset)
+	}
+}
+
+func TestDetectConfusables_LoadIdempotent(t *testing.T) {
+	// Calling multiple times must not panic or change results
+	input := "аdmin"
+	f1 := DetectConfusables(input)
+	f2 := DetectConfusables(input)
+	if len(f1) != len(f2) {
+		t.Errorf("idempotency: got %d then %d", len(f1), len(f2))
+	}
+}
+
+func TestConfusableMap_SizeReasonable(t *testing.T) {
+	// After loading, map should have at least 100 cross-script entries
+	confusableOnce.Do(loadConfusables)
+	if len(confusableMap) < 100 {
+		t.Errorf("confusableMap too small: %d entries (want ≥100)", len(confusableMap))
+	}
+}
+
+func TestDetectConfusables_ExcerptFormat(t *testing.T) {
+	input := "аdmin"
+	findings := DetectConfusables(input)
+	if len(findings) == 0 {
+		t.Fatal("want finding")
+	}
+	// Excerpt should contain " → " separator
+	if !strings.Contains(findings[0].Excerpt, " → ") {
+		t.Errorf("excerpt %q: missing ' → ' separator", findings[0].Excerpt)
+	}
+}

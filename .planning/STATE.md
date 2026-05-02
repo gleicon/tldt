@@ -73,7 +73,7 @@ None.
 | v3+ | --url authentication / cookie support | Deferred | v2.0 |
 | v3+ | TOML validation/lint command | Deferred | v2.0 |
 | v3+ | MCP server mode | Deferred | v2.0 |
-| v3+ | UTS#39 confusables database (cross-script homoglyphs) | Deferred | Phase 7 |
+| — | UTS#39 confusables database | Shipped in Phase 7 (SEC-10) | — |
 
 ## Session Continuity
 

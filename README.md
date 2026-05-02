@@ -241,6 +241,7 @@ All detection output goes to **stderr only** — stdout always contains just the
 | Pattern | Direct overrides (`ignore all previous instructions`), role injection, delimiter injection (`[INST]`, `<system>`), jailbreaks (DAN mode), exfiltration requests |
 | Encoding | Base64 payloads (entropy-gated), `\x`-escaped hex sequences, raw hex strings, abnormal control character density |
 | Outlier | Sentences statistically dissimilar from document neighbors (off-topic injection) — uses LexRank cosine similarity matrix |
+| Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o`, etc. — UTS#39 lookup (Unicode 17.0, ~700 entries) |
 
 Tune the outlier threshold:
 
@@ -248,7 +249,7 @@ Tune the outlier threshold:
 cat doc.txt | tldt --detect-injection --injection-threshold 0.90   # stricter
 ```
 
-**What is NOT detected:** Cross-script homoglyph substitution (Cyrillic `а` vs Latin `a`). NFKC normalization handles compatibility variants (fullwidth, ligatures) but not confusable cross-script characters. For that threat model, a UTS#39 confusables database is required.
+**Cross-script homoglyphs** (Cyrillic `а` vs Latin `a`) are caught by the confusables layer, which uses the UTS#39 `confusables.txt` database (Unicode 17.0, embedded in the binary). NFKC normalization alone cannot collapse these — they require a lookup table.
 
 ---
 
