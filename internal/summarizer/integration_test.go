@@ -232,9 +232,18 @@ func TestNew_UnknownAlgorithm(t *testing.T) {
 
 func TestNew_LexRank_Deterministic_RealData(t *testing.T) {
 	text := readTestFile(t, "wikipedia_en.txt")
-	s, _ := New("lexrank")
-	r1, _ := s.Summarize(text, 3)
-	r2, _ := s.Summarize(text, 3)
+	s, err := New("lexrank")
+	if err != nil {
+		t.Fatalf("New(lexrank) error: %v", err)
+	}
+	r1, err := s.Summarize(text, 3)
+	if err != nil {
+		t.Fatalf("first Summarize error: %v", err)
+	}
+	r2, err := s.Summarize(text, 3)
+	if err != nil {
+		t.Fatalf("second Summarize error: %v", err)
+	}
 	if len(r1) != len(r2) {
 		t.Fatalf("non-deterministic length: %d vs %d", len(r1), len(r2))
 	}
