@@ -7,7 +7,7 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 ## Phases
 
 - [x] **Phase 1: Foundation** - Modernize to go modules, clean CLI skeleton, baseline graph algorithm, test data
-- [ ] **Phase 2: Algorithms** - Implement LexRank and TextRank natively, expose algorithm/sentence/paragraph flags, full test suite
+- [x] **Phase 2: Algorithms** - Implement LexRank and TextRank natively, expose algorithm/sentence/paragraph flags, full test suite
 - [ ] **Phase 3: Polish** - TTY detection, output formats (JSON/markdown), pipe safety, O(n²) cap, README
 
 ## Phase Details
@@ -45,20 +45,20 @@ A brownfield Go web API is transformed into a pure CLI summarization tool. The t
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
-- [ ] 02-02-PLAN.md — LexRank algorithm (TF-IDF, cosine similarity, power iteration) with unit tests
-- [ ] 02-03-PLAN.md — TextRank algorithm (word overlap, damped PageRank iteration) with unit tests
-- [ ] 02-04-PLAN.md — CLI flag wiring (--algorithm, --sentences, --paragraphs), token stats, integration tests
+- [x] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
+- [x] 02-02-PLAN.md — LexRank algorithm (TF-IDF, cosine similarity, power iteration) with unit tests
+- [x] 02-03-PLAN.md — TextRank algorithm (word overlap, damped PageRank iteration) with unit tests
+- [x] 02-04-PLAN.md — CLI flag wiring (--algorithm, --sentences, --paragraphs), token stats, integration tests
 
 **Wave 1**
-- [ ] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
+- [x] 02-01-PLAN.md — Sentence tokenizer, Summarizer interface + registry, Graph struct wrapper
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 02-02-PLAN.md — LexRank algorithm with TF-IDF, cosine similarity, power iteration, and full unit tests
-- [ ] 02-03-PLAN.md — TextRank algorithm with word overlap similarity, damped power iteration, and full unit tests
+- [x] 02-02-PLAN.md — LexRank algorithm with TF-IDF, cosine similarity, power iteration, and full unit tests
+- [x] 02-03-PLAN.md — TextRank algorithm with word overlap similarity, damped power iteration, and full unit tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-04-PLAN.md — CLI flags, token stats to stderr, paragraph grouping, integration tests for all algorithms
+- [x] 02-04-PLAN.md — CLI flags, token stats to stderr, paragraph grouping, integration tests for all algorithms
 **UI hint**: no
 
 ### Phase 3: Polish
@@ -78,5 +78,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-05-01 |
-| 2. Algorithms | 0/4 | In progress | - |
+| 2. Algorithms | 4/4 | Complete | 2026-05-01 |
 | 3. Polish | 0/TBD | Not started | - |
