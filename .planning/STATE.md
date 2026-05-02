@@ -2,8 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-last_updated: "2026-05-02T12:30:00.000Z"
+status: completed
+stopped_at: context exhaustion at 75% (2026-05-02)
+last_updated: "2026-05-02T11:39:00.246Z"
 last_activity: 2026-05-02 -- Phase 03 complete (all 3 phases done)
 progress:
   total_phases: 3
@@ -85,9 +86,13 @@ None yet.
 | v2 | --url flag for web fetch | Deferred | Init |
 | v2 | ROUGE score evaluation mode | Deferred | Init |
 | v2 | Config file (~/.tldt.toml) | Deferred | Init |
+| v2 | Ensemble algorithm (LexRank + TextRank combined scores) | Deferred | 2026-05-02 |
+| v3 | AI assistant skill install (Claude Code / OpenCode / Copilot / MCP) | Deferred | 2026-05-02 |
+| v3 | Compression levels: lite / standard / aggressive (maps to --sentences + ratio target) | Deferred | 2026-05-02 |
+| v3 | Auto-trigger on long pastes/files above token threshold | Deferred | 2026-05-02 |
 
 ## Session Continuity
 
-Last session: 2026-05-02T10:18:05.291Z
+Last session: 2026-05-02T11:39:00.243Z
 Stopped at: context exhaustion at 75% (2026-05-02)
 Resume file: None

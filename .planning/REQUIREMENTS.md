@@ -61,6 +61,39 @@
 - Language detection and multilingual support
 - Streaming output (sentence by sentence as ranked)
 - Config file (`~/.tldt.toml`) for persistent defaults
+- Ensemble algorithm combining LexRank + TextRank scores (`--algorithm ensemble`)
+
+## v3 Requirements (backlog)
+
+### AI Assistant Integration (SKILL-01)
+
+Install tldt as a callable skill/tool inside Claude Code, OpenCode, Copilot, and compatible
+AI assistants — modeled after the RTK hook-based installation pattern.
+
+**Compression levels** (`--level lite|standard|aggressive`):
+- `lite` — 10 sentences, ratio ~70%, preserves more context
+- `standard` — 5 sentences (default), ratio ~85%
+- `aggressive` — 3 sentences, ratio ~95%, maximum token savings
+
+Level maps to `--sentences` + target compression ratio. If actual ratio falls short of target,
+retry with fewer sentences (one step down).
+
+**Auto-trigger rules** (fire without explicit invocation):
+- Paste or file input exceeds N tokens (configurable threshold, default 4000)
+- File extension matches a watched list (`.txt`, `.md`, `.pdf`, `.transcript`)
+- Piped input from clipboard exceeds threshold
+
+**Per-assistant installation targets:**
+- Claude Code — hook in `settings.json` (`UserPromptSubmit` or `PreToolUse` on Read)
+- OpenCode — tool definition in agent config
+- GitHub Copilot — VS Code extension skill via `@tldt` mention
+- Generic — MCP server wrapper exposing `tldt_summarize` tool
+
+**Skill contract:**
+```
+Input:  { text: string, level?: "lite"|"standard"|"aggressive" }
+Output: { summary: string, tokens_in: int, tokens_out: int, compression: float }
+```
 
 ## Out of Scope
 
