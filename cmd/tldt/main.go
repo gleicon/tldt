@@ -22,8 +22,9 @@ func main() {
 	explain := flag.Bool("explain", false, "print algorithm metrics and per-sentence scores to stderr (debug)")
 	noCap := flag.Bool("no-cap", false, "disable 2000-sentence cap (allows O(n^2) processing)")
 	format := flag.String("format", "text", "output format: text|json|markdown")
+	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [text...]")
+		fmt.Fprintln(os.Stderr, "Usage: tldt [-f file] [-algorithm lexrank|textrank|graph] [-sentences N] [-paragraphs N] [-explain] [-no-cap] [-format text|json|markdown] [-verbose] [text...]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -96,8 +97,7 @@ func main() {
 	if tokIn > 0 {
 		reduction = int(float64(tokIn-tokOut) / float64(tokIn) * 100)
 	}
-	isTTY := stdoutIsTerminal()
-	if isTTY && *format != "json" {
+	if *verbose && *format != "json" {
 		fmt.Fprintf(os.Stderr, "~%s -> ~%s tokens (%d%% reduction)\n",
 			formatTokens(tokIn), formatTokens(tokOut), reduction)
 	}
@@ -180,37 +180,7 @@ func groupIntoParagraphs(sentences []string, n int) string {
 	return b.String()
 }
 
-// resolveInput determines the text source using explicit precedence:
-//  1. stdin pipe (stdin is not a TTY)
-//  2. -f file flag
-//  3. positional arguments joined with spaces
-//  4. error (no input provided)
-func resolveInput(args []string, filePath string) (string, error) {
-	// 1. stdin pipe: check if stdin is a pipe/redirect (not a TTY)
-	stat, err := os.Stdin.Stat()
-	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-		data, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return "", fmt.Errorf("reading stdin: %w", err)
-		}
-		return string(data), nil
-	}
-	// 2. -f flag
-	if filePath != "" {
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			return "", fmt.Errorf("reading file %q: %w", filePath, err)
-		}
-		return string(data), nil
-	}
-	// 3. positional argument
-	if len(args) > 0 {
-		return strings.Join(args, " "), nil
-	}
-	return "", fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
-}
-
-// resolveInputBytes is like resolveInput but returns raw bytes for validation.
+// resolveInputBytes reads raw input bytes from stdin pipe, -f file, or positional args.
 func resolveInputBytes(args []string, filePath string) ([]byte, error) {
 	stat, err := os.Stdin.Stat()
 	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
@@ -231,16 +201,6 @@ func resolveInputBytes(args []string, filePath string) ([]byte, error) {
 		return []byte(strings.Join(args, " ")), nil
 	}
 	return nil, fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
-}
-
-// stdoutIsTerminal reports whether stdout is connected to a terminal (not piped/redirected).
-// Uses the same os.ModeCharDevice check as resolveInput for stdin.
-func stdoutIsTerminal() bool {
-	stat, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
 // validateInput checks raw input bytes for binary content and whitespace-only input.
