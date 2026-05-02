@@ -1,4 +1,4 @@
-.PHONY: build test install clean deps lint run help
+.PHONY: build test test-uat install clean deps lint run help
 
 BINARY := tldt
 CMD     := ./cmd/tldt
@@ -62,6 +62,15 @@ lint:
 ## run: build and run with stdin (usage example)
 run: build
 	@echo "Built. Pipe text: echo 'your text' | ./$(BINARY)"
+
+## test-uat: run automated UAT tests for phase 4 URL input feature
+test-uat:
+	@echo "=== UAT: Phase 4 URL Input ==="
+	go test -v -count=1 -run 'TestFetch_OK|TestFetch_404|TestFetch_Redirect|TestFetch_InvalidScheme|TestFetch_NonHTMLContentType' ./internal/fetcher/...
+	@echo ""
+	go test -v -count=1 -run 'TestMain_URLFlag' ./cmd/tldt/...
+	@echo ""
+	@echo "=== UAT PASS ==="
 
 ## bench: run benchmarks
 bench:

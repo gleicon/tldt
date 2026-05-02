@@ -616,3 +616,46 @@ func TestMain_URLFlag_404(t *testing.T) {
 		t.Errorf("--url 404: expected '404' in stderr, got %q", stderr)
 	}
 }
+
+func TestMain_URLFlag_Redirect(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/old", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/new", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><article>
+			<p>The redirect destination page has real article content.</p>
+			<p>Researchers have studied this topic for many decades.</p>
+			<p>Results show consistent improvement across all tested conditions.</p>
+			<p>The method outperforms baselines on standard benchmarks.</p>
+			<p>Future work will explore extensions to multilingual settings.</p>
+		</article></body></html>`)
+	})
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	stdout, _, ok := run(t, "", "--url", ts.URL+"/old", "--sentences", "2")
+	if !ok {
+		t.Fatal("--url redirect: binary exited non-zero; expected redirect to be followed")
+	}
+	if strings.TrimSpace(stdout) == "" {
+		t.Error("--url redirect: expected non-empty summary after following redirect, got empty string")
+	}
+}
+
+func TestMain_URLFlag_NonHTML(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		fmt.Fprint(w, "%PDF-1.4 fake content")
+	}))
+	defer ts.Close()
+
+	_, stderr, ok := run(t, "", "--url", ts.URL)
+	if ok {
+		t.Error("--url non-HTML: expected non-zero exit for PDF content-type")
+	}
+	if !strings.Contains(stderr, "unsupported content type") {
+		t.Errorf("--url non-HTML: expected 'unsupported content type' in stderr, got %q", stderr)
+	}
+}
