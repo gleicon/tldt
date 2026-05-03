@@ -372,6 +372,101 @@ func DetectOutliers(sentences []string, simMatrix [][]float64, threshold float64
 	return findings
 }
 
+// --- PII detection ---
+
+// CategoryPII classifies findings from DetectPII and SanitizePII.
+const CategoryPII Category = "pii"
+
+// piiDef pairs a human-readable name with a compiled regex for PII pattern matching.
+type piiDef struct {
+	name string
+	re   *regexp.Regexp
+}
+
+// piiPatterns is the canonical set of PII and secret patterns.
+// Ordered from most-specific (AKIA, AIza) to least-specific (generic digit runs).
+var piiPatterns = []piiDef{
+	// API Keys — specific prefixes first to avoid ambiguous matches
+	{
+		name: "api-key",
+		re:   regexp.MustCompile(`Bearer\s+[A-Za-z0-9._~+/\-]+=*`),
+	},
+	{
+		name: "api-key",
+		re:   regexp.MustCompile(`\bsk-[A-Za-z0-9]{20,}\b`),
+	},
+	{
+		name: "api-key",
+		re:   regexp.MustCompile(`\bAIza[A-Za-z0-9_\-]{35,}\b`),
+	},
+	{
+		name: "api-key",
+		re:   regexp.MustCompile(`\bAKIA[A-Za-z0-9]{16,}\b`),
+	},
+	// JWT — three base64url segments separated by dots, minimum 10 chars per segment
+	{
+		name: "jwt",
+		re:   regexp.MustCompile(`\b[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b`),
+	},
+	// Email addresses
+	{
+		name: "email",
+		re:   regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`),
+	},
+	// Credit card numbers — 13-16 consecutive digits
+	{
+		name: "credit-card",
+		re:   regexp.MustCompile(`\b(?:\d[ \-]?){12,15}\d\b`),
+	},
+}
+
+// DetectPII scans text for PII and secret patterns.
+// Returns one Finding per match. Text is not modified.
+// Excerpts for long values are truncated to first 12 chars + "..." in the Excerpt field.
+func DetectPII(text string) []Finding {
+	var findings []Finding
+	lines := strings.Split(text, "\n")
+	for lineIdx, line := range lines {
+		for _, p := range piiPatterns {
+			matches := p.re.FindAllStringIndex(line, -1)
+			for _, loc := range matches {
+				start, end := loc[0], loc[1]
+				raw := line[start:end]
+				excerpt := raw
+				if len(excerpt) > 12 {
+					excerpt = excerpt[:12] + "..."
+				}
+				findings = append(findings, Finding{
+					Category: CategoryPII,
+					Sentence: lineIdx + 1, // 1-based line number
+					Offset:   start,
+					Score:    0.95,
+					Pattern:  p.name,
+					Excerpt:  excerpt,
+				})
+			}
+		}
+	}
+	return findings
+}
+
+// SanitizePII replaces PII matches in text with [REDACTED:<type>] placeholders.
+// Returns the redacted string and a []Finding slice in a single pass.
+// The original text is never stored or logged — only the redacted form is returned.
+// Replacement format: [REDACTED:email], [REDACTED:api-key], [REDACTED:jwt], [REDACTED:credit-card].
+func SanitizePII(text string) (string, []Finding) {
+	findings := DetectPII(text)
+	if len(findings) == 0 {
+		return text, nil
+	}
+	redacted := text
+	for _, p := range piiPatterns {
+		replacement := "[REDACTED:" + p.name + "]"
+		redacted = p.re.ReplaceAllString(redacted, replacement)
+	}
+	return redacted, findings
+}
+
 // --- Combined analysis ---
 
 // Analyze runs pattern, encoding, and confusable-homoglyph detectors against text
