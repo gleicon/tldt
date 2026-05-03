@@ -98,26 +98,26 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - LLM integration — antithetical to tool's purpose
 - Abstractive summarization — LexRank/TextRank are extractive only
 
-## Current Milestone: v1.2.0 OWASP Security Hardening
+## Milestone v1.2.0 OWASP Security Hardening — COMPLETE (2026-05-03)
 
 **Goal:** Close the four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI middleware — SSRF protection, hook defense, PII detection, and output guard.
 
-**Target features:**
-- SSRF protection in `--url` fetcher (RFC 1918 + loopback + cloud metadata IP blocking)
-- Hook defense — wire `--sanitize --detect-injection` into `tldt-hook.sh` by default
-- PII/secret scanner — `--detect-pii` and `--sanitize-pii` flags
-- Output guard — re-check summary before hook emits to Claude context
-- README Security section documenting architectural immunity to LLM04/08/09
+### Validated in Phase 8: Network Hardening + Hook Defense
 
-### Active (v1.2.0)
+- ✓ SSRF protection: block RFC 1918 / loopback / cloud metadata IPs in `--url` fetcher (SEC-11)
+- ✓ `--url` redirect cap ≤5 hops (SEC-12)
+- ✓ Hook wires `--sanitize --detect-injection` by default; surfaces warnings to Claude (SEC-13)
+- ✓ Hook output guard re-runs injection check on summary before emitting to `additionalContext` (SEC-16)
+- ✓ docs/security.md — full OWASP LLM Top 10 2025 coverage reference (D-10, D-11)
+- ✓ pkg/tldt/ embeddable Go library (D-12)
 
-- [ ] SSRF protection: block RFC 1918 / loopback / cloud metadata IPs in `--url` fetcher (SEC-11)
-- [ ] `--url` redirect cap ≤5 hops (SEC-12)
-- [ ] Hook wires `--sanitize --detect-injection` by default; surfaces warnings to Claude (SEC-13)
-- [ ] `--detect-pii` scans for PII/secrets (email, API keys, JWTs, credit cards) — warns stderr (SEC-14)
-- [ ] `--sanitize-pii` redacts PII matches with `[REDACTED:<type>]` before summarization (SEC-15)
-- [ ] Hook output guard re-runs injection check on summary before emitting to `additionalContext` (SEC-16)
-- [ ] README `## Security` section — architectural immunity to LLM04/08/09 (DOC-01)
+### Validated in Phase 9: PII Detection + Output Guard + Docs
+
+- ✓ `--detect-pii` scans for PII/secrets (email, API keys, JWTs, credit cards) — warns stderr (SEC-14)
+- ✓ `--sanitize-pii` redacts PII matches with `[REDACTED:<type>]` before summarization (SEC-15)
+- ✓ Hook output guard extended with `--detect-pii` (D-03/D-05)
+- ✓ README `## Security` section — architectural immunity to LLM04/08/09 (DOC-01)
+- ✓ 344 total tests pass
 
 ## Key Decisions
 
