@@ -313,3 +313,48 @@ Plans:
 |-------|----------------|--------|-----------|
 | 8. Network Hardening + Hook Defense | 4/4 | Complete | 2026-05-03 |
 | 9. PII Detection + Output Guard + Docs | 3/3 | Complete | 2026-05-03 |
+
+---
+
+## Milestone v2.1.0: Library SDK
+
+### Overview
+
+v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt in Go programs. The work splits into two sequential phases: Phase 10 extends the library with public PII types and a PII-aware Pipeline; Phase 11 refactors the CLI to import only `pkg/tldt`, eliminating all direct `internal/` imports. Both phases are independently verifiable — Phase 10 by library unit tests, Phase 11 by the full CLI integration test suite.
+
+### Phases
+
+- [ ] **Phase 10: Library API Completion** - Extend pkg/tldt with PIIFinding type, DetectPII, SanitizePII, and PII stage in Pipeline; unit-test the new public API surface
+- [ ] **Phase 11: CLI Refactor** - Refactor cmd/tldt/main.go to route all logic through pkg/tldt; zero direct internal/ imports; all 344+ tests pass
+
+## Phase Details
+
+### Phase 10: Library API Completion
+**Goal**: Any Go program can embed tldt as a sanitize/summarize/PII-guard for LLM input using only the public `pkg/tldt` API — no internal package access required.
+**Depends on**: Phase 9
+**Requirements**: LIB-01, LIB-02, LIB-03, LIB-04
+**Success Criteria** (what must be TRUE):
+  1. A Go program that imports only `github.com/gleicon/tldt/pkg/tldt` can call `tldt.DetectPII(text)` and receive a `[]tldt.PIIFinding` with `Pattern`, `Excerpt`, and `Line` fields — no internal package needed
+  2. `tldt.SanitizePII(text)` returns a redacted string and `[]tldt.PIIFinding`; calling it on text containing an email address produces `[REDACTED:email]` in the output string
+  3. `tldt.Pipeline(text, tldt.PipelineOptions{DetectPII: true})` returns a `PipelineResult` with a non-empty `PIIFindings` slice when the input contains PII patterns
+  4. `go test ./pkg/tldt/...` passes all unit tests for the new API surface, including `DetectPII`, `SanitizePII`, and `Pipeline` with PII stage enabled
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 11: CLI Refactor
+**Goal**: `cmd/tldt/main.go` imports zero `internal/` packages; all existing CLI behavior is preserved and the full test suite passes.
+**Depends on**: Phase 10
+**Requirements**: CLI-10, CLI-11
+**Success Criteria** (what must be TRUE):
+  1. `grep -r 'github.com/gleicon/tldt/internal' cmd/tldt/main.go` returns no matches — main.go has zero direct internal/ imports
+  2. All flags present before the refactor (`--detect-pii`, `--sanitize-pii`, `--detect-injection`, `--sanitize`, `--url`, `--format`, `--algorithm`, `--sentences`, `--paragraphs`, `--level`, `--verbose`, `--explain`, `--rouge`, `--install-skill`, `--print-threshold`) continue to work identically after the refactor
+  3. `go test ./...` passes all 344+ tests with no regressions
+**Plans**: TBD
+**UI hint**: no
+
+## v2.1.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 10. Library API Completion | 0/? | Not started | - |
+| 11. CLI Refactor | 0/? | Not started | - |
