@@ -30,8 +30,15 @@ var (
 	lookupHost = net.LookupHost
 )
 
+// cgnBlock is the IANA Shared Address Space (RFC 6598, 100.64.0.0/10).
+// Reachable inside many cloud-provider VPC fabrics; not covered by IsPrivate().
+var cgnBlock = &net.IPNet{
+	IP:   net.ParseIP("100.64.0.0"),
+	Mask: net.CIDRMask(10, 32),
+}
+
 // blockPrivateIP returns ErrSSRFBlocked if any addr in addrs resolves to a
-// loopback, private, link-local, or cloud metadata IP.
+// loopback, private, link-local, unspecified, CGN, or cloud metadata IP.
 // host is included in the error message for debuggability.
 func blockPrivateIP(host string, addrs []string) error {
 	for _, addr := range addrs {
@@ -47,6 +54,12 @@ func blockPrivateIP(host string, addrs []string) error {
 		}
 		if ip.IsLinkLocalUnicast() {
 			return fmt.Errorf("host %q resolves to link-local IP %s: %w", host, addr, ErrSSRFBlocked)
+		}
+		if ip.IsUnspecified() {
+			return fmt.Errorf("host %q resolves to unspecified IP %s: %w", host, addr, ErrSSRFBlocked)
+		}
+		if cgnBlock.Contains(ip) {
+			return fmt.Errorf("host %q resolves to shared-address-space IP %s: %w", host, addr, ErrSSRFBlocked)
 		}
 		if ip.Equal(cloudMetadataIPv6) {
 			return fmt.Errorf("host %q resolves to cloud metadata IP %s: %w", host, addr, ErrSSRFBlocked)
