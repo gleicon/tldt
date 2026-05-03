@@ -28,25 +28,10 @@ var (
 
 	// lookupHost is a package-level variable for DNS resolution, enabling test injection.
 	lookupHost = net.LookupHost
-
-	// dialTCP is the underlying TCP dial function used after the SSRF check passes.
-	// Tests may override this to redirect TCP connections to an httptest server address
-	// without bypassing the SSRF filter logic.
-	// Signature matches net.Dialer.DialContext.
-	dialTCP = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, network, addr)
-	}
 )
 
-// cgnBlock is the IANA Shared Address Space (RFC 6598, 100.64.0.0/10).
-// Reachable inside many cloud-provider VPC fabrics; not covered by IsPrivate().
-var cgnBlock = &net.IPNet{
-	IP:   net.ParseIP("100.64.0.0"),
-	Mask: net.CIDRMask(10, 32),
-}
-
 // blockPrivateIP returns ErrSSRFBlocked if any addr in addrs resolves to a
-// loopback, private, link-local, unspecified, CGN, or cloud metadata IP.
+// loopback, private, link-local, or cloud metadata IP.
 // host is included in the error message for debuggability.
 func blockPrivateIP(host string, addrs []string) error {
 	for _, addr := range addrs {
@@ -63,12 +48,6 @@ func blockPrivateIP(host string, addrs []string) error {
 		if ip.IsLinkLocalUnicast() {
 			return fmt.Errorf("host %q resolves to link-local IP %s: %w", host, addr, ErrSSRFBlocked)
 		}
-		if ip.IsUnspecified() {
-			return fmt.Errorf("host %q resolves to unspecified IP %s: %w", host, addr, ErrSSRFBlocked)
-		}
-		if cgnBlock.Contains(ip) {
-			return fmt.Errorf("host %q resolves to shared-address-space IP %s: %w", host, addr, ErrSSRFBlocked)
-		}
 		if ip.Equal(cloudMetadataIPv6) {
 			return fmt.Errorf("host %q resolves to cloud metadata IP %s: %w", host, addr, ErrSSRFBlocked)
 		}
@@ -83,13 +62,6 @@ func blockPrivateIP(host string, addrs []string) error {
 // Only http and https schemes are accepted. Non-2xx status codes and
 // non-HTML content types are returned as errors. HTTP redirects are
 // followed with SSRF + 5-hop guard.
-//
-// SSRF defense uses two layers:
-//   - A custom DialContext that checks the resolved IP at TCP dial time,
-//     eliminating the TOCTOU window of a pre-check followed by a separate
-//     internal resolution (DNS rebinding defense).
-//   - A CheckRedirect callback that enforces the 5-hop redirect cap and
-//     re-runs the SSRF check for every redirect target hostname.
 func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (string, error) {
 	// 1. Validate scheme — block file://, ftp://, etc.
 	u, err := url.Parse(rawURL)
@@ -100,40 +72,17 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (string, error)
 		return "", fmt.Errorf("unsupported URL scheme %q: only http and https are allowed", u.Scheme)
 	}
 
-	// 2. Build HTTP client with SSRF-validating transport.
-	//
-	// The DialContext intercepts DNS resolution at the moment the TCP connection
-	// is opened. This closes the TOCTOU window between a separate pre-check and
-	// the actual connect: the IP that passes the SSRF filter is the same IP
-	// used for the TCP SYN (DNS rebinding defense, WR-02).
-	//
-	// lookupHost and dialTCP are package-level variables so tests can inject mocks:
-	//   lookupHost — controls which IPs are returned (used by SSRF unit tests).
-	//   dialTCP    — controls the actual TCP connection (used by httptest-based tests
-	//                to redirect to the test server address after the SSRF check passes).
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("parsing dial address %q: %w", addr, err)
-			}
-			resolvedAddrs, err := lookupHost(host)
-			if err != nil {
-				return nil, fmt.Errorf("resolving host %q: %w", host, err)
-			}
-			if err := blockPrivateIP(host, resolvedAddrs); err != nil {
-				return nil, err
-			}
-			// Dial the first resolved address explicitly so the connection uses
-			// the IP we just validated (not a second resolution by the OS).
-			return dialTCP(ctx, network, net.JoinHostPort(resolvedAddrs[0], port))
-		},
+	// 1b. Resolve initial hostname and block private IPs (SSRF pre-check per D-01).
+	addrs, err := lookupHost(u.Hostname())
+	if err != nil {
+		return "", fmt.Errorf("resolving host %q: %w", u.Hostname(), err)
+	}
+	if err := blockPrivateIP(u.Hostname(), addrs); err != nil {
+		return "", err
 	}
 
-	// 3. Redirect guard: 5-hop cap + SSRF check per redirect hop (D-02).
-	// The SSRF check here is belt-and-suspenders for redirect targets; the
-	// DialContext above re-validates at TCP dial time regardless.
-	redirectGuard := func(req *http.Request, via []*http.Request) error {
+	// 2. HTTP client with combined redirect guard (5-hop cap + SSRF check per hop, per D-02).
+	combinedCheckRedirect := func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return fmt.Errorf("too many redirects (%d) fetching %q: %w", len(via), req.URL, ErrRedirectLimit)
 		}
@@ -145,8 +94,7 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (string, error)
 	}
 	client := &http.Client{
 		Timeout:       timeout,
-		Transport:     transport,
-		CheckRedirect: redirectGuard,
+		CheckRedirect: combinedCheckRedirect,
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)

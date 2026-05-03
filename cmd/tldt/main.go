@@ -114,7 +114,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag, nil)
+	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -331,11 +331,7 @@ func groupIntoParagraphs(sentences []string, n int) string {
 }
 
 // resolveInputBytes reads raw input bytes from --url, stdin pipe, -f file, or positional args.
-//
-// stdinReader overrides os.Stdin for the stdin branch when non-nil.
-// Pass nil in production; pass strings.NewReader(...) or an *os.File pipe in tests.
-// This avoids global os.Stdin mutation in tests (WR-04).
-func resolveInputBytes(args []string, filePath string, urlStr string, stdinReader io.Reader) ([]byte, error) {
+func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, error) {
 	// --url branch: highest priority — most explicit input source (INP-01, INP-02)
 	if urlStr != "" {
 		text, err := fetcher.Fetch(urlStr, 30*time.Second, 5<<20) // 5MB cap
@@ -343,14 +339,6 @@ func resolveInputBytes(args []string, filePath string, urlStr string, stdinReade
 			return nil, fmt.Errorf("fetching URL: %w", err)
 		}
 		return []byte(text), nil
-	}
-	// Stdin branch: use injected reader if provided, otherwise check os.Stdin pipe state.
-	if stdinReader != nil {
-		data, err := io.ReadAll(stdinReader)
-		if err != nil {
-			return nil, fmt.Errorf("reading stdin: %w", err)
-		}
-		return data, nil
 	}
 	stat, err := os.Stdin.Stat()
 	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
