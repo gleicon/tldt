@@ -43,11 +43,14 @@ fi
 
 # Summarize with sanitization and injection detection (SEC-13, D-04)
 # Capture all stderr, then split WARNING lines from token stats
+# Register trap before any mktemp so temp files are cleaned on unexpected exit.
 STDERR_FILE=$(mktemp)
+GUARD_FILE=$(mktemp)
+trap 'rm -f "$STDERR_FILE" "$GUARD_FILE"' EXIT
+
 SUMMARY=$(printf '%s' "$PROMPT" | tldt --sanitize --detect-injection --verbose 2>"$STDERR_FILE" || true)
 WARNINGS=$(grep 'WARNING' "$STDERR_FILE" || true)
 SAVINGS=$(grep -v 'WARNING' "$STDERR_FILE" || true)
-rm -f "$STDERR_FILE"
 
 # If summarization failed or returned empty — pass through silently (D-05 spirit)
 if [ -z "$SUMMARY" ]; then
@@ -56,10 +59,8 @@ fi
 
 # Output guard: re-run detection on the summary itself (SEC-16, D-06)
 # --sentences 999 prevents re-summarization; stdout discarded; only stderr WARNING lines matter
-GUARD_FILE=$(mktemp)
 printf '%s' "$SUMMARY" | tldt --detect-injection --sentences 999 2>"$GUARD_FILE" >/dev/null || true
 SUMMARY_WARNINGS=$(grep 'WARNING' "$GUARD_FILE" || true)
-rm -f "$GUARD_FILE"
 
 # Build labeled additionalContext — only emit non-empty sections (D-08, D-09)
 REPLACEMENT="[Token savings]
