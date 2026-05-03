@@ -1,8 +1,10 @@
 package fetcher
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +16,7 @@ const testTimeout = 5 * time.Second
 const testMaxBytes = 1 << 20 // 1MB
 
 // withLookup temporarily overrides the package-level lookupHost for test isolation.
+// Use for SSRF-specific tests where the DNS response controls the test outcome.
 // It restores the original after the test function returns.
 func withLookup(fn func(string) ([]string, error), test func()) {
 	orig := lookupHost
@@ -22,8 +25,40 @@ func withLookup(fn func(string) ([]string, error), test func()) {
 	test()
 }
 
-// publicLookup always returns a public IP, bypassing the SSRF pre-check.
-// Use this for httptest-based tests that need to exercise non-SSRF behavior.
+// withServer overrides both lookupHost and dialTCP so that httptest-based tests
+// can exercise non-SSRF fetcher behavior (404, redirect following, content-type,
+// etc.) while the SSRF filter still runs.
+//
+// Background: httptest.NewServer binds to 127.0.0.1. With the DialContext transport
+// (WR-02 fix), the SSRF filter runs at TCP dial time. If the real loopback IP reaches
+// blockPrivateIP it is rejected — correct SSRF behavior but wrong for tests that need
+// to exercise the HTTP layer.
+//
+// Solution: lookupHost returns a public IP so the SSRF filter passes, and dialTCP
+// redirects all TCP connections to the real test server address so the request
+// actually reaches the httptest server.
+func withServer(ts *httptest.Server, test func()) {
+	origLookup := lookupHost
+	origDial := dialTCP
+
+	realAddr := ts.Listener.Addr().String()
+	lookupHost = func(host string) ([]string, error) {
+		return []string{"93.184.216.34"}, nil // public IP — passes blockPrivateIP
+	}
+	dialTCP = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// Ignore resolved addr; always connect to the real test server.
+		return (&net.Dialer{}).DialContext(ctx, network, realAddr)
+	}
+
+	defer func() {
+		lookupHost = origLookup
+		dialTCP = origDial
+	}()
+	test()
+}
+
+// publicLookup always returns a public IP, bypassing the SSRF filter.
+// Use with withLookup for SSRF tests that need to inject a specific IP separately.
 func publicLookup(host string) ([]string, error) {
 	return []string{"93.184.216.34"}, nil
 }
@@ -51,7 +86,7 @@ func TestFetch_OK(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	withLookup(publicLookup, func() {
+	withServer(ts, func() {
 		text, err := Fetch(ts.URL, testTimeout, testMaxBytes)
 		if err != nil {
 			t.Fatalf("Fetch: unexpected error: %v", err)
@@ -71,7 +106,7 @@ func TestFetch_404(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	withLookup(publicLookup, func() {
+	withServer(ts, func() {
 		_, err := Fetch(ts.URL, testTimeout, testMaxBytes)
 		if err == nil {
 			t.Error("Fetch: expected error for 404 response, got nil")
@@ -94,7 +129,7 @@ func TestFetch_Redirect(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	withLookup(publicLookup, func() {
+	withServer(ts, func() {
 		text, err := Fetch(ts.URL+"/old", testTimeout, testMaxBytes)
 		if err != nil {
 			t.Fatalf("Fetch redirect: unexpected error: %v", err)
@@ -122,7 +157,7 @@ func TestFetch_NonHTMLContentType(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	withLookup(publicLookup, func() {
+	withServer(ts, func() {
 		_, err := Fetch(ts.URL, testTimeout, testMaxBytes)
 		if err == nil {
 			t.Error("Fetch: expected error for application/pdf content-type, got nil")
@@ -149,6 +184,8 @@ func TestBlockPrivateIP(t *testing.T) {
 		{"private-192", "internal", []string{"192.168.1.1"}, true},
 		{"link-local", "metadata", []string{"169.254.169.254"}, true},
 		{"cloud-meta-v6", "metadata", []string{"fd00:ec2::254"}, true},
+		{"unspecified-v4", "zero", []string{"0.0.0.0"}, true},
+		{"cgn", "cgn", []string{"100.64.1.1"}, true},
 		{"public-ip", "example.com", []string{"93.184.216.34"}, false},
 		{"nil-parse", "bad", []string{"not-an-ip"}, false},
 	}
@@ -211,32 +248,34 @@ func TestFetch_SSRFBlockViaRedirect(t *testing.T) {
 	defer ts.Close()
 
 	callCount := 0
-	withLookup(func(host string) ([]string, error) {
-		callCount++
-		if callCount == 1 {
-			return []string{"93.184.216.34"}, nil // initial: public — passes pre-check
-		}
-		return []string{"10.0.0.1"}, nil // redirect: private — blocked by CheckRedirect
-	}, func() {
-		_, err := Fetch(ts.URL+"/start", testTimeout, testMaxBytes)
-		if err == nil {
-			t.Fatal("expected SSRF block on redirect to private IP, got nil")
-		}
-		if !errors.Is(err, ErrSSRFBlocked) && !errors.Is(err, ErrRedirectLimit) {
-			t.Errorf("expected ErrSSRFBlocked or ErrRedirectLimit, got: %v", err)
-		}
+	withServer(ts, func() {
+		withLookup(func(host string) ([]string, error) {
+			callCount++
+			if callCount == 1 {
+				return []string{"93.184.216.34"}, nil // initial: public — passes SSRF check
+			}
+			return []string{"10.0.0.1"}, nil // redirect: private — blocked
+		}, func() {
+			_, err := Fetch(ts.URL+"/start", testTimeout, testMaxBytes)
+			if err == nil {
+				t.Fatal("expected SSRF block on redirect to private IP, got nil")
+			}
+			if !errors.Is(err, ErrSSRFBlocked) && !errors.Is(err, ErrRedirectLimit) {
+				t.Errorf("expected ErrSSRFBlocked or ErrRedirectLimit, got: %v", err)
+			}
+		})
 	})
 }
 
 // TestFetch_RedirectLimitExceeded tests that redirect chains > 5 hops are rejected.
-// Uses publicLookup so the SSRF pre-check passes and the redirect cap is exercised.
+// Uses withServer so the SSRF filter passes and the redirect cap is exercised.
 func TestFetch_RedirectLimitExceeded(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, r.URL.String(), http.StatusMovedPermanently)
 	}))
 	defer ts.Close()
 
-	withLookup(publicLookup, func() {
+	withServer(ts, func() {
 		_, err := Fetch(ts.URL, testTimeout, testMaxBytes)
 		if err == nil {
 			t.Fatal("expected redirect limit error, got nil")
