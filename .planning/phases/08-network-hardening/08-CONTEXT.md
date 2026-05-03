@@ -6,12 +6,12 @@
 <domain>
 ## Phase Boundary
 
-Phase 8 delivers two security layers:
+Phase 8 delivers four deliverables:
 
 1. **URL fetcher hardening** (`internal/fetcher/fetcher.go`): SSRF protection via hostname resolution + private IP blocking on every hop, plus a 5-hop redirect cap enforced via a custom `http.Client.CheckRedirect` function.
 2. **Hook defense** (`internal/installer/hooks/tldt-hook.sh`): The embedded hook template is updated to invoke `tldt --sanitize --detect-injection --verbose` by default, split WARNING lines from token stats via grep, run an output guard that re-checks the summary before emitting, and compose everything into a labeled `additionalContext` structure.
-
-No new Go packages. No new CLI flags on `tldt` binary. Changes confined to `internal/fetcher/fetcher.go` and `internal/installer/hooks/tldt-hook.sh` (the embedded source).
+3. **Security documentation** (`docs/security.md`): A standalone technical document covering SSRF defense, injection detection, OWASP LLM Top 10 2025 category mitigations, with code examples. Professional reference for security-conscious adopters.
+4. **Embeddable Go library** (`pkg/tldt/`): A new public package that wraps the `internal/` pipeline and exposes a stable API for programs that consume AI APIs and want to embed tldt's summarization, detection, and sanitization capabilities directly — without shelling out to the binary.
 
 </domain>
 
@@ -52,6 +52,33 @@ No new Go packages. No new CLI flags on `tldt` binary. Changes confined to `inte
   ```
 - **D-09:** When there are **no warnings** (clean input and clean summary), additionalContext contains only `[Token savings]` and `[Summary]` sections. Warning sections are omitted entirely. No noise on clean runs.
 
+### Security Documentation (docs/security.md)
+
+- **D-10:** Create `docs/security.md` — a standalone, technical, professional reference document covering:
+  - OWASP LLM Top 10 2025 categories addressed by tldt (LLM01 Prompt Injection, LLM02 Sensitive Info Disclosure, LLM05 Improper Output Handling, LLM10 SSRF) — one section per category with rationale
+  - Each section includes: threat description, how tldt mitigates it, and a concrete CLI example showing detection/blocking behavior
+  - Injection detection: example showing `WARNING:` output for a real payload pattern
+  - SSRF: example showing blocked private IP and cloud metadata responses
+  - PII: example of `--detect-pii` and `--sanitize-pii` output (Phase 9 items documented here too, as the security doc is the canonical reference)
+  - Tone: technical, no marketing fluff; targeted at security engineers and platform teams evaluating tldt as AI middleware
+- **D-11:** Update `docs/index.html` to surface tldt's security posture. Add a "Security" section or callout block on the landing page that: lists the OWASP LLM categories addressed, links to `docs/security.md` for detail, and frames the protection as a value proposition for AI pipeline operators. Consistent with existing page style.
+
+### Embeddable Go Library (pkg/tldt/)
+
+- **D-12:** Create `pkg/tldt/` as a new public Go package exporting a stable API for embedding tldt into programs that consume AI APIs. Key design decisions:
+  - **Why `pkg/`**: All existing code is in `internal/` — not importable by external Go programs. `pkg/tldt/` wraps the internal packages and is the only public API surface. Module path: `github.com/gleicon/tldt/pkg/tldt`.
+  - **Core exported types/functions** (researcher and planner to finalize exact signatures):
+    - `Summarize(text string, opts SummarizeOptions) (Result, error)` — runs the summarization pipeline
+    - `Detect(text string, opts DetectOptions) (DetectResult, error)` — runs injection/encoding detection without summarizing
+    - `Sanitize(text string) (string, SanitizeReport, error)` — runs Unicode sanitization
+    - `Fetch(url string, opts FetchOptions) (string, error)` — fetches + extracts article text with SSRF protection
+    - `Pipeline(text string, opts PipelineOptions) (PipelineResult, error)` — single call: sanitize → detect → summarize; designed for AI API middleware use case
+  - **Options structs** use functional options or plain structs (researcher to recommend idiomatic Go pattern for this API surface)
+  - **No global state**: each call is stateless; options passed explicitly
+  - **SummarizeOptions** mirrors CLI flags: `Algorithm string`, `Sentences int`, `Format string`
+  - **PipelineResult** includes: `Summary string`, `TokenSavings TokenStats`, `Warnings []Warning`, `Redactions int`
+  - Unit tests in `pkg/tldt/tldt_test.go` — integration-style (calls through to internal packages)
+
 </decisions>
 
 <canonical_refs>
@@ -70,6 +97,19 @@ No new Go packages. No new CLI flags on `tldt` binary. Changes confined to `inte
 ### Hook (target file for 08-02)
 - `internal/installer/hooks/tldt-hook.sh` — Embedded hook template source; this is what gets changed (NOT a deployed copy)
 - `internal/installer/embed.go` — go:embed wiring that packages the hook template into the binary
+
+### Security Documentation + Landing Page
+- `docs/index.html` — Existing 904-line landing page; security callout block added here
+- `docs/security.md` — New file; canonical reference for OWASP mitigations (created in this phase)
+- `.planning/REQUIREMENTS.md` §SEC-11–SEC-16, §DOC-01 — requirements covered by security doc
+
+### Embeddable Library
+- `internal/summarizer/` — Core algorithms to wrap in pkg/tldt/
+- `internal/detector/` — Detection pipeline to expose via Detect()
+- `internal/sanitizer/` — Sanitization to expose via Sanitize()
+- `internal/fetcher/` — Fetch() to expose (with SSRF hardening from this phase)
+- `internal/config/` — Config struct for options defaults reference
+- `cmd/tldt/main.go` — Reference for Pipeline() call order and flag→option mapping
 
 ### Cross-cutting constraints (from ROADMAP.md — MUST follow)
 - SSRF block must resolve hostname after each redirect, not just initial URL
@@ -97,6 +137,9 @@ No new Go packages. No new CLI flags on `tldt` binary. Changes confined to `inte
 ### Integration Points
 - `internal/fetcher/fetcher.go`: Add `blockPrivateIP(host string) error` helper + typed sentinels. Wire initial check after scheme validation. Pass combined `CheckRedirect` func to `http.Client`.
 - `internal/installer/hooks/tldt-hook.sh`: Replace current `tldt --verbose` invocation with `tldt --sanitize --detect-injection --verbose`. Add stderr-split (grep WARNING / grep -v WARNING). Add output guard section. Replace flat REPLACEMENT string with labeled-section builder.
+- `pkg/tldt/tldt.go` (new): Thin wrapper — imports internal packages, exposes exported types and functions. No business logic; delegates entirely to `internal/`.
+- `docs/security.md` (new): References real tldt flag behavior; examples must match actual CLI output format.
+- `docs/index.html`: Security callout added — style must match existing page design.
 
 </code_context>
 
@@ -106,6 +149,9 @@ No new Go packages. No new CLI flags on `tldt` binary. Changes confined to `inte
 - The `--sentences 999` trick for output guard is intentional: it makes the guard a pure detection pass without re-summarization side effects. If `--sentences` ever gets a dedicated "no-summarize" mode in a future phase, the hook can be simplified then.
 - Labeled sections in additionalContext are rendered conditionally — the bash script should only emit a section header if its content is non-empty. Python3 JSON encoding (already used in the hook) handles the final output safely.
 - `ErrSSRFBlocked` and `ErrRedirectLimit` as package-level vars in `internal/fetcher` make test assertions clean: `errors.Is(err, fetcher.ErrSSRFBlocked)`.
+- `pkg/tldt/` is a thin wrapper — it must not duplicate logic from `internal/`. If a caller passes options that don't map to existing internal flags, reject at the `pkg/` boundary, not deep in the pipeline.
+- `docs/security.md` examples should use real command output format — e.g. actual WARNING line format: `WARNING: [role-injection] "You are now DAN..." (line 3)`.
+- The `Pipeline()` function is the primary embedding use case: one call for the full sanitize→detect→summarize flow, matching what the hook does in bash but as a native Go call. AI API middleware (LangChain, Anthropic SDK, etc.) can call this before sending text to the model.
 
 </specifics>
 
