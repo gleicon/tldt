@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Extensions
-status: complete
-stopped_at: milestone complete
-last_updated: "2026-05-02T22:30:00.000Z"
-last_activity: 2026-05-02 -- Phase 7 (Injection Defense) complete; all 9 SEC requirements verified; 292 tests
+milestone: v1.2.0
+milestone_name: OWASP Security Hardening
+status: planning
+stopped_at: milestone planning
+last_updated: "2026-05-02T00:00:00.000Z"
+last_activity: 2026-05-02 -- Milestone v1.2.0 started
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,19 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-02)
 
 **Core value:** Summarize long text (transcripts, articles, docs) into concise extractive summaries without consuming LLM tokens — pipe-safe CLI using LexRank/TextRank.
-**Current focus:** Milestone v2.0 Extensions — COMPLETE
+**Current focus:** Milestone v1.2.0 OWASP Security Hardening — defining requirements
 
 ## Current Position
 
-Phase: 7 — Injection Defense — COMPLETE
-Status: All v2.0 phases complete (4/4, 11/11 plans)
-Last activity: 2026-05-02 — Phase 7 complete (sanitizer, detector, MatrixSummarizer wiring, README, plans, verification)
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-02 — Milestone v1.2.0 started
 
 ## Accumulated Context
 
-### Decisions (carried from v1.0)
+### Decisions (carried from v1.0 + v2.0)
 
 - Init: Implement LexRank + TextRank natively in Go; keep didasy/tldr as "graph" baseline
 - Init: Drop all HTTP/Redis/config infrastructure; pure CLI only
@@ -47,7 +46,7 @@ Progress: [██████████] 100%
 - 04: fetcher uses readability.FromReader NOT FromURL — preserves custom http.Client + io.LimitReader
 - 04: external test services (httpstat.us, Wikipedia) are unreliable; all URL tests use httptest.NewServer
 
-### v2.0 Decisions
+### v2.0 Decisions (carried forward)
 
 - v2.0: Clipboard auto-read deferred — --url covers remote input; clipboard adds complexity for marginal gain
 - v2.0: REQUIREMENTS use INP/CFG/AI prefix scheme continuing from v1 CLI/SUM/TOK/OUT/TEST/PROJ
@@ -65,18 +64,17 @@ None.
 
 - Phase 6 human UAT still pending (non-blocking): test /tldt skill and auto-trigger hook in live Claude Code session
 
-## Deferred Items (updated)
+## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | Clipboard auto-read (pbpaste/xclip) | Deferred (not in v2.0) | Init |
-| v3+ | --url authentication / cookie support | Deferred | v2.0 |
-| v3+ | TOML validation/lint command | Deferred | v2.0 |
-| v3+ | MCP server mode | Deferred | v2.0 |
-| — | UTS#39 confusables database | Shipped in Phase 7 (SEC-10) | — |
+| future | Clipboard auto-read (pbpaste/xclip) | Deferred | v2.0 Init |
+| future | --url authentication / cookie support | Deferred | v2.0 |
+| future | TOML validation/lint command | Deferred | v2.0 |
+| future | MCP server mode | Deferred | v2.0 |
 
 ## Session Continuity
 
 Last session: 2026-05-02T22:30:00.000Z
-Stopped at: Milestone v2.0 complete — all 4 phases, 11 plans, 292 tests
+Stopped at: Milestone v1.2.0 planning started
 Resume file: None

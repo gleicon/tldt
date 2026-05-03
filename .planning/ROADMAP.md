@@ -230,3 +230,77 @@ Plans:
 | 5. Configuration | 2/2 | Complete | 2026-05-02 |
 | 6. AI Integration | 4/4 | Complete | 2026-05-02 |
 | 7. Injection Defense | 3/3 | Complete | 2026-05-02 |
+
+---
+
+## Milestone v1.2.0: OWASP Security Hardening
+
+### Overview
+
+v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI middleware. The work splits naturally along two delivery boundaries: network-layer and hook-layer hardening are surgical changes to existing files (fetcher.go and tldt-hook.sh) with no new packages; PII detection introduces a new scanner and requires new flags wired into main.go alongside the README security section. Each phase is independently verifiable and the two phases have no shared files, enabling clean sequential delivery.
+
+### Phases
+
+- [ ] **Phase 8: Network Hardening + Hook Defense** - SSRF protection and redirect cap in the URL fetcher; hook wires --sanitize --detect-injection by default and guards its own output before emitting to Claude context
+- [ ] **Phase 9: PII Detection + Output Guard + Docs** - --detect-pii and --sanitize-pii flags for email, API keys, JWTs, and credit card patterns; hook output guard re-runs injection check on summary; README Security section
+
+## Phase Details
+
+### Phase 8: Network Hardening + Hook Defense
+**Goal**: The URL fetcher cannot be weaponized for SSRF attacks and the auto-trigger hook defends every summarization pass against injection by default.
+**Depends on**: Phase 7
+**Requirements**: SEC-11, SEC-12, SEC-13, SEC-16
+**Success Criteria** (what must be TRUE):
+  1. `tldt --url http://192.168.1.1/admin` exits non-zero with a descriptive SSRF-block error to stderr and produces no summary output
+  2. `tldt --url http://169.254.169.254/latest/meta-data/` exits non-zero with a cloud-metadata-block error to stderr
+  3. A URL that redirects more than 5 times causes tldt to exit non-zero with a redirect-limit error; a URL with exactly 5 hops succeeds
+  4. When the installed hook processes a document, any WARNING lines emitted by --detect-injection appear in the additionalContext returned to Claude alongside the summary
+**Plans**: TBD
+**UI hint**: no
+
+**Wave 1** *(parallel — no shared files)*
+- [ ] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go (SEC-11, SEC-12); fetcher unit tests using httptest.NewServer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 08-02-PLAN.md — Update internal/installer/hooks/tldt-hook.sh: invoke `tldt --sanitize --detect-injection --verbose` by default; capture stderr WARNING lines and append to additionalContext; add output guard that re-runs --detect-injection on the summary before emitting (SEC-13, SEC-16)
+
+**Cross-cutting constraints:**
+- SSRF block must resolve the hostname (net.LookupHost) after redirect, not just the initial URL — block applies at every hop
+- Cloud metadata range is 169.254.169.254/32 (IPv4) and fd00:ec2::254/128 (IPv6)
+- Redirect cap is enforced via a custom http.Client CheckRedirect func; the 5-hop limit is inclusive (5 redirects allowed, 6th is rejected)
+- All new fetcher tests use httptest.NewServer — no live network calls
+- Hook changes are in the embedded template source (internal/installer/hooks/tldt-hook.sh), not a deployed copy
+
+### Phase 9: PII Detection + Output Guard + Docs
+**Goal**: Users can detect or redact PII and secrets in source text before summarization, the hook guards its output against injection, and the README documents tldt's architectural immunity to three OWASP LLM categories.
+**Depends on**: Phase 8
+**Requirements**: SEC-14, SEC-15, DOC-01
+**Success Criteria** (what must be TRUE):
+  1. `echo "Contact alice@example.com or use key sk-abc123" | tldt --detect-pii` prints WARNING lines to stderr identifying the email and API key pattern; stdout contains only the summary
+  2. `echo "Card: 4111111111111111 JWT: eyJ..." | tldt --sanitize-pii` replaces the credit card and JWT with `[REDACTED:credit-card]` and `[REDACTED:jwt]` before summarization; stderr reports the count of redactions
+  3. `--sanitize-pii` without `--detect-pii` still performs redaction (--sanitize-pii implies detection)
+  4. README contains a `## Security` section with rationale entries for LLM04, LLM08, and LLM09 architectural immunity
+**Plans**: TBD
+**UI hint**: no
+
+**Wave 1** *(parallel — no shared files)*
+- [ ] 09-01-PLAN.md — internal/pii package (or extend internal/detector): DetectPII with patterns for email, API key prefixes (Bearer/sk-/AIza/AKIA), JWT (three-segment base64url), and 13-16-digit credit card sequences; unit tests covering all pattern categories (SEC-14)
+- [ ] 09-02-PLAN.md — README.md `## Security` section: LLM04 (no ML weights), LLM08 (no vector store), LLM09 (extractive = no hallucination) with one-paragraph rationale each (DOC-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 09-03-PLAN.md — Wire --detect-pii and --sanitize-pii flags into cmd/tldt/main.go; SanitizePII redaction with [REDACTED:<type>] placeholders; stderr redaction count; integration tests (SEC-15)
+
+**Cross-cutting constraints:**
+- `--detect-pii` is advisory only — never modifies stdout, never blocks summarization (mirrors SEC-07 contract)
+- `--sanitize-pii` implies detection: if --sanitize-pii is set, PII detection runs automatically even without --detect-pii
+- Redaction replaces the matched span in-place before the text reaches the summarizer; original text is never logged
+- API key patterns: `Bearer\s+[A-Za-z0-9._~+/-]+=*`, `sk-[A-Za-z0-9]{20,}`, `AIza[A-Za-z0-9_-]{35}`, `AKIA[A-Z0-9]{16}`
+- JWT pattern: three base64url segments separated by dots with minimum length guard to reduce false positives
+- Credit card pattern: 13-16 consecutive digits (Luhn check optional but preferred to reduce false positives)
+
+## v1.2.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 8. Network Hardening + Hook Defense | 0/2 | Not started | - |
+| 9. PII Detection + Output Guard + Docs | 0/3 | Not started | - |

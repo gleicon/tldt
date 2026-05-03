@@ -98,24 +98,26 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - LLM integration — antithetical to tool's purpose
 - Abstractive summarization — LexRank/TextRank are extractive only
 
-## Current Milestone: v2.0 Extensions
+## Current Milestone: v1.2.0 OWASP Security Hardening
 
-**Goal:** Expand tldt's reach — fetch URLs, persist user defaults via config, add compression presets, and integrate as an AI assistant skill with auto-trigger support.
+**Goal:** Close the four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI middleware — SSRF protection, hook defense, PII detection, and output guard.
 
 **Target features:**
-- `--url <url>` — fetch a webpage, strip HTML, summarize
-- `~/.tldt.toml` — persist default flags (algorithm, sentences, format, level)
-- `--level lite|standard|aggressive` — compression presets
-- Claude Code skill + MCP integration — summarize selected text on demand
-- Auto-trigger hook — fire when pasted/input text exceeds token threshold
+- SSRF protection in `--url` fetcher (RFC 1918 + loopback + cloud metadata IP blocking)
+- Hook defense — wire `--sanitize --detect-injection` into `tldt-hook.sh` by default
+- PII/secret scanner — `--detect-pii` and `--sanitize-pii` flags
+- Output guard — re-check summary before hook emits to Claude context
+- README Security section documenting architectural immunity to LLM04/08/09
 
-### Active (v2.0)
+### Active (v1.2.0)
 
-- [x] `--url` flag: fetch URL, strip boilerplate, summarize (INP-01, INP-02) — Validated in Phase 4: URL Input
-- [x] `~/.tldt.toml` config with flag defaults (CFG-01, CFG-02, CFG-03) — Validated in Phase 5: Configuration
-- [x] `--level lite|standard|aggressive` compression presets (CFG-04, CFG-05) — Validated in Phase 5: Configuration
-- [ ] Claude Code / MCP AI skill installable file (AI-01, AI-02)
-- [ ] Auto-trigger hook fires above configurable token threshold (AI-03, AI-04)
+- [ ] SSRF protection: block RFC 1918 / loopback / cloud metadata IPs in `--url` fetcher (SEC-11)
+- [ ] `--url` redirect cap ≤5 hops (SEC-12)
+- [ ] Hook wires `--sanitize --detect-injection` by default; surfaces warnings to Claude (SEC-13)
+- [ ] `--detect-pii` scans for PII/secrets (email, API keys, JWTs, credit cards) — warns stderr (SEC-14)
+- [ ] `--sanitize-pii` redacts PII matches with `[REDACTED:<type>]` before summarization (SEC-15)
+- [ ] Hook output guard re-runs injection check on summary before emitting to `additionalContext` (SEC-16)
+- [ ] README `## Security` section — architectural immunity to LLM04/08/09 (DOC-01)
 
 ## Key Decisions
 
@@ -143,4 +145,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-02 after Phase 5 Configuration complete*
+*Last updated: 2026-05-02 after milestone v1.2.0 OWASP Security Hardening started*
