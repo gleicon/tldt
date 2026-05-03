@@ -581,82 +581,54 @@ func TestMain_NoInput_ExitsNonZero(t *testing.T) {
 }
 
 // ── --url flag integration tests ──────────────────────────────────────────────
+//
+// NOTE: httptest.NewServer binds to 127.0.0.1 (loopback). After SSRF hardening
+// (Phase 8, Plan 01), the fetcher blocks loopback addresses at the initial pre-check.
+// Tests that previously used httptest to serve HTML/404/redirect/non-HTML content are
+// replaced with SSRF-focused binary integration tests that verify SSRF errors surface
+// correctly through the CLI binary. The underlying fetcher behaviors (404, redirect,
+// non-HTML) remain covered by the package-level tests in internal/fetcher/fetcher_test.go
+// using the lookupHost override pattern.
 
-func TestMain_URLFlag_ServesHTML(t *testing.T) {
+// TestMain_URLFlag_SSRFBlocksLoopback verifies that the binary emits an SSRF error
+// and exits non-zero when a URL resolves to a loopback address (httptest server).
+func TestMain_URLFlag_SSRFBlocksLoopback(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<html><body><article>
-			<p>The fox is clever and quick in the forest.</p>
-			<p>Dogs are loyal and brave companions to their owners.</p>
-			<p>Scientists study animal behavior carefully over many years.</p>
-			<p>Research shows that animals communicate in complex ways.</p>
-			<p>Ecosystems depend on balanced predator and prey relationships.</p>
-		</article></body></html>`)
-	}))
-	defer ts.Close()
-
-	stdout, _, ok := run(t, "", "--url", ts.URL, "--sentences", "2")
-	if !ok {
-		t.Fatal("--url: binary exited non-zero for valid HTML page")
-	}
-	if strings.TrimSpace(stdout) == "" {
-		t.Error("--url: expected non-empty summary on stdout, got empty string")
-	}
-}
-
-func TestMain_URLFlag_404(t *testing.T) {
-	ts := httptest.NewServer(http.NotFoundHandler())
-	defer ts.Close()
-
-	_, stderr, ok := run(t, "", "--url", ts.URL)
-	if ok {
-		t.Error("--url 404: expected non-zero exit code, got exit 0")
-	}
-	if !strings.Contains(stderr, "404") {
-		t.Errorf("--url 404: expected '404' in stderr, got %q", stderr)
-	}
-}
-
-func TestMain_URLFlag_Redirect(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/old", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/new", http.StatusMovedPermanently)
-	})
-	mux.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<html><body><article>
-			<p>The redirect destination page has real article content.</p>
-			<p>Researchers have studied this topic for many decades.</p>
-			<p>Results show consistent improvement across all tested conditions.</p>
-			<p>The method outperforms baselines on standard benchmarks.</p>
-			<p>Future work will explore extensions to multilingual settings.</p>
-		</article></body></html>`)
-	})
-	ts := httptest.NewServer(mux)
-	defer ts.Close()
-
-	stdout, _, ok := run(t, "", "--url", ts.URL+"/old", "--sentences", "2")
-	if !ok {
-		t.Fatal("--url redirect: binary exited non-zero; expected redirect to be followed")
-	}
-	if strings.TrimSpace(stdout) == "" {
-		t.Error("--url redirect: expected non-empty summary after following redirect, got empty string")
-	}
-}
-
-func TestMain_URLFlag_NonHTML(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/pdf")
-		fmt.Fprint(w, "%PDF-1.4 fake content")
+		fmt.Fprint(w, `<html><body><article><p>Content that should never be reached.</p></article></body></html>`)
 	}))
 	defer ts.Close()
 
 	_, stderr, ok := run(t, "", "--url", ts.URL)
 	if ok {
-		t.Error("--url non-HTML: expected non-zero exit for PDF content-type")
+		t.Error("--url SSRF loopback: expected non-zero exit code, got exit 0")
 	}
-	if !strings.Contains(stderr, "unsupported content type") {
-		t.Errorf("--url non-HTML: expected 'unsupported content type' in stderr, got %q", stderr)
+	if !strings.Contains(stderr, "SSRF blocked") && !strings.Contains(stderr, "loopback") {
+		t.Errorf("--url SSRF loopback: expected SSRF block error in stderr, got %q", stderr)
+	}
+}
+
+// TestMain_URLFlag_SSRFBlocksPrivateIP verifies that the binary emits an SSRF error
+// for a URL with a private IP in the hostname.
+func TestMain_URLFlag_SSRFBlocksPrivateIP(t *testing.T) {
+	_, stderr, ok := run(t, "", "--url", "http://192.168.1.1/admin")
+	if ok {
+		t.Error("--url SSRF private IP: expected non-zero exit code, got exit 0")
+	}
+	if !strings.Contains(stderr, "SSRF blocked") && !strings.Contains(stderr, "private") {
+		t.Errorf("--url SSRF private IP: expected SSRF block error in stderr, got %q", stderr)
+	}
+}
+
+// TestMain_URLFlag_SSRFBlocksCloudMeta verifies that the binary emits an SSRF error
+// for the AWS instance metadata endpoint (169.254.169.254).
+func TestMain_URLFlag_SSRFBlocksCloudMeta(t *testing.T) {
+	_, stderr, ok := run(t, "", "--url", "http://169.254.169.254/latest/meta-data/")
+	if ok {
+		t.Error("--url SSRF cloud meta: expected non-zero exit code, got exit 0")
+	}
+	if !strings.Contains(stderr, "SSRF blocked") && !strings.Contains(stderr, "link-local") {
+		t.Errorf("--url SSRF cloud meta: expected SSRF block error in stderr, got %q", stderr)
 	}
 }
 
