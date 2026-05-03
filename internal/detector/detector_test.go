@@ -580,9 +580,8 @@ func TestDetectPII_APIKey(t *testing.T) {
 		}
 	}
 	// sk- prefix too short — should not match
-	findings := DetectPII("sk-short")
-	for _, f := range findings {
-		if f.Pattern == "api-key" && strings.Contains("sk-short", "sk-short") {
+	for _, f := range DetectPII("sk-short") {
+		if f.Pattern == "api-key" {
 			t.Errorf("DetectPII(sk-short): unexpected api-key match for short token")
 		}
 	}
