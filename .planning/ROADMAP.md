@@ -255,14 +255,21 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
   2. `tldt --url http://169.254.169.254/latest/meta-data/` exits non-zero with a cloud-metadata-block error to stderr
   3. A URL that redirects more than 5 times causes tldt to exit non-zero with a redirect-limit error; a URL with exactly 5 hops succeeds
   4. When the installed hook processes a document, any WARNING lines emitted by --detect-injection appear in the additionalContext returned to Claude alongside the summary
-**Plans**: TBD
-**UI hint**: no
+**Plans**: 4 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go (SEC-11, SEC-12)
+- [ ] 08-02-PLAN.md — Hook defense: --sanitize --detect-injection by default, output guard (SEC-13, SEC-16)
+- [ ] 08-03-PLAN.md — Security documentation (docs/security.md) + landing page security section (D-10, D-11)
+- [ ] 08-04-PLAN.md — Embeddable Go library pkg/tldt/ with Summarize, Detect, Sanitize, Fetch, Pipeline (D-12)
 
 **Wave 1** *(parallel — no shared files)*
-- [ ] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go (SEC-11, SEC-12); fetcher unit tests using httptest.NewServer
+- [ ] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go; fetcher unit tests using httptest.NewServer
+- [ ] 08-03-PLAN.md — docs/security.md (OWASP LLM Top 10 2025 reference) + docs/index.html security section
+- [ ] 08-04-PLAN.md — pkg/tldt/tldt.go + pkg/tldt/tldt_test.go (embeddable Go library)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 08-02-PLAN.md — Update internal/installer/hooks/tldt-hook.sh: invoke `tldt --sanitize --detect-injection --verbose` by default; capture stderr WARNING lines and append to additionalContext; add output guard that re-runs --detect-injection on the summary before emitting (SEC-13, SEC-16)
+- [ ] 08-02-PLAN.md — Update internal/installer/hooks/tldt-hook.sh: invoke `tldt --sanitize --detect-injection --verbose` by default; capture stderr WARNING lines and append to additionalContext; add output guard that re-runs --detect-injection on the summary before emitting
 
 **Cross-cutting constraints:**
 - SSRF block must resolve the hostname (net.LookupHost) after redirect, not just the initial URL — block applies at every hop
@@ -270,6 +277,8 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
 - Redirect cap is enforced via a custom http.Client CheckRedirect func; the 5-hop limit is inclusive (5 redirects allowed, 6th is rejected)
 - All new fetcher tests use httptest.NewServer — no live network calls
 - Hook changes are in the embedded template source (internal/installer/hooks/tldt-hook.sh), not a deployed copy
+- Use `grep 'WARNING'` (unanchored) in hook — tldt emits `injection-detect: WARNING —` format (not line-starting `WARNING:`)
+**UI hint**: no
 
 ### Phase 9: PII Detection + Output Guard + Docs
 **Goal**: Users can detect or redact PII and secrets in source text before summarization, the hook guards its output against injection, and the README documents tldt's architectural immunity to three OWASP LLM categories.
@@ -302,5 +311,5 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 8. Network Hardening + Hook Defense | 0/2 | Not started | - |
+| 8. Network Hardening + Hook Defense | 0/4 | Not started | - |
 | 9. PII Detection + Output Guard + Docs | 0/3 | Not started | - |
