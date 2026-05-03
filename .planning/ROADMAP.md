@@ -242,7 +242,7 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
 ### Phases
 
 - [x] **Phase 8: Network Hardening + Hook Defense** - SSRF protection and redirect cap in the URL fetcher; hook wires --sanitize --detect-injection by default and guards its own output before emitting to Claude context (2026-05-03)
-- [ ] **Phase 9: PII Detection + Output Guard + Docs** - --detect-pii and --sanitize-pii flags for email, API keys, JWTs, and credit card patterns; hook output guard re-runs injection check on summary; README Security section
+- [x] **Phase 9: PII Detection + Output Guard + Docs** - --detect-pii and --sanitize-pii flags for email, API keys, JWTs, and credit card patterns; hook output guard re-runs injection check on summary; README Security section (2026-05-03)
 
 ## Phase Details
 
@@ -293,11 +293,11 @@ Plans:
 **UI hint**: no
 
 **Wave 1** *(parallel — no shared files)*
-- [ ] 09-01-PLAN.md — internal/pii package (or extend internal/detector): DetectPII with patterns for email, API key prefixes (Bearer/sk-/AIza/AKIA), JWT (three-segment base64url), and 13-16-digit credit card sequences; unit tests covering all pattern categories (SEC-14)
-- [ ] 09-02-PLAN.md — README.md `## Security` section: LLM04 (no ML weights), LLM08 (no vector store), LLM09 (extractive = no hallucination) with one-paragraph rationale each (DOC-01)
+- [x] 09-01-PLAN.md — internal/pii package (or extend internal/detector): DetectPII with patterns for email, API key prefixes (Bearer/sk-/AIza/AKIA), JWT (three-segment base64url), and 13-16-digit credit card sequences; unit tests covering all pattern categories (SEC-14)
+- [x] 09-02-PLAN.md — README.md `## Security` section: LLM04 (no ML weights), LLM08 (no vector store), LLM09 (extractive = no hallucination) with one-paragraph rationale each (DOC-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 09-03-PLAN.md — Wire --detect-pii and --sanitize-pii flags into cmd/tldt/main.go; SanitizePII redaction with [REDACTED:<type>] placeholders; stderr redaction count; integration tests (SEC-15)
+- [x] 09-03-PLAN.md — Wire --detect-pii and --sanitize-pii flags into cmd/tldt/main.go; SanitizePII redaction with [REDACTED:<type>] placeholders; stderr redaction count; integration tests (SEC-15)
 
 **Cross-cutting constraints:**
 - `--detect-pii` is advisory only — never modifies stdout, never blocks summarization (mirrors SEC-07 contract)
@@ -312,4 +312,4 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 8. Network Hardening + Hook Defense | 4/4 | Complete | 2026-05-03 |
-| 9. PII Detection + Output Guard + Docs | 0/3 | Not started | - |
+| 9. PII Detection + Output Guard + Docs | 3/3 | Complete | 2026-05-03 |
