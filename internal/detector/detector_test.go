@@ -518,3 +518,172 @@ func TestDetectConfusables_ExcerptFormat(t *testing.T) {
 		t.Errorf("excerpt %q: missing ' → ' separator", findings[0].Excerpt)
 	}
 }
+
+// --- DetectPII tests ---
+
+func TestDetectPII_Email(t *testing.T) {
+	positive := []string{
+		"alice@example.com",
+		"Contact user.name+tag@sub.domain.org for details",
+		"Send to foo@bar.co",
+	}
+	for _, input := range positive {
+		findings := DetectPII(input)
+		found := false
+		for _, f := range findings {
+			if f.Pattern == "email" {
+				found = true
+				if f.Category != CategoryPII {
+					t.Errorf("DetectPII(%q): want Category=CategoryPII, got %q", input, f.Category)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("DetectPII(%q): want email finding, got %v", input, findings)
+		}
+	}
+	negative := []string{
+		"not an email",
+		"no-at-sign.com",
+		"missingdomain@",
+	}
+	for _, input := range negative {
+		findings := DetectPII(input)
+		for _, f := range findings {
+			if f.Pattern == "email" {
+				t.Errorf("DetectPII(%q): unexpected email finding: %v", input, f)
+			}
+		}
+	}
+}
+
+func TestDetectPII_APIKey(t *testing.T) {
+	positive := []struct {
+		input   string
+		pattern string
+	}{
+		{"Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig", "api-key"},
+		{"key: sk-abc12345678901234567890", "api-key"},
+		{"AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "api-key"},
+		{"AKIAIOSFODNN7EXAMPLE1234", "api-key"},
+	}
+	for _, tc := range positive {
+		findings := DetectPII(tc.input)
+		found := false
+		for _, f := range findings {
+			if f.Pattern == tc.pattern {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("DetectPII(%q): want api-key finding, got %v", tc.input, findings)
+		}
+	}
+	// sk- prefix too short — should not match
+	findings := DetectPII("sk-short")
+	for _, f := range findings {
+		if f.Pattern == "api-key" && strings.Contains("sk-short", "sk-short") {
+			t.Errorf("DetectPII(sk-short): unexpected api-key match for short token")
+		}
+	}
+}
+
+func TestDetectPII_JWT(t *testing.T) {
+	validJWT := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+	findings := DetectPII("Token: " + validJWT)
+	found := false
+	for _, f := range findings {
+		if f.Pattern == "jwt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("DetectPII: want jwt finding for valid JWT, got %v", findings)
+	}
+
+	// Two segments only — should not match JWT pattern
+	for _, f := range DetectPII("one.two") {
+		if f.Pattern == "jwt" {
+			t.Errorf("DetectPII(one.two): unexpected jwt match for two-segment token")
+		}
+	}
+}
+
+func TestDetectPII_CreditCard(t *testing.T) {
+	positive := []string{
+		"Card: 4111111111111111",
+		"Amex: 378282246310005",
+		"Visa: 4111 1111 1111 1111",
+	}
+	for _, input := range positive {
+		findings := DetectPII(input)
+		found := false
+		for _, f := range findings {
+			if f.Pattern == "credit-card" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("DetectPII(%q): want credit-card finding, got %v", input, findings)
+		}
+	}
+	// 5 digits — should not match
+	for _, f := range DetectPII("code 12345 here") {
+		if f.Pattern == "credit-card" {
+			t.Errorf("DetectPII(12345): unexpected credit-card match for 5-digit number")
+		}
+	}
+}
+
+func TestSanitizePII_Redaction(t *testing.T) {
+	input := "Contact alice@example.com for help"
+	redacted, findings := SanitizePII(input)
+	if strings.Contains(redacted, "alice@example.com") {
+		t.Errorf("SanitizePII: original email still present in redacted output: %q", redacted)
+	}
+	if !strings.Contains(redacted, "[REDACTED:email]") {
+		t.Errorf("SanitizePII: expected [REDACTED:email] in output, got: %q", redacted)
+	}
+	if len(findings) == 0 {
+		t.Errorf("SanitizePII: expected non-empty findings slice")
+	}
+}
+
+func TestSanitizePII_NoMatch(t *testing.T) {
+	input := "hello world no pii here"
+	redacted, findings := SanitizePII(input)
+	if redacted != input {
+		t.Errorf("SanitizePII: expected unchanged string, got: %q", redacted)
+	}
+	if findings != nil {
+		t.Errorf("SanitizePII: expected nil findings for clean input, got %v", findings)
+	}
+}
+
+func TestSanitizePII_MultipleTypes(t *testing.T) {
+	input := "Email alice@example.com and card 4111111111111111"
+	redacted, findings := SanitizePII(input)
+	if strings.Contains(redacted, "alice@example.com") {
+		t.Errorf("SanitizePII: email not redacted in: %q", redacted)
+	}
+	if strings.Contains(redacted, "4111111111111111") {
+		t.Errorf("SanitizePII: credit card not redacted in: %q", redacted)
+	}
+	if len(findings) < 2 {
+		t.Errorf("SanitizePII: want >= 2 findings, got %d", len(findings))
+	}
+}
+
+func TestDetectPII_CategoryField(t *testing.T) {
+	inputs := []string{
+		"alice@example.com",
+		"sk-abc12345678901234567890",
+	}
+	for _, input := range inputs {
+		for _, f := range DetectPII(input) {
+			if f.Category != CategoryPII {
+				t.Errorf("DetectPII(%q): want CategoryPII, got %q", input, f.Category)
+			}
+		}
+	}
+}
