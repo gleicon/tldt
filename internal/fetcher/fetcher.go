@@ -4,8 +4,10 @@ package fetcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,13 +16,52 @@ import (
 	readability "github.com/go-shiori/go-readability"
 )
 
+var (
+	// ErrSSRFBlocked is returned when a URL resolves to a private or reserved IP address.
+	ErrSSRFBlocked = errors.New("SSRF blocked: private or reserved IP address")
+	// ErrRedirectLimit is returned when the redirect chain exceeds the 5-hop cap.
+	ErrRedirectLimit = errors.New("redirect limit exceeded")
+
+	// cloudMetadataIPv6 is the EC2 IPv6 metadata endpoint.
+	// ip.IsPrivate() already covers fd00::/8 (ULA), but explicit check documents intent.
+	cloudMetadataIPv6 = net.ParseIP("fd00:ec2::254")
+
+	// lookupHost is a package-level variable for DNS resolution, enabling test injection.
+	lookupHost = net.LookupHost
+)
+
+// blockPrivateIP returns ErrSSRFBlocked if any addr in addrs resolves to a
+// loopback, private, link-local, or cloud metadata IP.
+// host is included in the error message for debuggability.
+func blockPrivateIP(host string, addrs []string) error {
+	for _, addr := range addrs {
+		ip := net.ParseIP(addr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() {
+			return fmt.Errorf("host %q resolves to loopback %s: %w", host, addr, ErrSSRFBlocked)
+		}
+		if ip.IsPrivate() {
+			return fmt.Errorf("host %q resolves to private IP %s: %w", host, addr, ErrSSRFBlocked)
+		}
+		if ip.IsLinkLocalUnicast() {
+			return fmt.Errorf("host %q resolves to link-local IP %s: %w", host, addr, ErrSSRFBlocked)
+		}
+		if ip.Equal(cloudMetadataIPv6) {
+			return fmt.Errorf("host %q resolves to cloud metadata IP %s: %w", host, addr, ErrSSRFBlocked)
+		}
+	}
+	return nil
+}
+
 // Fetch fetches rawURL and returns the main article text content.
 // timeout applies to the entire HTTP round-trip (http.Client level).
 // maxBytes caps the response body read to prevent memory exhaustion.
 //
 // Only http and https schemes are accepted. Non-2xx status codes and
 // non-HTML content types are returned as errors. HTTP redirects are
-// followed automatically (up to 10 hops via net/http default).
+// followed with SSRF + 5-hop guard.
 func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (string, error) {
 	// 1. Validate scheme — block file://, ftp://, etc.
 	u, err := url.Parse(rawURL)
@@ -31,17 +72,38 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (string, error)
 		return "", fmt.Errorf("unsupported URL scheme %q: only http and https are allowed", u.Scheme)
 	}
 
-	// 2. HTTP GET with Client-level timeout (covers full round-trip).
-	// Use http.Client.Timeout rather than context.WithTimeout to avoid
-	// double-timeout confusion (Pitfall 3 in research).
-	client := &http.Client{Timeout: timeout}
+	// 1b. Resolve initial hostname and block private IPs (SSRF pre-check per D-01).
+	addrs, err := lookupHost(u.Hostname())
+	if err != nil {
+		return "", fmt.Errorf("resolving host %q: %w", u.Hostname(), err)
+	}
+	if err := blockPrivateIP(u.Hostname(), addrs); err != nil {
+		return "", err
+	}
+
+	// 2. HTTP client with combined redirect guard (5-hop cap + SSRF check per hop, per D-02).
+	combinedCheckRedirect := func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects (%d) fetching %q: %w", len(via), req.URL, ErrRedirectLimit)
+		}
+		hopAddrs, err := lookupHost(req.URL.Hostname())
+		if err != nil {
+			return fmt.Errorf("resolving redirect host %q: %w", req.URL.Hostname(), err)
+		}
+		return blockPrivateIP(req.URL.Hostname(), hopAddrs)
+	}
+	client := &http.Client{
+		Timeout:       timeout,
+		CheckRedirect: combinedCheckRedirect,
+	}
+
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("building request for %q: %w", rawURL, err)
 	}
 	req.Header.Set("User-Agent", "tldt/2.0 (https://github.com/gleicon/tldt)")
 
-	// 3. Execute — net/http.Client follows redirects automatically (max 10 hops).
+	// 3. Execute — net/http.Client follows redirects with SSRF + 5-hop guard.
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("fetching %q: %w", rawURL, err)
