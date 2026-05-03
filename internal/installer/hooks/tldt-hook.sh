@@ -41,21 +41,47 @@ if [ "$TOKEN_ESTIMATE" -lt "$THRESHOLD" ]; then
   exit 0
 fi
 
-# Summarize — capture stderr (savings line) separately from stdout (summary)
-# MUST use --verbose: tldt only prints token stats to stderr when --verbose is set (Pitfall 1)
-STATS_FILE=$(mktemp)
-SUMMARY=$(printf '%s' "$PROMPT" | tldt --verbose 2>"$STATS_FILE" || true)
-SAVINGS=$(cat "$STATS_FILE")
-rm -f "$STATS_FILE"
+# Summarize with sanitization and injection detection (SEC-13, D-04)
+# Capture all stderr, then split WARNING lines from token stats
+STDERR_FILE=$(mktemp)
+SUMMARY=$(printf '%s' "$PROMPT" | tldt --sanitize --detect-injection --verbose 2>"$STDERR_FILE" || true)
+WARNINGS=$(grep 'WARNING' "$STDERR_FILE" || true)
+SAVINGS=$(grep -v 'WARNING' "$STDERR_FILE" || true)
+rm -f "$STDERR_FILE"
 
-# If summarization failed or returned empty — pass through silently (D-08 spirit)
+# If summarization failed or returned empty — pass through silently (D-05 spirit)
 if [ -z "$SUMMARY" ]; then
   exit 0
 fi
 
-# Build replacement context: savings line first, then summary (D-04, D-06)
-REPLACEMENT="${SAVINGS}
+# Output guard: re-run detection on the summary itself (SEC-16, D-06)
+# --sentences 999 prevents re-summarization; stdout discarded; only stderr WARNING lines matter
+GUARD_FILE=$(mktemp)
+printf '%s' "$SUMMARY" | tldt --detect-injection --sentences 999 2>"$GUARD_FILE" >/dev/null || true
+SUMMARY_WARNINGS=$(grep 'WARNING' "$GUARD_FILE" || true)
+rm -f "$GUARD_FILE"
 
+# Build labeled additionalContext — only emit non-empty sections (D-08, D-09)
+REPLACEMENT="[Token savings]
+${SAVINGS}"
+
+if [ -n "$WARNINGS" ]; then
+REPLACEMENT="${REPLACEMENT}
+
+[Security warnings - input]
+${WARNINGS}"
+fi
+
+if [ -n "$SUMMARY_WARNINGS" ]; then
+REPLACEMENT="${REPLACEMENT}
+
+[Security warnings - summary]
+${SUMMARY_WARNINGS}"
+fi
+
+REPLACEMENT="${REPLACEMENT}
+
+[Summary]
 ${SUMMARY}"
 
 # Output hookSpecificOutput JSON for Claude Code to inject as additionalContext (D-06)
