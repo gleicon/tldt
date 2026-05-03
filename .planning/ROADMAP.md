@@ -259,17 +259,17 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
 
 Plans:
 - [x] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go (SEC-11, SEC-12)
-- [ ] 08-02-PLAN.md — Hook defense: --sanitize --detect-injection by default, output guard (SEC-13, SEC-16)
+- [x] 08-02-PLAN.md — Hook defense: --sanitize --detect-injection by default, output guard (SEC-13, SEC-16)
 - [x] 08-03-PLAN.md — Security documentation (docs/security.md) + landing page security section (D-10, D-11)
-- [ ] 08-04-PLAN.md — Embeddable Go library pkg/tldt/ with Summarize, Detect, Sanitize, Fetch, Pipeline (D-12)
+- [x] 08-04-PLAN.md — Embeddable Go library pkg/tldt/ with Summarize, Detect, Sanitize, Fetch, Pipeline (D-12)
 
 **Wave 1** *(parallel — no shared files)*
 - [x] 08-01-PLAN.md — SSRF IP block + redirect cap in internal/fetcher/fetcher.go; fetcher unit tests using httptest.NewServer
 - [x] 08-03-PLAN.md — docs/security.md (OWASP LLM Top 10 2025 reference) + docs/index.html security section
-- [ ] 08-04-PLAN.md — pkg/tldt/tldt.go + pkg/tldt/tldt_test.go (embeddable Go library)
+- [x] 08-04-PLAN.md — pkg/tldt/tldt.go + pkg/tldt/tldt_test.go (embeddable Go library)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 08-02-PLAN.md — Update internal/installer/hooks/tldt-hook.sh: invoke `tldt --sanitize --detect-injection --verbose` by default; capture stderr WARNING lines and append to additionalContext; add output guard that re-runs --detect-injection on the summary before emitting
+- [x] 08-02-PLAN.md — Update internal/installer/hooks/tldt-hook.sh: invoke `tldt --sanitize --detect-injection --verbose` by default; capture stderr WARNING lines and append to additionalContext; add output guard that re-runs --detect-injection on the summary before emitting
 
 **Cross-cutting constraints:**
 - SSRF block must resolve the hostname (net.LookupHost) after redirect, not just the initial URL — block applies at every hop
