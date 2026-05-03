@@ -253,6 +253,20 @@ cat doc.txt | tldt --detect-injection --injection-threshold 0.90   # stricter
 
 ---
 
+## Security
+
+tldt's architecture provides structural immunity to three OWASP LLM Top 10 2025 categories:
+
+**LLM04 — Model Denial of Service**: tldt is a pure CLI binary. There is no model server, no inference endpoint, and no shared resource that a caller can exhaust. Each invocation is an isolated process that exits when summarization completes — no pooling, no queuing, no per-request GPU allocation.
+
+**LLM08 — Vector and Embedding Weaknesses**: tldt uses no embeddings and no vector store. Similarity scores are computed from raw TF-IDF cosine similarity and word-overlap ratios on the input text alone. There is no persistent index to poison, no retrieval path to manipulate, and no external knowledge base to corrupt.
+
+**LLM09 — Misinformation**: tldt is a purely extractive summarizer. Every sentence in the output is copied verbatim from the source document — no paraphrasing, no generation, no inference. Hallucination is structurally impossible: if a sentence appears in the summary, it existed in the input.
+
+For full OWASP LLM Top 10 2025 coverage including LLM01 (prompt injection defense), LLM02 (insecure output handling), LLM05 (supply chain), and LLM10 (model theft), see [docs/security.md](docs/security.md).
+
+---
+
 ## Build & test
 
 ```bash
