@@ -57,7 +57,7 @@ fi
 # Output guard: re-run detection on the summary itself (SEC-16, D-06)
 # --sentences 999 prevents re-summarization; stdout discarded; only stderr WARNING lines matter
 GUARD_FILE=$(mktemp)
-printf '%s' "$SUMMARY" | tldt --detect-injection --sentences 999 2>"$GUARD_FILE" >/dev/null || true
+printf '%s' "$SUMMARY" | tldt --detect-injection --detect-pii --sentences 999 2>"$GUARD_FILE" >/dev/null || true
 SUMMARY_WARNINGS=$(grep 'WARNING' "$GUARD_FILE" || true)
 rm -f "$GUARD_FILE"
 

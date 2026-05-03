@@ -802,3 +802,69 @@ func TestMain_ConfigLevelDefault(t *testing.T) {
 		t.Errorf("config level default: want 10 output lines, got %d\nstdout: %q", got, stdout)
 	}
 }
+
+// ── --detect-pii and --sanitize-pii integration tests ─────────────────────────
+
+// piiText has 3 sentences; one contains an email address for PII detection tests.
+const piiText = "Contact alice@example.com for support. This is a second sentence for content. Third sentence here."
+
+// cleanText has 3 sentences with no PII content.
+const cleanText = "The quick brown fox jumps over the lazy dog. " +
+	"No secrets or personal information here. " +
+	"This is a third sentence."
+
+// TestDetectPIIFlag verifies --detect-pii is advisory: summary on stdout, WARNING on stderr.
+func TestDetectPIIFlag(t *testing.T) {
+	stdout, stderr, ok := run(t, piiText, "--detect-pii")
+	if !ok {
+		t.Fatalf("tldt --detect-pii failed\nstderr: %s", stderr)
+	}
+	if strings.Contains(stdout, "pii-detect") {
+		t.Errorf("--detect-pii: pii-detect output leaked to stdout: %q", stdout)
+	}
+	if !strings.Contains(stderr, "pii-detect") {
+		t.Errorf("--detect-pii: expected pii-detect output on stderr, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, "WARNING") {
+		t.Errorf("--detect-pii: expected WARNING on stderr for PII input, got: %q", stderr)
+	}
+}
+
+// TestDetectPIIFlagCleanInput verifies --detect-pii reports "no findings" for clean text.
+func TestDetectPIIFlagCleanInput(t *testing.T) {
+	stdout, stderr, ok := run(t, cleanText, "--detect-pii")
+	if !ok {
+		t.Fatalf("tldt --detect-pii (clean) failed\nstderr: %s", stderr)
+	}
+	_ = stdout // summary on stdout is expected; content not checked here
+	if !strings.Contains(stderr, "no findings") {
+		t.Errorf("--detect-pii: expected 'no findings' on stderr for clean input, got: %q", stderr)
+	}
+}
+
+// TestSanitizePIIFlag verifies --sanitize-pii redacts PII before summarization.
+func TestSanitizePIIFlag(t *testing.T) {
+	const email = "alice@example.com"
+	stdout, stderr, ok := run(t, piiText, "--sanitize-pii")
+	if !ok {
+		t.Fatalf("tldt --sanitize-pii failed\nstderr: %s", stderr)
+	}
+	if strings.Contains(stdout, email) {
+		t.Errorf("--sanitize-pii: original email present in stdout summary: %q", stdout)
+	}
+	if !strings.Contains(stderr, "redaction(s) applied") {
+		t.Errorf("--sanitize-pii: expected 'redaction(s) applied' on stderr, got: %q", stderr)
+	}
+}
+
+// TestSanitizePIIFlagStdoutOnly verifies --sanitize-pii output is summary-only on stdout.
+func TestSanitizePIIFlagStdoutOnly(t *testing.T) {
+	const apiKeyText = "Email sk-abc12345678901234567. Second sentence for content. Third sentence."
+	stdout, _, ok := run(t, apiKeyText, "--sanitize-pii")
+	if !ok {
+		t.Fatalf("tldt --sanitize-pii (api key) failed")
+	}
+	if strings.Contains(stdout, "pii-detect") {
+		t.Errorf("--sanitize-pii: pii-detect output on stdout: %q", stdout)
+	}
+}

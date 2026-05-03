@@ -39,9 +39,11 @@ func main() {
 	sanitizeFlag      := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection   := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
 	injectionThreshold := flag.Float64("injection-threshold", detector.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
+	detectPII    := flag.Bool("detect-pii", false, "report PII and secret patterns (email, API keys, JWTs, credit cards) to stderr (advisory)")
+	sanitizePII  := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: tldt [--print-threshold] [--install-skill [--skill-dir path] [--target app]]")
-		fmt.Fprintln(os.Stderr, "       tldt [-f file] [--url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N]")
+		fmt.Fprintln(os.Stderr, "       tldt [-f file] [--url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [--detect-pii] [--sanitize-pii]")
 		fmt.Fprintln(os.Stderr, "       tldt [-level aggressive|standard|lite] [-paragraphs N] [-format text|json|markdown]")
 		fmt.Fprintln(os.Stderr, "       cat file.txt | tldt")
 		flag.PrintDefaults()
@@ -137,6 +139,31 @@ func main() {
 			}
 		}
 		text = stripped
+	}
+
+	// --sanitize-pii: redact PII and secrets before summarization (D-06).
+	// Implies detection: redaction count always reported to stderr.
+	// --sanitize-pii and --sanitize stack independently (D-07).
+	if *sanitizePII {
+		redacted, findings := detector.SanitizePII(text)
+		count := len(findings)
+		fmt.Fprintf(os.Stderr, "pii-detect: %d redaction(s) applied\n", count)
+		text = redacted
+	}
+
+	// --detect-pii: advisory PII scan; never modifies text or blocks summarization (mirrors SEC-07 contract, D-05).
+	// When --sanitize-pii is also set, this block runs on the already-redacted text — findings will be empty
+	// (since redaction already replaced matches). This is correct behavior: detection post-redaction is safe.
+	if *detectPII {
+		findings := detector.DetectPII(text)
+		if len(findings) == 0 {
+			fmt.Fprintln(os.Stderr, "pii-detect: no findings")
+		} else {
+			fmt.Fprintf(os.Stderr, "pii-detect: %d finding(s)\n", len(findings))
+			for _, f := range findings {
+				fmt.Fprintf(os.Stderr, "pii-detect: WARNING — [%s] %s (line %d)\n", f.Pattern, f.Excerpt, f.Sentence)
+			}
+		}
 	}
 
 	// --detect-injection: report pattern, encoding, and invisible-char findings to stderr.
