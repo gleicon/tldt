@@ -75,8 +75,8 @@ func TestInstallHookFile_WritesExecutable(t *testing.T) {
 	if !strings.Contains(string(data), "tldt --print-threshold") {
 		t.Error("hook missing 'tldt --print-threshold'")
 	}
-	if !strings.Contains(string(data), "tldt --verbose") {
-		t.Error("hook missing 'tldt --verbose'")
+	if !strings.Contains(string(data), "tldt --sanitize --detect-injection --verbose") {
+		t.Error("hook missing 'tldt --sanitize --detect-injection --verbose'")
 	}
 }
 
