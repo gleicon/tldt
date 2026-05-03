@@ -210,14 +210,14 @@ rm -f "$STATS_FILE"
 # Phase 8 expansion:
 STDERR_FILE=$(mktemp)
 SUMMARY=$(printf '%s' "$PROMPT" | tldt --sanitize --detect-injection --verbose 2>"$STDERR_FILE" || true)
-WARNINGS=$(grep '^WARNING' "$STDERR_FILE" || true)         # injection warning lines
-SAVINGS=$(grep -v '^WARNING' "$STDERR_FILE" || true)       # token stats (everything else)
+WARNINGS=$(grep 'WARNING' "$STDERR_FILE" || true)         # injection warning lines (unanchored — actual format is "injection-detect: WARNING —")
+SAVINGS=$(grep -v 'WARNING' "$STDERR_FILE" || true)        # token stats (everything else)
 rm -f "$STDERR_FILE"
 
 # Output guard:
 GUARD_FILE=$(mktemp)
 printf '%s' "$SUMMARY" | tldt --detect-injection --sentences 999 2>"$GUARD_FILE" >/dev/null || true
-SUMMARY_WARNINGS=$(grep '^WARNING' "$GUARD_FILE" || true)
+SUMMARY_WARNINGS=$(grep 'WARNING' "$GUARD_FILE" || true)
 rm -f "$GUARD_FILE"
 
 # Conditional section builder:
@@ -566,22 +566,17 @@ Adding `security` nav link and a security section between `#algorithms` and the 
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **grep pattern mismatch (CRITICAL)**
-   - What we know: D-04 specifies `grep ^WARNING` but tldt's actual injection detection output starts with `injection-detect: WARNING —` (not `WARNING`)
-   - What's unclear: Should the hook use `grep 'WARNING'` (unanchored match), or should `main.go` be updated to emit a `WARNING: ...` prefixed line in addition to or instead of the current format?
-   - Recommendation: Simpler fix is `grep 'WARNING'` in the hook. But if the intent is to have a machine-parseable prefix, adding `fmt.Fprintln(os.Stderr, "WARNING: injection detected")` as an additional line when `report.Suspicious` is true would make `^WARNING` work without changing any grep in the hook. The planner should decide which approach to take.
+1. **grep pattern mismatch (CRITICAL) — RESOLVED**
+   - **Decision:** Use `grep 'WARNING'` (unanchored) in the hook. D-04's assumption that the output starts with `WARNING:` was incorrect — actual format is `injection-detect: WARNING — input flagged as suspicious`. Amending D-04 to use unanchored match. No changes to `main.go` needed; keeping the binary output format unchanged avoids breaking any consumers that already parse `injection-detect:` lines.
+   - **D-04 amendment:** The hook uses `grep 'WARNING'` (not `grep '^WARNING'`) to extract injection warning lines, and `grep -v 'WARNING'` for token stats.
 
-2. **pkg/tldt/ options: plain struct vs functional options**
-   - What we know: Codebase uses plain structs everywhere. D-12 says "researcher to recommend."
-   - What's unclear: Whether the public API is expected to evolve with backward-compat additions.
-   - Recommendation: Plain structs. Go zero-values provide sensible defaults. If a field is added later, callers using `tldt.SummarizeOptions{Sentences: 3}` automatically get zero-values (which map to defaults) for new fields without breaking. Functional options add boilerplate for marginal benefit at this scale.
+2. **pkg/tldt/ options: plain struct vs functional options — RESOLVED**
+   - **Decision:** Plain structs. Codebase uses plain structs everywhere (`config.Config`, `detector.Report`, etc.). Go zero-values provide sensible defaults for new fields without breaking existing callers. Functional options add boilerplate for marginal benefit at this scale.
 
-3. **docs/security.md Phase 9 content**
-   - What we know: D-10 says to document Phase 9 items (PII/--detect-pii) in security.md even though Phase 9 hasn't shipped.
-   - What's unclear: Should Phase 9 content be marked "coming soon" or described as if shipped?
-   - Recommendation: Document Phase 9 CLI examples as planned behavior with a clear "(Phase 9)" marker. Security docs should be aspirational but accurate — callers need to know what's coming.
+3. **docs/security.md Phase 9 content — RESOLVED**
+   - **Decision:** Document Phase 9 CLI examples with a `(Phase 9 — coming soon)` marker. Security docs are aspirational but accurate — readers need visibility into the full roadmap.
 
 ---
 
