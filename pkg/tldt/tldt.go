@@ -29,7 +29,13 @@ type SummarizeOptions struct {
 
 // DetectOptions controls detection behavior.
 type DetectOptions struct {
-	OutlierThreshold float64 // default: 0.85 (detector.DefaultOutlierThreshold)
+	// OutlierThreshold is reserved for future use.
+	// The underlying detector.Analyze function runs pattern, encoding, and confusable
+	// checks only; statistical outlier detection (which requires a precomputed LexRank
+	// similarity matrix) is not performed by Detect or Pipeline.
+	// Setting this field to a non-zero value returns an error to prevent silent
+	// misconfiguration. Leave at 0 (zero value) to use the built-in defaults.
+	OutlierThreshold float64
 }
 
 // FetchOptions controls URL fetching behavior.
@@ -126,7 +132,14 @@ func Summarize(text string, opts SummarizeOptions) (Result, error) {
 
 // Detect runs injection and encoding detection on text without summarizing.
 // Returns findings and human-readable warning lines.
+//
+// If opts.OutlierThreshold is non-zero, Detect returns an error: outlier
+// detection requires a precomputed similarity matrix and is not available
+// through this function. This error prevents silent misconfiguration.
 func Detect(text string, opts DetectOptions) (DetectResult, error) {
+	if opts.OutlierThreshold != 0 {
+		return DetectResult{}, fmt.Errorf("tldt.Detect: OutlierThreshold is not supported (outlier detection requires a precomputed similarity matrix); set to 0 to use built-in defaults")
+	}
 	report := detector.Analyze(text)
 	var warnings []string
 	if report.Suspicious {
@@ -160,7 +173,14 @@ func Fetch(url string, opts FetchOptions) (string, error) {
 
 // Pipeline runs the full sanitize -> detect -> summarize flow in one call.
 // This is the primary embedding use case for AI API middleware.
+//
+// If opts.Detect.OutlierThreshold is non-zero, Pipeline returns an error.
+// See Detect for details.
 func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
+	if opts.Detect.OutlierThreshold != 0 {
+		return PipelineResult{}, fmt.Errorf("tldt.Pipeline: OutlierThreshold is not supported (outlier detection requires a precomputed similarity matrix); set to 0 to use built-in defaults")
+	}
+
 	var redactions int
 
 	// Step 1: sanitize (if enabled)
