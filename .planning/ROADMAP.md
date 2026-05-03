@@ -289,7 +289,7 @@ Plans:
   2. `echo "Card: 4111111111111111 JWT: eyJ..." | tldt --sanitize-pii` replaces the credit card and JWT with `[REDACTED:credit-card]` and `[REDACTED:jwt]` before summarization; stderr reports the count of redactions
   3. `--sanitize-pii` without `--detect-pii` still performs redaction (--sanitize-pii implies detection)
   4. README contains a `## Security` section with rationale entries for LLM04, LLM08, and LLM09 architectural immunity
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: no
 
 **Wave 1** *(parallel — no shared files)*
