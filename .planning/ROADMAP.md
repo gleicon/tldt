@@ -241,7 +241,7 @@ v1.2.0 closes four concrete OWASP LLM Top 10 2025 gaps in tldt's role as AI midd
 
 ### Phases
 
-- [ ] **Phase 8: Network Hardening + Hook Defense** - SSRF protection and redirect cap in the URL fetcher; hook wires --sanitize --detect-injection by default and guards its own output before emitting to Claude context
+- [x] **Phase 8: Network Hardening + Hook Defense** - SSRF protection and redirect cap in the URL fetcher; hook wires --sanitize --detect-injection by default and guards its own output before emitting to Claude context (2026-05-03)
 - [ ] **Phase 9: PII Detection + Output Guard + Docs** - --detect-pii and --sanitize-pii flags for email, API keys, JWTs, and credit card patterns; hook output guard re-runs injection check on summary; README Security section
 
 ## Phase Details
@@ -311,5 +311,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 8. Network Hardening + Hook Defense | 0/4 | Not started | - |
+| 8. Network Hardening + Hook Defense | 4/4 | Complete | 2026-05-03 |
 | 9. PII Detection + Output Guard + Docs | 0/3 | Not started | - |
