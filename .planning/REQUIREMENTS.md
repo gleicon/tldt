@@ -77,22 +77,22 @@
 
 ### Network Security (SEC, continuing)
 
-- [ ] **SEC-11**: `--url` fetcher resolves the target hostname and blocks requests to RFC 1918 ranges (10.x, 172.16–31.x, 192.168.x), loopback (127.x, ::1), and cloud metadata endpoints (169.254.169.254, fd00:ec2::254) — exits non-zero with error to stderr (LLM10)
-- [ ] **SEC-12**: `--url` fetcher limits redirect chain to ≤5 hops; exceeding limit exits non-zero with error to stderr (LLM10)
+- [x] **SEC-11**: `--url` fetcher resolves the target hostname and blocks requests to RFC 1918 ranges (10.x, 172.16–31.x, 192.168.x), loopback (127.x, ::1), and cloud metadata endpoints (169.254.169.254, fd00:ec2::254) — exits non-zero with error to stderr (LLM10)
+- [x] **SEC-12**: `--url` fetcher limits redirect chain to ≤5 hops; exceeding limit exits non-zero with error to stderr (LLM10)
 
 ### Hook Defense (SEC)
 
-- [ ] **SEC-13**: Auto-trigger hook (`tldt-hook.sh`) invokes `tldt --sanitize --detect-injection --verbose` by default; any `WARNING` lines from stderr are appended to `additionalContext` returned to Claude alongside the summary (LLM01)
-- [ ] **SEC-16**: Hook output guard re-runs `--detect-injection` on the summary text produced by tldt before emitting it into `additionalContext`; any `WARNING` findings are appended to the context note (LLM05)
+- [x] **SEC-13**: Auto-trigger hook (`tldt-hook.sh`) invokes `tldt --sanitize --detect-injection --verbose` by default; any `WARNING` lines from stderr are appended to `additionalContext` returned to Claude alongside the summary (LLM01)
+- [x] **SEC-16**: Hook output guard re-runs `--detect-injection` on the summary text produced by tldt before emitting it into `additionalContext`; any `WARNING` findings are appended to the context note (LLM05)
 
 ### PII / Secret Detection (SEC)
 
-- [ ] **SEC-14**: `--detect-pii` scans source text for PII and secret patterns — email addresses, common API key formats (Bearer tokens, `sk-`/`AIza`/`AKIA` prefixes), JWTs (three-segment base64url), and 13–16-digit credit card sequences; reports matches with type and line number to stderr; never blocks summarization (LLM02)
-- [ ] **SEC-15**: `--sanitize-pii` redacts PII/secret matches detected by `--detect-pii` with `[REDACTED:<type>]` placeholders before summarization; count of redactions reported to stderr (LLM02)
+- [x] **SEC-14**: `--detect-pii` scans source text for PII and secret patterns — email addresses, common API key formats (Bearer tokens, `sk-`/`AIza`/`AKIA` prefixes), JWTs (three-segment base64url), and 13–16-digit credit card sequences; reports matches with type and line number to stderr; never blocks summarization (LLM02)
+- [x] **SEC-15**: `--sanitize-pii` redacts PII/secret matches detected by `--detect-pii` with `[REDACTED:<type>]` placeholders before summarization; count of redactions reported to stderr (LLM02)
 
 ### Documentation (DOC)
 
-- [ ] **DOC-01**: README `## Security` section documents tldt's architectural immunity to OWASP LLM04 (no ML weights to poison), LLM08 (no vector store), and LLM09 (extractive = no hallucination), with brief rationale for each
+- [x] **DOC-01**: README `## Security` section documents tldt's architectural immunity to OWASP LLM04 (no ML weights to poison), LLM08 (no vector store), and LLM09 (extractive = no hallucination), with brief rationale for each
 
 ---
 
@@ -100,13 +100,42 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-11 | Phase 8: Network Hardening + Hook Defense | Pending |
-| SEC-12 | Phase 8: Network Hardening + Hook Defense | Pending |
-| SEC-13 | Phase 8: Network Hardening + Hook Defense | Pending |
-| SEC-16 | Phase 8: Network Hardening + Hook Defense | Pending |
-| SEC-14 | Phase 9: PII Detection + Output Guard + Docs | Pending |
-| SEC-15 | Phase 9: PII Detection + Output Guard + Docs | Pending |
-| DOC-01 | Phase 9: PII Detection + Output Guard + Docs | Pending |
+| SEC-11 | Phase 8: Network Hardening + Hook Defense | Complete |
+| SEC-12 | Phase 8: Network Hardening + Hook Defense | Complete |
+| SEC-13 | Phase 8: Network Hardening + Hook Defense | Complete |
+| SEC-16 | Phase 8: Network Hardening + Hook Defense | Complete |
+| SEC-14 | Phase 9: PII Detection + Output Guard + Docs | Complete |
+| SEC-15 | Phase 9: PII Detection + Output Guard + Docs | Complete |
+| DOC-01 | Phase 9: PII Detection + Output Guard + Docs | Complete |
+
+---
+
+## v2.1.0 Requirements — Library SDK
+
+**Milestone goal:** Make `pkg/tldt` the authoritative public API. Extend with full PII coverage. Refactor CLI to use `pkg/tldt` exclusively so any Go program can embed tldt as a sanitize/summarize guard for LLM input.
+
+### Library API (LIB)
+
+- [ ] **LIB-01**: `pkg/tldt` exports a `PIIFinding` type with fields `Pattern string`, `Excerpt string`, `Line int` — public wrapper over `detector.Finding` for library consumers
+- [ ] **LIB-02**: `pkg/tldt.DetectPII(text string) []PIIFinding` scans text for PII/secret patterns (email, api-key, jwt, credit-card) and returns findings; mirrors `detector.DetectPII` but with the public `PIIFinding` type
+- [ ] **LIB-03**: `pkg/tldt.SanitizePII(text string) (string, []PIIFinding)` redacts PII matches with `[REDACTED:<type>]` and returns the redacted string + findings slice
+- [ ] **LIB-04**: `PipelineOptions` gains `DetectPII bool` and `SanitizePII bool` fields; `PipelineResult` gains `PIIFindings []PIIFinding` field; `Pipeline` executes PII stage (sanitize-pii → detect-pii) between the Unicode sanitize and injection-detect stages
+
+### CLI Refactor (CLI)
+
+- [ ] **CLI-10**: `cmd/tldt/main.go` has zero direct `github.com/gleicon/tldt/internal/` imports — all logic routes through `pkg/tldt` functions (`Summarize`, `Detect`, `Sanitize`, `SanitizePII`, `DetectPII`, `Fetch`, `Pipeline`)
+- [ ] **CLI-11**: All existing CLI flags and behavioral contracts preserved after refactor: `--detect-pii`, `--sanitize-pii`, `--detect-injection`, `--sanitize`, `--url`, `--format`, `--algorithm`, `--sentences`, `--paragraphs`, `--level`, `--verbose`, `--explain`, `--rouge`, `--install-skill`, `--print-threshold`; full test suite (344+ tests) passes
+
+## v2.1.0 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| LIB-01 | Phase 10: Library API Completion | Pending |
+| LIB-02 | Phase 10: Library API Completion | Pending |
+| LIB-03 | Phase 10: Library API Completion | Pending |
+| LIB-04 | Phase 10: Library API Completion | Pending |
+| CLI-10 | Phase 11: CLI Refactor | Pending |
+| CLI-11 | Phase 11: CLI Refactor | Pending |
 
 ---
 

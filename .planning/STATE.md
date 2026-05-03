@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2.0
-milestone_name: OWASP Security Hardening
-status: milestone complete
-stopped_at: phase 9 complete
+milestone: v2.1.0
+milestone_name: Library SDK
+status: planning
+stopped_at: requirements defined
 last_updated: "2026-05-03T00:00:00.000Z"
-last_activity: 2026-05-03 -- Phase 9 complete (3/3 plans, 344 tests pass)
+last_activity: 2026-05-03 -- Milestone v2.1.0 started, requirements defined (LIB-01–04, CLI-10–11)
 progress:
   total_phases: 2
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State

@@ -119,6 +119,25 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - ✓ README `## Security` section — architectural immunity to LLM04/08/09 (DOC-01)
 - ✓ 344 total tests pass
 
+## Current Milestone: v2.1.0 Library SDK
+
+**Goal:** Make `pkg/tldt` the single authoritative API surface — extend it with full PII coverage, refactor the CLI to use it exclusively, so any Go program can embed tldt as a sanitize/summarize guard for LLM input.
+
+**Target features:**
+- `pkg/tldt` exposes `DetectPII`, `SanitizePII`, updated `Pipeline` with PII stage
+- `cmd/tldt/main.go` imports only `pkg/tldt` — zero direct `internal/` imports
+- `Pipeline` is the primary embedding call: sanitize → detect injection → detect PII → summarize
+- All existing CLI behavior preserved (no user-facing regressions)
+
+### Active (v2.1.0)
+
+- [ ] `pkg/tldt.DetectPII` exposes PII detection to library consumers (LIB-01)
+- [ ] `pkg/tldt.SanitizePII` exposes PII redaction to library consumers (LIB-02)
+- [ ] `Pipeline` includes PII stage; `PipelineOptions` has `DetectPII bool`, `SanitizePII bool` (LIB-03)
+- [ ] `PipelineResult` includes PII findings count and redacted flag (LIB-04)
+- [ ] `cmd/tldt/main.go` has zero direct `internal/` imports; uses only `pkg/tldt` (CLI-10)
+- [ ] All existing CLI flags and behavior preserved after refactor (CLI-11)
+
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
@@ -145,4 +164,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-02 after milestone v1.2.0 OWASP Security Hardening started*
+*Last updated: 2026-05-03 — milestone v2.1.0 Library SDK started*
