@@ -58,7 +58,9 @@ if [ -z "$SUMMARY" ]; then
 fi
 
 # Output guard: re-run detection on the summary itself (SEC-16, D-06)
-# --sentences 999 prevents re-summarization; stdout discarded; only stderr WARNING lines matter
+# --sentences 999 exceeds any realistic sentence count — used as a sentinel to prevent
+# re-summarization of the already-summarized output. Only detection (stderr) matters here;
+# stdout is discarded. If tldt ever adds a --detect-only flag, replace this sentinel.
 printf '%s' "$SUMMARY" | tldt --detect-injection --sentences 999 2>"$GUARD_FILE" >/dev/null || true
 SUMMARY_WARNINGS=$(grep 'WARNING' "$GUARD_FILE" || true)
 
