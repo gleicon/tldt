@@ -150,7 +150,7 @@ func TestValidateInput_ValidUnicode(t *testing.T) {
 // ── resolveInputBytes ─────────────────────────────────────────────────────────
 
 func TestResolveInputBytes_PositionalArgs(t *testing.T) {
-	got, err := resolveInputBytes([]string{"hello", "world"}, "", "")
+	got, err := resolveInputBytes([]string{"hello", "world"}, "", "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestResolveInputBytes_PositionalArgs(t *testing.T) {
 
 func TestResolveInputBytes_FilePath(t *testing.T) {
 	path := writeTempFile(t, "file content here")
-	got, err := resolveInputBytes([]string{}, path, "")
+	got, err := resolveInputBytes([]string{}, path, "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -171,14 +171,14 @@ func TestResolveInputBytes_FilePath(t *testing.T) {
 }
 
 func TestResolveInputBytes_FileNotFound(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt", "")
+	_, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt", "", nil)
 	if err == nil {
 		t.Error("missing file: want error, got nil")
 	}
 }
 
 func TestResolveInputBytes_NoInput(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "", "")
+	_, err := resolveInputBytes([]string{}, "", "", nil)
 	if err == nil {
 		t.Error("no input: want error, got nil")
 	}
@@ -188,24 +188,9 @@ func TestResolveInputBytes_NoInput(t *testing.T) {
 }
 
 func TestResolveInputBytes_Stdin(t *testing.T) {
-	// Replace os.Stdin with a pipe to exercise the stdin branch.
-	// Tests in package main run sequentially (no t.Parallel), so global mutation is safe.
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe: %v", err)
-	}
-	old := os.Stdin
-	os.Stdin = r
-	defer func() {
-		os.Stdin = old
-		r.Close()
-	}()
-	if _, err := w.WriteString("piped content here"); err != nil {
-		t.Fatalf("write pipe: %v", err)
-	}
-	w.Close()
-
-	got, err := resolveInputBytes([]string{}, "", "")
+	// Inject a reader directly — no global os.Stdin mutation needed (WR-04).
+	// This is safe to run in parallel and immune to future t.Parallel() additions.
+	got, err := resolveInputBytes([]string{}, "", "", strings.NewReader("piped content here"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
