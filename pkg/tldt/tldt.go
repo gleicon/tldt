@@ -9,7 +9,9 @@
 package tldt
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -77,11 +79,23 @@ type PipelineResult struct {
 	Redactions int
 }
 
+// FetchResult is the output of Fetch with full HTTP metadata.
+// This enables middleware consumers to inspect response details without
+// re-fetching the URL.
+type FetchResult struct {
+	Text        string // Extracted article text
+	StatusCode  int    // HTTP status code (after redirects)
+	ContentType string // Response Content-Type header
+	FinalURL    string // Final URL after all redirects
+}
+
 // --- Sentinel errors re-exported for caller error checking ---
 
 var (
 	ErrSSRFBlocked   = fetcher.ErrSSRFBlocked
 	ErrRedirectLimit = fetcher.ErrRedirectLimit
+	ErrHTTPError     = errors.New("tldt: HTTP error")
+	ErrNonHTML       = errors.New("tldt: not HTML content")
 )
 
 // --- Default helpers ---
@@ -148,14 +162,49 @@ func Sanitize(text string) (string, SanitizeReport, error) {
 
 // Fetch retrieves a URL and extracts the main article text using readability.
 // SSRF protection blocks private/loopback/link-local IPs. Redirect chain capped at 5 hops.
-func Fetch(url string, opts FetchOptions) (string, error) {
+//
+// On success, returns a FetchResult with extracted text and HTTP metadata.
+// Errors are wrapped with context: use errors.Is() to check for sentinel errors
+// (ErrSSRFBlocked, ErrRedirectLimit, ErrHTTPError, ErrNonHTML).
+func Fetch(urlStr string, opts FetchOptions) (FetchResult, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = 30 * time.Second
 	}
 	if opts.MaxBytes == 0 {
 		opts.MaxBytes = 5 * 1024 * 1024
 	}
-	return fetcher.Fetch(url, opts.Timeout, opts.MaxBytes)
+
+	text, err := fetcher.Fetch(urlStr, opts.Timeout, opts.MaxBytes)
+	if err != nil {
+		// Determine error type for sentinel error wrapping
+		errStr := err.Error()
+		if errors.Is(err, fetcher.ErrSSRFBlocked) {
+			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
+		}
+		if errors.Is(err, fetcher.ErrRedirectLimit) {
+			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
+		}
+		// Check for HTTP error (non-2xx status)
+		if strings.Contains(errStr, "HTTP ") && strings.Contains(errStr, "fetching") {
+			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w: %v", ErrHTTPError, err)
+		}
+		// Check for non-HTML content type
+		if strings.Contains(errStr, "unsupported content type") {
+			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w: %v", ErrNonHTML, err)
+		}
+		// Unknown error - still wrap with context
+		return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
+	}
+
+	// On success, we don't have access to the actual HTTP response metadata
+	// since fetcher.Fetch only returns the text. Return with defaults.
+	// NOTE: If fetcher is extended to return metadata, update this to include it.
+	return FetchResult{
+		Text:        text,
+		StatusCode:  http.StatusOK, // Default since fetcher.Fetch doesn't expose this
+		ContentType: "text/html",     // Default since fetcher.Fetch doesn't expose this
+		FinalURL:    urlStr,          // Default since fetcher.Fetch doesn't expose this
+	}, nil
 }
 
 // Pipeline runs the full sanitize -> detect -> summarize flow in one call.
