@@ -325,3 +325,53 @@ func TestSentinelErrors_AllDefined(t *testing.T) {
 		}
 	}
 }
+
+// --- PII Detection Tests (Plan 10-01) ---
+
+func TestDetectPII_NoFindings(t *testing.T) {
+	findings := DetectPII("hello world no pii here")
+	if len(findings) != 0 {
+		t.Errorf("DetectPII: expected 0 findings for clean text, got %d", len(findings))
+	}
+}
+
+func TestDetectPII_EmailFound(t *testing.T) {
+	findings := DetectPII("Contact alice@example.com for help")
+	if len(findings) == 0 {
+		t.Fatalf("DetectPII: expected findings for email, got none")
+	}
+	if findings[0].Pattern != "email" {
+		t.Errorf("DetectPII: expected pattern 'email', got %q", findings[0].Pattern)
+	}
+	if findings[0].Line != 1 {
+		t.Errorf("DetectPII: expected Line=1, got %d", findings[0].Line)
+	}
+	if findings[0].Excerpt == "" {
+		t.Error("DetectPII: expected non-empty Excerpt")
+	}
+}
+
+func TestSanitizePII_CleanText(t *testing.T) {
+	text := "hello world no pii here"
+	redacted, findings := SanitizePII(text)
+	if redacted != text {
+		t.Errorf("SanitizePII: clean text should be unchanged, got %q", redacted)
+	}
+	if len(findings) != 0 {
+		t.Errorf("SanitizePII: expected 0 findings for clean text, got %d", len(findings))
+	}
+}
+
+func TestSanitizePII_EmailRedacted(t *testing.T) {
+	text := "Contact alice@example.com for help"
+	redacted, findings := SanitizePII(text)
+	if strings.Contains(redacted, "alice@example.com") {
+		t.Error("SanitizePII: redacted text should NOT contain original email")
+	}
+	if len(findings) == 0 {
+		t.Fatalf("SanitizePII: expected findings for email, got none")
+	}
+	if findings[0].Pattern != "email" {
+		t.Errorf("SanitizePII: expected pattern 'email', got %q", findings[0].Pattern)
+	}
+}
