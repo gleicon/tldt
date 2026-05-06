@@ -1,6 +1,7 @@
 package tldt
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -180,5 +181,147 @@ func TestSentinelErrors_Exported(t *testing.T) {
 	}
 	if ErrRedirectLimit == nil {
 		t.Error("ErrRedirectLimit should not be nil")
+	}
+}
+
+// --- Edge case integration tests (D-01 coverage) ---
+
+func TestSummarize_EmptyInput(t *testing.T) {
+	result, err := Summarize("", SummarizeOptions{Sentences: 3})
+	if err != nil {
+		t.Fatalf("Summarize empty: unexpected error: %v", err)
+	}
+	if result.Summary != "" {
+		t.Errorf("Summarize empty: expected empty summary, got %q", result.Summary)
+	}
+	if result.TokensIn != 0 {
+		t.Errorf("Summarize empty: expected TokensIn=0, got %d", result.TokensIn)
+	}
+	if result.TokensOut != 0 {
+		t.Errorf("Summarize empty: expected TokensOut=0, got %d", result.TokensOut)
+	}
+	if result.Reduction != 0 {
+		t.Errorf("Summarize empty: expected Reduction=0, got %d", result.Reduction)
+	}
+}
+
+func TestSummarize_WhitespaceOnly(t *testing.T) {
+	result, err := Summarize("   \n\t  ", SummarizeOptions{Sentences: 3})
+	if err != nil {
+		t.Fatalf("Summarize whitespace: unexpected error: %v", err)
+	}
+	// Whitespace should be tokenized (length/4 = 6/4 = 1 token)
+	if result.TokensIn == 0 {
+		t.Error("Summarize whitespace: expected non-zero TokensIn for whitespace input")
+	}
+}
+
+func TestFetch_SSRFBlocked(t *testing.T) {
+	// This test verifies the SSRF protection works through the public API
+	// Private IP addresses should be blocked
+	_, err := Fetch("http://192.168.1.1/admin", FetchOptions{})
+	if err == nil {
+		t.Fatal("Fetch SSRF: expected error for private IP, got nil")
+	}
+	// Check that errors.Is() correctly identifies ErrSSRFBlocked
+	if !errors.Is(err, ErrSSRFBlocked) {
+		t.Errorf("Fetch SSRF: expected errors.Is(err, ErrSSRFBlocked) = true, got false. Error: %v", err)
+	}
+	// Check that error contains tldt.Fetch prefix
+	if !strings.Contains(err.Error(), "tldt.Fetch") {
+		t.Errorf("Fetch SSRF: expected error to contain 'tldt.Fetch', got: %v", err)
+	}
+}
+
+func TestFetch_InvalidURL(t *testing.T) {
+	_, err := Fetch("not-a-valid-url", FetchOptions{})
+	if err == nil {
+		t.Fatal("Fetch invalid URL: expected error, got nil")
+	}
+	// Error should have tldt.Fetch prefix (wrapped context)
+	if !strings.Contains(err.Error(), "tldt.Fetch") {
+		t.Errorf("Fetch invalid URL: expected error with 'tldt.Fetch' prefix, got: %v", err)
+	}
+}
+
+func TestDetect_EmptyInput(t *testing.T) {
+	result, err := Detect("", DetectOptions{})
+	if err != nil {
+		t.Fatalf("Detect empty: unexpected error: %v", err)
+	}
+	if result.Report.Suspicious {
+		t.Error("Detect empty: expected Suspicious=false for empty input")
+	}
+	if len(result.Warnings) > 0 {
+		t.Errorf("Detect empty: expected no warnings, got %d", len(result.Warnings))
+	}
+}
+
+func TestSanitize_EmptyInput(t *testing.T) {
+	cleaned, report, err := Sanitize("")
+	if err != nil {
+		t.Fatalf("Sanitize empty: unexpected error: %v", err)
+	}
+	if cleaned != "" {
+		t.Errorf("Sanitize empty: expected empty cleaned text, got %q", cleaned)
+	}
+	if report.RemovedCount != 0 {
+		t.Errorf("Sanitize empty: expected RemovedCount=0, got %d", report.RemovedCount)
+	}
+}
+
+func TestPipeline_EmptyInput(t *testing.T) {
+	result, err := Pipeline("", PipelineOptions{
+		Sanitize:  true,
+		Summarize: SummarizeOptions{Sentences: 3},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline empty: unexpected error: %v", err)
+	}
+	if result.Summary != "" {
+		t.Errorf("Pipeline empty: expected empty summary, got %q", result.Summary)
+	}
+	if result.TokensIn != 0 {
+		t.Errorf("Pipeline empty: expected TokensIn=0, got %d", result.TokensIn)
+	}
+	if result.TokensOut != 0 {
+		t.Errorf("Pipeline empty: expected TokensOut=0, got %d", result.TokensOut)
+	}
+	if result.Reduction != 0 {
+		t.Errorf("Pipeline empty: expected Reduction=0, got %d", result.Reduction)
+	}
+}
+
+func TestPipeline_ZeroValueOptions(t *testing.T) {
+	// All-zero PipelineOptions should use defaults:
+	// - sanitize=false (redactions=0)
+	// - lexrank algorithm (from applySummarizeDefaults)
+	// - 5 sentences (from applySummarizeDefaults)
+	result, err := Pipeline(testArticle, PipelineOptions{})
+	if err != nil {
+		t.Fatalf("Pipeline zero-value: unexpected error: %v", err)
+	}
+	if strings.TrimSpace(result.Summary) == "" {
+		t.Error("Pipeline zero-value: expected non-empty summary")
+	}
+	// With zero-value options, Sanitize=false so redactions should be 0
+	if result.Redactions != 0 {
+		t.Errorf("Pipeline zero-value: expected Redactions=0 (sanitize=false), got %d", result.Redactions)
+	}
+}
+
+func TestSentinelErrors_AllDefined(t *testing.T) {
+	// Verify all sentinel errors are exported and non-nil
+	errors := []error{
+		ErrSSRFBlocked,
+		ErrRedirectLimit,
+		ErrHTTPError,
+		ErrNonHTML,
+	}
+	names := []string{"ErrSSRFBlocked", "ErrRedirectLimit", "ErrHTTPError", "ErrNonHTML"}
+	for i, err := range errors {
+		if err == nil {
+			t.Errorf("%s should not be nil", names[i])
+		}
 	}
 }
