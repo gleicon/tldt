@@ -320,14 +320,26 @@ Plans:
 
 ### Overview
 
-v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt in Go programs. The work splits into two sequential phases: Phase 10 extends the library with public PII types and a PII-aware Pipeline; Phase 11 refactors the CLI to import only `pkg/tldt`, eliminating all direct `internal/` imports. Both phases are independently verifiable — Phase 10 by library unit tests, Phase 11 by the full CLI integration test suite.
+v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt in Go programs. The work splits into three sequential phases: Phase 9.1 establishes the library foundation by verifying the existing `pkg/tldt` surface and routing core CLI operations through it; Phase 10 extends the library with public PII types and a PII-aware Pipeline; Phase 11 completes the CLI refactor to zero direct `internal/` imports. Each phase is independently verifiable.
 
 ### Phases
 
+- [ ] **Phase 9.1: Library Foundation** *(INSERTED)* - Verify and stabilize pkg/tldt as a complete, externally-importable library for Summarize/Detect/Sanitize/Fetch/Pipeline; route core CLI operations through pkg/tldt; prove external usability with integration tests
 - [ ] **Phase 10: Library API Completion** - Extend pkg/tldt with PIIFinding type, DetectPII, SanitizePII, and PII stage in Pipeline; unit-test the new public API surface
 - [ ] **Phase 11: CLI Refactor** - Refactor cmd/tldt/main.go to route all logic through pkg/tldt; zero direct internal/ imports; all 344+ tests pass
 
 ## Phase Details
+
+### Phase 9.1: Library Foundation *(INSERTED)*
+**Goal**: `pkg/tldt` is a stable, externally-importable Go library covering all core capabilities (summarize, detect injection, sanitize Unicode, fetch URLs, full Pipeline); the CLI routes these core operations through `pkg/tldt` rather than calling `internal/` packages directly, proving the library is production-ready for embedding in external Go programs.
+**Depends on**: Phase 9
+**Requirements**: LIB-CORE-01, LIB-CORE-02, LIB-CORE-03
+**Success Criteria** (what must be TRUE):
+  1. `go test ./pkg/tldt/...` passes — all existing pkg/tldt tests pass and at least one new integration test exercises Summarize + Detect + Sanitize + Fetch + Pipeline round-trip with no internal/ imports in the test file
+  2. `grep -r 'github.com/gleicon/tldt/internal/summarizer\|internal/detector\|internal/sanitizer\|internal/fetcher' cmd/tldt/main.go` returns no matches — main.go routes these four operations through pkg/tldt
+  3. `go test ./...` passes all 344+ tests with no regressions after main.go refactor
+**Plans**: TBD
+**UI hint**: no
 
 ### Phase 10: Library API Completion
 **Goal**: Any Go program can embed tldt as a sanitize/summarize/PII-guard for LLM input using only the public `pkg/tldt` API — no internal package access required.
@@ -356,5 +368,6 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 10. Library API Completion | 0/? | Not started | - |
+| 9.1. Library Foundation *(INSERTED)* | 0/? | Not started | - |
+| 10. Library API Completion | 2/2 | Planned | - |
 | 11. CLI Refactor | 0/? | Not started | - |

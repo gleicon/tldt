@@ -114,6 +114,12 @@
 
 **Milestone goal:** Make `pkg/tldt` the authoritative public API. Extend with full PII coverage. Refactor CLI to use `pkg/tldt` exclusively so any Go program can embed tldt as a sanitize/summarize guard for LLM input.
 
+### Library Foundation (LIB-CORE)
+
+- [ ] **LIB-CORE-01**: `pkg/tldt.Summarize`, `Detect`, `Sanitize`, `Fetch`, and `Pipeline` are the primary public API surface — behavior matches the wrapped internal packages for all inputs covered by existing tests; `go test ./pkg/tldt/...` passes
+- [ ] **LIB-CORE-02**: A Go program that imports only `github.com/gleicon/tldt/pkg/tldt` (no `internal/` imports) can call `tldt.Summarize`, `tldt.Detect`, `tldt.Sanitize`, `tldt.Fetch`, and `tldt.Pipeline`; verified by at least one integration test in `pkg/tldt/tldt_test.go` that exercises the full round-trip from text input to PipelineResult with no internal package access
+- [ ] **LIB-CORE-03**: `cmd/tldt/main.go` does not directly import `internal/summarizer`, `internal/detector`, `internal/sanitizer`, or `internal/fetcher`; all summarize, detect, sanitize, and fetch operations in main.go route through the corresponding `pkg/tldt` public functions
+
 ### Library API (LIB)
 
 - [ ] **LIB-01**: `pkg/tldt` exports a `PIIFinding` type with fields `Pattern string`, `Excerpt string`, `Line int` — public wrapper over `detector.Finding` for library consumers
@@ -130,6 +136,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| LIB-CORE-01 | Phase 9.1: Library Foundation | Pending |
+| LIB-CORE-02 | Phase 9.1: Library Foundation | Pending |
+| LIB-CORE-03 | Phase 9.1: Library Foundation | Pending |
 | LIB-01 | Phase 10: Library API Completion | Pending |
 | LIB-02 | Phase 10: Library API Completion | Pending |
 | LIB-03 | Phase 10: Library API Completion | Pending |

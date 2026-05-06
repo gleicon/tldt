@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v2.1.0
 milestone_name: Library SDK
 status: planning
-stopped_at: Phase 10 planned
+stopped_at: Phase 9.1 inserted (Library Foundation)
 last_updated: "2026-05-06T00:00:00.000Z"
-last_activity: 2026-05-06 -- Phase 10 Library API Completion planned; 2 plans in 2 waves (LIB-01, LIB-02, LIB-03, LIB-04)
+last_activity: 2026-05-06 -- Phase 9.1 Library Foundation inserted before Phase 10; 3 phases total in v2.1.0; Phase 10 plans ready (2 plans)
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 0
   total_plans: 2
   completed_plans: 0
@@ -25,10 +25,13 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 10 — Library API Completion
-Plan: Ready to execute (2 plans in 2 waves)
-Status: Ready to execute
-Last activity: 2026-05-06 — Phase 10 planned; 2 plans in 2 waves covering LIB-01, LIB-02, LIB-03, LIB-04
+Phase: 9.1 — Library Foundation *(INSERTED)*
+Plan: Not planned yet
+Status: Ready to plan
+Last activity: 2026-05-06 — Phase 9.1 inserted before Phase 10; Phase 10 plans already ready (2 plans, 2 waves)
+
+### Roadmap Evolution
+- Phase 9.1 Library Foundation inserted (URGENT) after Phase 9 — pre-condition for Phase 10: route CLI core ops through pkg/tldt before adding PII API
 
 ## Accumulated Context
 
