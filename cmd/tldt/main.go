@@ -11,9 +11,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	tldt "github.com/gleicon/tldt/pkg/tldt"
+
 	"github.com/gleicon/tldt/internal/config"
 	"github.com/gleicon/tldt/internal/detector"
-	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
 	"github.com/gleicon/tldt/internal/sanitizer"
@@ -174,7 +175,14 @@ func main() {
 				fmt.Fprintf(os.Stderr, "  offset %d: U+%04X %s (%s)\n", r.Offset, r.Rune, r.Name, r.Category)
 			}
 		}
-		report := detector.Analyze(text)
+		dresult, err := tldt.Detect(text, tldt.DetectOptions{
+			OutlierThreshold: *injectionThreshold,
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "detection error:", err)
+			os.Exit(1)
+		}
+		report := dresult.Report
 		if len(report.Findings) > 0 {
 			fmt.Fprintf(os.Stderr, "injection-detect: %d finding(s), max confidence %.2f\n", len(report.Findings), report.MaxScore)
 			for _, f := range report.Findings {
@@ -361,11 +369,14 @@ func groupIntoParagraphs(sentences []string, n int) string {
 func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, error) {
 	// --url branch: highest priority — most explicit input source (INP-01, INP-02)
 	if urlStr != "" {
-		text, err := fetcher.Fetch(urlStr, 30*time.Second, 5<<20) // 5MB cap
+		fresult, err := tldt.Fetch(urlStr, tldt.FetchOptions{
+			Timeout:  30 * time.Second,
+			MaxBytes: 5 << 20, // 5MB cap
+		})
 		if err != nil {
 			return nil, fmt.Errorf("fetching URL: %w", err)
 		}
-		return []byte(text), nil
+		return []byte(fresult.Text), nil
 	}
 	stat, err := os.Stdin.Stat()
 	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
