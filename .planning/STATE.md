@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1.0
 milestone_name: Library SDK
 status: planning
-stopped_at: Phase 9.1 inserted (Library Foundation)
-last_updated: "2026-05-06T00:00:00.000Z"
-last_activity: 2026-05-06 -- Phase 9.1 Library Foundation inserted before Phase 10; 3 phases total in v2.1.0; Phase 10 plans ready (2 plans)
+stopped_at: Phase 9.1 complete - ready to execute Phase 10
+last_updated: "2026-05-06T17:55:00.000Z"
+last_activity: 2026-05-06 -- Phase 9.1 Library Foundation COMPLETE (2 plans executed); pkg/tldt is load-bearing; ready for Phase 10 PII API extension
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 33
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 9.1 — Library Foundation *(INSERTED)*
-Plan: Not planned yet
-Status: Ready to plan
-Last activity: 2026-05-06 — Phase 9.1 inserted before Phase 10; Phase 10 plans already ready (2 plans, 2 waves)
+Phase: 9.1 — Library Foundation *(COMPLETE)*
+Plan: 02 — Partial CLI Refactor *(COMPLETE)*
+Status: Completed - Phase 9.1 Library Foundation DONE
+Last activity: 2026-05-06 — Phase 9.1 complete (2/2 plans); fetcher.Fetch and detector.Analyze routed through pkg/tldt; 353 tests pass; Phase 10 ready to execute
 
 ### Roadmap Evolution
 - Phase 9.1 Library Foundation inserted (URGENT) after Phase 9 — pre-condition for Phase 10: route CLI core ops through pkg/tldt before adding PII API
@@ -84,8 +84,21 @@ None.
 - D-04: Big-bang refactor — replace all 4 internal imports in main.go in one atomic commit
 - D-05: internal/config, internal/formatter, internal/installer stay as direct imports — not part of pkg/tldt scope
 
+### Phase 9.1 Execution Decisions (2026-05-06)
+
+- D-09.1-02: Approved partial refactor scope — route only fetcher.Fetch and detector.Analyze through pkg/tldt; defer summarizer/sanitizer/detector.PII routing to Phase 10 when PII APIs are available
+- D-09.1-02a: Architecture gap identified — pkg/tldt lacks PII detection/sanitization exports; Phase 10 will add DetectPII/SanitizePII/PIIFinding to enable full internal/detector removal
+- D-09.1-02b: internal/detector import kept for PII functions (SanitizePII, DetectPII, DetectOutliers, DefaultOutlierThreshold) — minimal surface area, will be removed in Phase 10
+
 ## Session Continuity
 
-Last session: 2026-05-06T16:30:00.000Z
-Stopped at: Phase 9.1 context gathered, ready for planning
-Resume file: .planning/phases/9.1-library-foundation/9.1-CONTEXT.md
+Last session: 2026-05-06T17:55:00.000Z
+Stopped at: Phase 9.1 COMPLETE — Both plans executed successfully
+Resume file: None — Phase 9.1 done, ready for Phase 10 execution
+
+## Phase 9.1 Summary
+
+**Completed:** 2026-05-06  
+**Plans:** 2/2 (9.1-01 Library Enhancement, 9.1-02 Partial CLI Refactor)  
+**Tests:** 353 passing, no regressions  
+**Key Result:** pkg/tldt is now a load-bearing public API — CLI routes Fetch and Detect operations through it, proving external embeddability before Phase 10 PII extensions
