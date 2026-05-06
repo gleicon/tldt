@@ -324,7 +324,7 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
 
 ### Phases
 
-- [ ] **Phase 9.1: Library Foundation** *(INSERTED)* - Verify and stabilize pkg/tldt as a complete, externally-importable library for Summarize/Detect/Sanitize/Fetch/Pipeline; route core CLI operations through pkg/tldt; prove external usability with integration tests
+- [x] **Phase 9.1: Library Foundation** *(INSERTED)* - Verify and stabilize pkg/tldt as a complete, externally-importable library for Summarize/Detect/Sanitize/Fetch/Pipeline; route core CLI operations through pkg/tldt; prove external usability with integration tests
 - [ ] **Phase 10: Library API Completion** - Extend pkg/tldt with PIIFinding type, DetectPII, SanitizePII, and PII stage in Pipeline; unit-test the new public API surface
 - [ ] **Phase 11: CLI Refactor** - Refactor cmd/tldt/main.go to route all logic through pkg/tldt; zero direct internal/ imports; all 344+ tests pass
 
@@ -335,11 +335,21 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
 **Depends on**: Phase 9
 **Requirements**: LIB-CORE-01, LIB-CORE-02, LIB-CORE-03
 **Success Criteria** (what must be TRUE):
-  1. `go test ./pkg/tldt/...` passes — all existing pkg/tldt tests pass and at least one new integration test exercises Summarize + Detect + Sanitize + Fetch + Pipeline round-trip with no internal/ imports in the test file
-  2. `grep -r 'github.com/gleicon/tldt/internal/summarizer\|internal/detector\|internal/sanitizer\|internal/fetcher' cmd/tldt/main.go` returns no matches — main.go routes these four operations through pkg/tldt
-  3. `go test ./...` passes all 344+ tests with no regressions after main.go refactor
-**Plans**: TBD
+   1. `go test ./pkg/tldt/...` passes — all existing pkg/tldt tests pass and at least one new integration test exercises Summarize + Detect + Sanitize + Fetch + Pipeline round-trip with no internal/ imports in the test file
+   2. `grep -r 'github.com/gleicon/tldt/internal/summarizer\|internal/detector\|internal/sanitizer\|internal/fetcher' cmd/tldt/main.go` returns no matches — main.go routes these four operations through pkg/tldt
+   3. `go test ./...` passes all 344+ tests with no regressions after main.go refactor
+**Plans**: 2 plans
 **UI hint**: no
+
+Plans:
+- [x] 9.1-01-PLAN.md — Add FetchResult type with HTTP metadata, sentinel errors ErrHTTPError/ErrNonHTML, comprehensive pkg/tldt integration tests (LIB-CORE-01, LIB-CORE-02)
+- [x] 9.1-02-PLAN.md — Partial refactor: route fetcher and detector.Analyze through pkg/tldt; keep internal/detector, internal/sanitizer, internal/summarizer for PII and advanced features pending Phase 10 (LIB-CORE-03 partial)
+
+**Wave 1**
+- [x] 9.1-01-PLAN.md — pkg/tldt.Fetch returns FetchResult, ErrHTTPError and ErrNonHTML sentinel errors defined, 9+ edge case integration tests added
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 9.1-02-PLAN.md — Partial refactor: cmd/tldt/main.go routed fetcher.Fetch and detector.Analyze through pkg/tldt; internal/detector kept for PII functions, internal/sanitizer and internal/summarizer kept for full functionality pending Phase 10; all tests pass
 
 ### Phase 10: Library API Completion
 **Goal**: Any Go program can embed tldt as a sanitize/summarize/PII-guard for LLM input using only the public `pkg/tldt` API — no internal package access required.
@@ -350,7 +360,18 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
   2. `tldt.SanitizePII(text)` returns a redacted string and `[]tldt.PIIFinding`; calling it on text containing an email address produces `[REDACTED:email]` in the output string
   3. `tldt.Pipeline(text, tldt.PipelineOptions{DetectPII: true})` returns a `PipelineResult` with a non-empty `PIIFindings` slice when the input contains PII patterns
   4. `go test ./pkg/tldt/...` passes all unit tests for the new API surface, including `DetectPII`, `SanitizePII`, and `Pipeline` with PII stage enabled
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Add PIIFinding type, DetectPII, and SanitizePII to pkg/tldt (LIB-01, LIB-02, LIB-03)
+- [ ] 10-02-PLAN.md — Extend Pipeline with PII stage and PipelineOptions/Result fields (LIB-04)
+
+**Wave 1** *(parallel — no shared files)*
+- [ ] 10-01-PLAN.md — TDD: Add PIIFinding type, DetectPII wrapper, SanitizePII wrapper, 4 unit tests
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 10-02-PLAN.md — Extend PipelineOptions with DetectPII/SanitizePII bool, PipelineResult with PIIFindings, insert PII stage between Unicode sanitize and injection-detect, 3 Pipeline PII tests
+
 **UI hint**: no
 
 ### Phase 11: CLI Refactor
@@ -368,6 +389,8 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9.1. Library Foundation *(INSERTED)* | 0/? | Not started | - |
+| 9.1. Library Foundation *(INSERTED)* | 2/2 | Complete | 2026-05-06 |
 | 10. Library API Completion | 2/2 | Planned | - |
 | 11. CLI Refactor | 0/? | Not started | - |
+
+**Ready for Execution**: Phase 10 plans are complete and follow TDD patterns (RED→GREEN). Execute with `/gsd-execute-phase 10`.
