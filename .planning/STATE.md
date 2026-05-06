@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1.0
 milestone_name: Library SDK
 status: planning
-stopped_at: Phase 9.1 complete - ready to execute Phase 10
-last_updated: "2026-05-06T17:55:00.000Z"
-last_activity: 2026-05-06 -- Phase 9.1 Library Foundation COMPLETE (2 plans executed); pkg/tldt is load-bearing; ready for Phase 10 PII API extension
+stopped_at: Phase 10 complete - library API finished
+last_updated: "2026-05-06T18:30:00.000Z"
+last_activity: 2026-05-06 -- Phase 10 Library API Completion COMPLETE (2 plans executed, 2 waves); 360 tests pass; pkg/tldt has full PII API surface
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 33
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
+  percent: 66
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 9.1 — Library Foundation *(COMPLETE)*
-Plan: 02 — Partial CLI Refactor *(COMPLETE)*
-Status: Completed - Phase 9.1 Library Foundation DONE
-Last activity: 2026-05-06 — Phase 9.1 complete (2/2 plans); fetcher.Fetch and detector.Analyze routed through pkg/tldt; 353 tests pass; Phase 10 ready to execute
+Phase: 10 — Library API Completion *(COMPLETE)*
+Plan: 02 — Pipeline PII Stage Extension *(COMPLETE)*
+Status: Completed - Phase 10 Library API Completion DONE
+Last activity: 2026-05-06 — Phase 10 complete (2/2 plans, 2 waves); pkg/tldt has full PII API with DetectPII, SanitizePII, Pipeline PII stage; 360 tests pass
 
 ### Roadmap Evolution
 - Phase 9.1 Library Foundation inserted (URGENT) after Phase 9 — pre-condition for Phase 10: route CLI core ops through pkg/tldt before adding PII API
@@ -92,9 +92,9 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-06T17:55:00.000Z
-Stopped at: Phase 9.1 COMPLETE — Both plans executed successfully
-Resume file: None — Phase 9.1 done, ready for Phase 10 execution
+Last session: 2026-05-06T18:30:00.000Z
+Stopped at: Phase 10 COMPLETE — Both waves executed successfully with full TDD cycle preservation
+Resume file: None — Phase 10 done, pkg/tldt library API complete
 
 ## Phase 9.1 Summary
 
@@ -102,3 +102,18 @@ Resume file: None — Phase 9.1 done, ready for Phase 10 execution
 **Plans:** 2/2 (9.1-01 Library Enhancement, 9.1-02 Partial CLI Refactor)  
 **Tests:** 353 passing, no regressions  
 **Key Result:** pkg/tldt is now a load-bearing public API — CLI routes Fetch and Detect operations through it, proving external embeddability before Phase 10 PII extensions
+
+## Phase 10 Summary
+
+**Completed:** 2026-05-06  
+**Plans:** 2/2 (10-01 PIIFinding Type & Wrappers, 10-02 Pipeline PII Stage)  
+**Waves:** 2 (Wave 1: 10-01, Wave 2: 10-02)  
+**Tests:** 360 passing (7 new, 0 regressions)  
+**TDD Cycle:** Full RED/GREEN preservation across both waves  
+**Key Results:**
+- `PIIFinding{Pattern, Excerpt, Line}` type exported
+- `DetectPII(text) []PIIFinding` and `SanitizePII(text) (string, []PIIFinding)` exported
+- PipelineOptions extended with `DetectPII` and `SanitizePII` bool fields
+- PipelineResult extended with `PIIFindings []PIIFinding` field
+- PII stage runs between Unicode sanitize and injection detect (order: sanitize → PII → inject-detect → summarize)
+- Library consumers can now do PII-aware summarization: `tldt.Pipeline(text, PipelineOptions{DetectPII: true, Summarize: tldt.SummarizeOptions{Sentences: 3}})`
