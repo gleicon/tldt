@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-06T16:18:18.056Z",
+  "phase": "9.1",
+  "phase_name": "Library Foundation",
+  "phase_dir": ".planning/phases/9.1-library-foundation",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [],
+  "remaining_tasks": [
+    {"id": 1, "name": "Plan Phase 9.1 (/gsd-plan-phase 9.1)", "status": "not_started"},
+    {"id": 2, "name": "Execute Phase 9.1 (/gsd-execute-phase 9.1)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "Insert Phase 9.1 (Library Foundation) before Phase 10 (Library API Completion)",
+      "rationale": "pkg/tldt already exists from Phase 8 (08-04-PLAN.md) but CLI still imports internal/summarizer, internal/detector, internal/sanitizer, internal/fetcher directly. Phase 9.1 makes the library load-bearing before Phase 10 adds PII extensions on top.",
+      "phase": "9.1"
+    },
+    {
+      "decision": "Phase 10 plans (10-01, 10-02) use TDD wave structure",
+      "rationale": "Wave 1 (10-01): PIIFinding type + DetectPII + SanitizePII. Wave 2 (10-02): Pipeline PII stage. Sequential because Wave 2 needs PIIFinding type from Wave 1 to compile.",
+      "phase": "10"
+    },
+    {
+      "decision": "Field mapping: PIIFinding.Line = detector.Finding.Sentence (not .Line — .Line doesn't exist)",
+      "rationale": "internal/detector uses Sentence int (repurposed as 1-based line number for PII). Using .Line causes compile error.",
+      "phase": "10"
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "Run /gsd-plan-phase 9.1 to create plans for Library Foundation phase",
+  "context_notes": "This session: planned Phase 10 (LIB-01–04, 2 plans verified), then inserted Phase 9.1 as prerequisite. Phase 9.1 needs planning. Phase 10 plans are ready to execute after Phase 9.1. No blockers, clean git state."
+}
