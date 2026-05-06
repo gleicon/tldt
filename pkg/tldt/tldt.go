@@ -42,9 +42,11 @@ type FetchOptions struct {
 
 // PipelineOptions combines all pipeline stages.
 type PipelineOptions struct {
-	Summarize SummarizeOptions
-	Detect    DetectOptions
-	Sanitize  bool // run sanitizer before detection/summarization
+	Summarize   SummarizeOptions
+	Detect      DetectOptions
+	Sanitize    bool // run Unicode sanitizer before detection/summarization
+	DetectPII   bool // run PII detection stage (text unchanged)
+	SanitizePII bool // run PII redaction stage (text redacted; implies detection)
 }
 
 // --- Result types ---
@@ -81,12 +83,13 @@ type PIIFinding struct {
 
 // PipelineResult is the output of Pipeline.
 type PipelineResult struct {
-	Summary    string
-	TokensIn   int
-	TokensOut  int
-	Reduction  int
-	Warnings   []string
-	Redactions int
+	Summary     string
+	TokensIn    int
+	TokensOut   int
+	Reduction   int
+	Warnings    []string
+	Redactions  int
+	PIIFindings []PIIFinding // populated when DetectPII or SanitizePII is true; nil otherwise
 }
 
 // FetchResult is the output of Fetch with full HTTP metadata.
@@ -257,33 +260,45 @@ func Fetch(urlStr string, opts FetchOptions) (FetchResult, error) {
 // This is the primary embedding use case for AI API middleware.
 func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
 	var redactions int
+	var piiFindings []PIIFinding
 
-	// Step 1: sanitize (if enabled)
+	// Step 1: Unicode sanitize (if enabled)
 	if opts.Sanitize {
 		inv := sanitizer.ReportInvisibles(text)
 		redactions = len(inv)
 		text = sanitizer.SanitizeAll(text)
 	}
 
-	// Step 2: detect
+	// Step 2: PII stage (between sanitize and inject-detect per LIB-04)
+	if opts.SanitizePII {
+		redacted, findings := detector.SanitizePII(text)
+		piiFindings = toPublicPIIFindings(findings)
+		text = redacted
+	} else if opts.DetectPII {
+		findings := detector.DetectPII(text)
+		piiFindings = toPublicPIIFindings(findings)
+	}
+
+	// Step 3: injection detect
 	var warnings []string
 	report := detector.Analyze(text)
 	if report.Suspicious {
 		warnings = append(warnings, "injection-detect: WARNING -- input flagged as suspicious")
 	}
 
-	// Step 3: summarize
+	// Step 4: summarize
 	result, err := Summarize(text, opts.Summarize)
 	if err != nil {
 		return PipelineResult{}, err
 	}
 
 	return PipelineResult{
-		Summary:    result.Summary,
-		TokensIn:   result.TokensIn,
-		TokensOut:  result.TokensOut,
-		Reduction:  result.Reduction,
-		Warnings:   warnings,
-		Redactions: redactions,
+		Summary:     result.Summary,
+		TokensIn:    result.TokensIn,
+		TokensOut:   result.TokensOut,
+		Reduction:   result.Reduction,
+		Warnings:    warnings,
+		Redactions:  redactions,
+		PIIFindings: piiFindings,
 	}, nil
 }
