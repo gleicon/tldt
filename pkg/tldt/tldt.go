@@ -69,6 +69,16 @@ type SanitizeReport struct {
 	Invisibles   []sanitizer.InvisibleReport
 }
 
+// PIIFinding describes a single PII or secret detected in text.
+// Pattern names: "email", "api-key", "jwt", "credit-card".
+// Excerpt is truncated to first 12 chars + "..." by the detector for privacy.
+// Line is 1-based.
+type PIIFinding struct {
+	Pattern string
+	Excerpt string
+	Line    int
+}
+
 // PipelineResult is the output of Pipeline.
 type PipelineResult struct {
 	Summary    string
@@ -107,6 +117,27 @@ func applySummarizeDefaults(opts *SummarizeOptions) {
 	if opts.Sentences == 0 {
 		opts.Sentences = 5
 	}
+}
+
+// toPublicPIIFinding converts internal detector.Finding to public PIIFinding.
+func toPublicPIIFinding(f detector.Finding) PIIFinding {
+	return PIIFinding{
+		Pattern: f.Pattern,
+		Excerpt: f.Excerpt,
+		Line:    f.Sentence, // NOT f.Line -- detector.Finding has no Line field
+	}
+}
+
+// toPublicPIIFindings converts a slice of detector.Findings to []PIIFinding.
+func toPublicPIIFindings(findings []detector.Finding) []PIIFinding {
+	if len(findings) == 0 {
+		return nil
+	}
+	out := make([]PIIFinding, len(findings))
+	for i, f := range findings {
+		out[i] = toPublicPIIFinding(f)
+	}
+	return out
 }
 
 // --- Exported functions ---
@@ -158,6 +189,21 @@ func Sanitize(text string) (string, SanitizeReport, error) {
 		RemovedCount: len(inv),
 		Invisibles:   inv,
 	}, nil
+}
+
+// DetectPII scans text for PII and secret patterns.
+// Returns findings with pattern name, truncated excerpt, and 1-based line number.
+// Text is not modified. Safe to call on untrusted input.
+func DetectPII(text string) []PIIFinding {
+	return toPublicPIIFindings(detector.DetectPII(text))
+}
+
+// SanitizePII replaces PII/secret matches with [REDACTED:<type>] placeholders.
+// Returns the redacted string and the findings that triggered redaction.
+// When no PII is found, the original text is returned unchanged and findings is nil.
+func SanitizePII(text string) (string, []PIIFinding) {
+	redacted, findings := detector.SanitizePII(text)
+	return redacted, toPublicPIIFindings(findings)
 }
 
 // Fetch retrieves a URL and extracts the main article text using readability.
