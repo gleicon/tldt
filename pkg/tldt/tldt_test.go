@@ -375,3 +375,51 @@ func TestSanitizePII_EmailRedacted(t *testing.T) {
 		t.Errorf("SanitizePII: expected pattern 'email', got %q", findings[0].Pattern)
 	}
 }
+
+// --- Pipeline PII Integration Tests (Plan 10-02) ---
+
+func TestPipeline_DetectPII(t *testing.T) {
+	text := "Contact alice@example.com for details.\n" + testArticle
+	result, err := Pipeline(text, PipelineOptions{
+		DetectPII: true,
+		Summarize: SummarizeOptions{Sentences: 2},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline DetectPII: unexpected error: %v", err)
+	}
+	if len(result.PIIFindings) == 0 {
+		t.Error("Pipeline DetectPII: expected PIIFindings to be populated")
+	}
+	if strings.TrimSpace(result.Summary) == "" {
+		t.Error("Pipeline DetectPII: expected non-empty summary")
+	}
+}
+
+func TestPipeline_SanitizePII(t *testing.T) {
+	text := "Contact alice@example.com for details.\n" + testArticle
+	result, err := Pipeline(text, PipelineOptions{
+		SanitizePII: true,
+		Summarize:   SummarizeOptions{Sentences: 2},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline SanitizePII: unexpected error: %v", err)
+	}
+	if len(result.PIIFindings) == 0 {
+		t.Error("Pipeline SanitizePII: expected PIIFindings to be populated")
+	}
+	if strings.TrimSpace(result.Summary) == "" {
+		t.Error("Pipeline SanitizePII: expected non-empty summary")
+	}
+}
+
+func TestPipeline_NoPII(t *testing.T) {
+	result, err := Pipeline(testArticle, PipelineOptions{
+		Summarize: SummarizeOptions{Sentences: 2},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline: unexpected error: %v", err)
+	}
+	if result.PIIFindings != nil {
+		t.Errorf("Pipeline: expected nil PIIFindings when no PII flag set, got %v", result.PIIFindings)
+	}
+}
