@@ -76,8 +76,16 @@ None.
 | future | TOML validation/lint command | Deferred | v2.0 |
 | future | MCP server mode | Deferred | v2.0 |
 
+### Phase 9.1 Decisions (context gathered 2026-05-06)
+
+- D-01: Comprehensive integration tests at pkg/tldt layer — edge cases, not just callable verification
+- D-02: Add structured FetchResult type with metadata (StatusCode, ContentType, FinalURL) + sentinel errors
+- D-03: Wrap all errors with context (`fmt.Errorf("tldt.FunctionName: %w", err)`) — tradeoff: callers can't use internal error types directly
+- D-04: Big-bang refactor — replace all 4 internal imports in main.go in one atomic commit
+- D-05: internal/config, internal/formatter, internal/installer stay as direct imports — not part of pkg/tldt scope
+
 ## Session Continuity
 
-Last session: 2026-05-02T22:30:00.000Z
-Stopped at: Milestone v1.2.0 planning started
-Resume file: None
+Last session: 2026-05-06T16:30:00.000Z
+Stopped at: Phase 9.1 context gathered, ready for planning
+Resume file: .planning/phases/9.1-library-foundation/9.1-CONTEXT.md
