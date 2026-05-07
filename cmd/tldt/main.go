@@ -14,11 +14,8 @@ import (
 	tldt "github.com/gleicon/tldt/pkg/tldt"
 
 	"github.com/gleicon/tldt/internal/config"
-	"github.com/gleicon/tldt/internal/detector"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
-	"github.com/gleicon/tldt/internal/sanitizer"
-	"github.com/gleicon/tldt/internal/summarizer"
 )
 
 func main() {
@@ -39,7 +36,7 @@ func main() {
 	skillTarget       := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
 	sanitizeFlag      := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection   := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
-	injectionThreshold := flag.Float64("injection-threshold", detector.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
+	injectionThreshold := flag.Float64("injection-threshold", tldt.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
 	detectPII    := flag.Bool("detect-pii", false, "report PII and secret patterns (email, API keys, JWTs, credit cards) to stderr (advisory)")
 	sanitizePII  := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
 	flag.Usage = func() {
@@ -133,9 +130,9 @@ func main() {
 
 	// --sanitize: strip invisible Unicode and NFKC-normalize before summarization.
 	if *sanitizeFlag {
-		stripped := sanitizer.SanitizeAll(text)
+		stripped := tldt.SanitizeAll(text)
 		if stripped != text {
-			if inv := sanitizer.ReportInvisibles(text); len(inv) > 0 {
+			if inv := tldt.ReportInvisibles(text); len(inv) > 0 {
 				fmt.Fprintf(os.Stderr, "sanitize: removed %d invisible codepoint(s)\n", len(inv))
 			}
 		}
@@ -146,7 +143,7 @@ func main() {
 	// Implies detection: redaction count always reported to stderr.
 	// --sanitize-pii and --sanitize stack independently (D-07).
 	if *sanitizePII {
-		redacted, findings := detector.SanitizePII(text)
+		redacted, findings := tldt.SanitizePII(text)
 		count := len(findings)
 		fmt.Fprintf(os.Stderr, "pii-detect: %d redaction(s) applied\n", count)
 		text = redacted
@@ -156,20 +153,20 @@ func main() {
 	// When --sanitize-pii is also set, this block runs on the already-redacted text — findings will be empty
 	// (since redaction already replaced matches). This is correct behavior: detection post-redaction is safe.
 	if *detectPII {
-		findings := detector.DetectPII(text)
+		findings := tldt.DetectPII(text)
 		if len(findings) == 0 {
 			fmt.Fprintln(os.Stderr, "pii-detect: no findings")
 		} else {
 			fmt.Fprintf(os.Stderr, "pii-detect: %d finding(s)\n", len(findings))
 			for _, f := range findings {
-				fmt.Fprintf(os.Stderr, "pii-detect: WARNING — [%s] %s (line %d)\n", f.Pattern, f.Excerpt, f.Sentence)
+				fmt.Fprintf(os.Stderr, "pii-detect: WARNING — [%s] %s (line %d)\n", f.Pattern, f.Excerpt, f.Line)
 			}
 		}
 	}
 
 	// --detect-injection: report pattern, encoding, and invisible-char findings to stderr.
 	if *detectInjection {
-		if inv := sanitizer.ReportInvisibles(text); len(inv) > 0 {
+		if inv := tldt.ReportInvisibles(text); len(inv) > 0 {
 			fmt.Fprintf(os.Stderr, "injection-detect: %d invisible Unicode codepoint(s) found\n", len(inv))
 			for _, r := range inv {
 				fmt.Fprintf(os.Stderr, "  offset %d: U+%04X %s (%s)\n", r.Offset, r.Rune, r.Name, r.Category)
@@ -201,7 +198,7 @@ func main() {
 		text = applySentenceCap(text, defaultSentenceCap)
 	}
 
-	s, err := summarizer.New(effectiveAlgorithm)
+	s, err := tldt.NewSummarizer(effectiveAlgorithm)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -211,8 +208,8 @@ func main() {
 	var result []string
 	var simMatrix [][]float64 // populated if algorithm supports MatrixSummarizer
 	if *explain {
-		if ex, ok := s.(summarizer.Explainer); ok {
-			var info *summarizer.ExplainInfo
+		if ex, ok := s.(tldt.Explainer); ok {
+			var info *tldt.ExplainInfo
 			var err2 error
 			result, info, err2 = ex.SummarizeExplain(text, effectiveSentences)
 			if err2 != nil {
@@ -232,7 +229,7 @@ func main() {
 				os.Exit(1)
 			}
 		}
-	} else if ms, ok := s.(summarizer.MatrixSummarizer); ok {
+	} else if ms, ok := s.(tldt.MatrixSummarizer); ok {
 		var err2 error
 		result, simMatrix, err2 = ms.SummarizeWithMatrix(text, effectiveSentences)
 		if err2 != nil {
@@ -250,8 +247,8 @@ func main() {
 
 	// --detect-injection outlier layer: run after summarization to use LexRank matrix.
 	if *detectInjection && simMatrix != nil {
-		sentences := summarizer.TokenizeSentences(text)
-		outliers := detector.DetectOutliers(sentences, simMatrix, *injectionThreshold)
+		sentences := tldt.TokenizeSentences(text)
+		outliers := tldt.DetectOutliers(sentences, simMatrix, *injectionThreshold)
 		if len(outliers) > 0 {
 			fmt.Fprintf(os.Stderr, "injection-detect: %d outlier sentence(s) above threshold %.2f\n", len(outliers), *injectionThreshold)
 			for _, f := range outliers {
@@ -267,8 +264,8 @@ func main() {
 			fmt.Fprintln(os.Stderr, "rouge: cannot read reference file:", err)
 			os.Exit(1)
 		}
-		refSents := summarizer.TokenizeSentences(string(refData))
-		scores := summarizer.EvalROUGE(result, refSents)
+		refSents := tldt.TokenizeSentences(string(refData))
+		scores := tldt.EvalROUGE(result, refSents)
 		fmt.Fprintf(os.Stderr, "rouge-1  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGE1.Precision, scores.ROUGE1.Recall, scores.ROUGE1.F1)
 		fmt.Fprintf(os.Stderr, "rouge-2  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGE2.Precision, scores.ROUGE2.Recall, scores.ROUGE2.F1)
 		fmt.Fprintf(os.Stderr, "rouge-l  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGEL.Precision, scores.ROUGEL.Recall, scores.ROUGEL.F1)
@@ -290,7 +287,7 @@ func main() {
 	// Build metadata for structured formats
 	meta := formatter.SummaryMeta{
 		Algorithm:          effectiveAlgorithm,
-		SentencesIn:        len(summarizer.TokenizeSentences(text)),
+		SentencesIn:        len(tldt.TokenizeSentences(text)),
 		SentencesOut:       len(result),
 		CharsIn:            charsIn,
 		CharsOut:           charsOut,
@@ -420,7 +417,7 @@ func validateInput(data []byte) (string, bool, error) {
 // applySentenceCap limits text to at most cap sentences to prevent O(n^2) hang.
 // Returns text unchanged if sentence count is within cap.
 func applySentenceCap(text string, cap int) string {
-	sents := summarizer.TokenizeSentences(text)
+	sents := tldt.TokenizeSentences(text)
 	if len(sents) <= cap {
 		return text
 	}
