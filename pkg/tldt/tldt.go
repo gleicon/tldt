@@ -29,9 +29,13 @@ type SummarizeOptions struct {
 	Sentences int    // number of output sentences (default: 5)
 }
 
+// DefaultOutlierThreshold is the default threshold for outlier detection.
+// Sentences with outlier score above this are flagged as off-topic.
+const DefaultOutlierThreshold = detector.DefaultOutlierThreshold
+
 // DetectOptions controls detection behavior.
 type DetectOptions struct {
-	OutlierThreshold float64 // default: 0.85 (detector.DefaultOutlierThreshold)
+	OutlierThreshold float64 // default: 0.85 (DefaultOutlierThreshold)
 }
 
 // FetchOptions controls URL fetching behavior.
@@ -68,8 +72,12 @@ type DetectResult struct {
 // SanitizeReport is the output metadata from Sanitize.
 type SanitizeReport struct {
 	RemovedCount int
-	Invisibles   []sanitizer.InvisibleReport
+	Invisibles   []InvisibleReport
 }
+
+// InvisibleReport describes a single stripped invisible codepoint for audit purposes.
+// Re-exported from internal/sanitizer for CLI use.
+type InvisibleReport = sanitizer.InvisibleReport
 
 // PIIFinding describes a single PII or secret detected in text.
 // Pattern names: "email", "api-key", "jwt", "credit-card".
@@ -186,8 +194,8 @@ func Detect(text string, opts DetectOptions) (DetectResult, error) {
 // Sanitize strips invisible Unicode characters and applies NFKC normalization.
 // Returns the cleaned text and a report of what was removed.
 func Sanitize(text string) (string, SanitizeReport, error) {
-	inv := sanitizer.ReportInvisibles(text)
-	cleaned := sanitizer.SanitizeAll(text)
+	inv := ReportInvisibles(text)
+	cleaned := SanitizeAll(text)
 	return cleaned, SanitizeReport{
 		RemovedCount: len(inv),
 		Invisibles:   inv,
@@ -256,6 +264,87 @@ func Fetch(urlStr string, opts FetchOptions) (FetchResult, error) {
 	}, nil
 }
 
+// --- Detector Types ---
+
+// Finding describes a single injection detection signal from DetectOutliers.
+// Re-exported from internal/detector for CLI --detect-injection use.
+type Finding = detector.Finding
+
+// --- Summarizer Types ---
+
+// Summarizer is the common interface for all extractive summarization algorithms.
+// Re-exported from internal/summarizer for type assertions by CLI consumers.
+type Summarizer = summarizer.Summarizer
+
+// Explainer is an optional interface implemented by algorithms that can return
+// per-run diagnostics alongside the summary. Used with --explain flag.
+type Explainer = summarizer.Explainer
+
+// MatrixSummarizer is an optional interface implemented by LexRank.
+// Returns the top n sentences and the raw similarity matrix for outlier detection.
+type MatrixSummarizer = summarizer.MatrixSummarizer
+
+// ExplainInfo holds debug diagnostics from a summarization run.
+// Re-exported from internal/summarizer for CLI --explain output.
+type ExplainInfo = summarizer.ExplainInfo
+
+// SentenceScore holds the centrality score and selection status for one sentence.
+type SentenceScore = summarizer.SentenceScore
+
+// F1Score holds precision, recall, and F1 for one ROUGE metric.
+type F1Score = summarizer.F1Score
+
+// ROUGEScore holds ROUGE-1, ROUGE-2, and ROUGE-L scores.
+type ROUGEScore = summarizer.ROUGEScore
+
+// NewSummarizer returns a Summarizer for the named algorithm.
+// Valid algorithms: "lexrank", "textrank", "graph", "ensemble".
+func NewSummarizer(algo string) (Summarizer, error) {
+	s, err := summarizer.New(algo)
+	if err != nil {
+		return nil, fmt.Errorf("tldt.NewSummarizer: %w", err)
+	}
+	return s, nil
+}
+
+// TokenizeSentences splits text into sentences using a regexp heuristic.
+// Sentences are returned trimmed, in original order.
+func TokenizeSentences(text string) []string {
+	return summarizer.TokenizeSentences(text)
+}
+
+// EvalROUGE computes ROUGE-1, ROUGE-2, and ROUGE-L between system sentences
+// and reference sentences. Used for evaluating summarization quality.
+func EvalROUGE(system, reference []string) ROUGEScore {
+	return summarizer.EvalROUGE(system, reference)
+}
+
+// --- Detector Wrappers ---
+
+// DetectOutliers computes per-sentence outlier scores from the similarity matrix
+// and returns findings for sentences above threshold. Used with --detect-injection.
+//
+// outlier_score(i) = 1 - mean(simMatrix[i][j] for j ≠ i)
+// Higher scores mean less similarity to neighbors = more off-topic.
+func DetectOutliers(sentences []string, simMatrix [][]float64, threshold float64) []Finding {
+	return detector.DetectOutliers(sentences, simMatrix, threshold)
+}
+
+// --- Sanitizer Wrappers ---
+
+// SanitizeAll applies StripInvisible followed by NormalizeUnicode.
+// This is the single entry point for the --sanitize CLI flag.
+func SanitizeAll(text string) string {
+	return sanitizer.SanitizeAll(text)
+}
+
+// ReportInvisibles returns a description of every codepoint that would be stripped
+// by SanitizeAll, without modifying the text. Used by --detect-injection to audit
+// invisible content.
+func ReportInvisibles(text string) []InvisibleReport {
+	return sanitizer.ReportInvisibles(text)
+}
+
 // Pipeline runs the full sanitize -> detect -> summarize flow in one call.
 // This is the primary embedding use case for AI API middleware.
 func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
@@ -264,9 +353,9 @@ func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
 
 	// Step 1: Unicode sanitize (if enabled)
 	if opts.Sanitize {
-		inv := sanitizer.ReportInvisibles(text)
+		inv := ReportInvisibles(text)
 		redactions = len(inv)
-		text = sanitizer.SanitizeAll(text)
+		text = SanitizeAll(text)
 	}
 
 	// Step 2: PII stage (between sanitize and inject-detect per LIB-04)
