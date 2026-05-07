@@ -291,6 +291,8 @@
     </div>
     <div class="nav-links">
       <a href="#features" class="nav-link">features</a>
+      <a href="#examples" class="nav-link">examples</a>
+      <a href="library.html" class="nav-link">library api</a>
       <a href="#defense" class="nav-link">injection defense</a>
       <a href="#algorithms" class="nav-link">algorithms</a>
       <a href="#security" class="nav-link">security</a>
@@ -313,7 +315,7 @@
       <span class="pill"><span class="pill-dot"></span>No API keys</span>
       <span class="pill"><span class="pill-dot"></span>Pipe-safe</span>
       <span class="pill"><span class="pill-dot"></span>MIT License</span>
-      <span class="pill"><span class="pill-dot"></span>302 tests</span>
+      <span class="pill"><span class="pill-dot"></span>360 tests</span>
     </div>
 
     <h1 class="hero-title reveal">
@@ -590,6 +592,93 @@
         </div>
       </div>
     </div><!-- end .reveal -->
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- EXAMPLES -->
+<section class="section" id="examples">
+  <div class="container">
+    <div class="reveal" style="margin-bottom:40px">
+      <div class="section-label">examples</div>
+      <h2 class="section-title">Library usage,<br><span class="acc">production-ready.</span></h2>
+      <p style="color:var(--text-2);margin-top:16px;max-width:560px;font-size:14px;line-height:1.85">
+        Use tldt as a Go library in your applications. Stateless, thread-safe, zero global mutable state.
+        See <a href="library.html" style="color:var(--accent);text-decoration:none">library api docs</a> for complete reference.
+      </p>
+    </div>
+
+    <div class="reveal" style="display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));margin-bottom:40px">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="font-family:var(--serif);font-size:18px;margin-bottom:12px">Basic Summarization</div>
+        <div class="term" style="font-size:12px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div><span class="p">$</span> <span class="c">go get</span> <span class="s">github.com/gleicon/tldt/pkg/tldt</span></div>
+            <div style="margin-top:12px"><span class="cm">// Summarize with defaults</span></div>
+            <div><span class="kw">result</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">Summarize</span>(<span class="s">"long text..."</span>,</div>
+            <div style="margin-left:28px"><span class="kw">tldt</span>.<span class="kw">SummarizeOptions</span>{})</div>
+            <div style="margin-top:8px"><span class="kw">fmt</span>.<span class="kw">Println</span>(<span class="kw">result</span>.<span class="kw">Summary</span>)</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="font-family:var(--serif);font-size:18px;margin-bottom:12px">Security Pipeline</div>
+        <div class="term" style="font-size:12px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div><span class="cm">// Full security pipeline before LLM context</span></div>
+            <div><span class="kw">result</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">Pipeline</span>(<span class="s">"untrusted text"</span>,</div>
+            <div style="margin-left:28px"><span class="kw">tldt</span>.<span class="kw">PipelineOptions</span>{</div>
+            <div style="margin-left:48px"><span class="kw">Sanitize</span>:    <span class="num">true</span>,  <span class="cm">// Unicode cleaning</span></div>
+            <div style="margin-left:48px"><span class="kw">SanitizePII</span>: <span class="num">true</span>,  <span class="cm">// Redact secrets</span></div>
+            <div style="margin-left:48px"><span class="kw">DetectPII</span>:   <span class="num">true</span>,  <span class="cm">// Report PII</span></div>
+            <div style="margin-left:48px"><span class="kw">Summarize</span>:   <span class="kw">tldt</span>.<span class="kw">SummarizeOptions</span>{<span class="kw">Sentences</span>: <span class="num">3</span>},</div>
+            <div style="margin-left:28px">})</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="font-family:var(--serif);font-size:18px;margin-bottom:12px">OpenAPI Client</div>
+        <div class="term" style="font-size:12px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div><span class="cm">// Fetch and summarize API documentation</span></div>
+            <div><span class="kw">fetch</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">Fetch</span>(<span class="s">"https://api.example.com/openapi.json"</span>,</div>
+            <div style="margin-left:28px"><span class="kw">tldt</span>.<span class="kw">FetchOptions</span>{<span class="kw">Timeout</span>: <span class="num">30</span> * <span class="kw">time</span>.<span class="kw">Second</span>})</div>
+            <div style="margin-top:8px"><span class="kw">pipeline</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">Pipeline</span>(<span class="kw">fetch</span>.<span class="kw">Text</span>, opts)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal" style="border:1px solid var(--border);border-radius:8px;padding:20px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <span style="font-family:var(--serif);font-size:16px">Complete Examples</span>
+        <span style="background:var(--surface-2);padding:2px 10px;border-radius:4px;font-size:11px">examples/</span>
+      </div>
+      <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:16px">
+        Three complete, self-contained examples demonstrating production usage patterns.
+        Each includes go.mod for independent use and a Makefile for building.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a href="https://github.com/gleicon/tldt/tree/main/examples/basic" target="_blank" rel="noopener" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-decoration:none;color:var(--text);font-size:13px;flex:1;min-width:200px">
+          <div style="color:var(--accent);font-weight:500;margin-bottom:4px">basic/</div>
+          <div style="color:var(--text-2);font-size:12px">Simple summarization with algorithm selection</div>
+        </a>
+        <a href="https://github.com/gleicon/tldt/tree/main/examples/pipeline" target="_blank" rel="noopener" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-decoration:none;color:var(--text);font-size:13px;flex:1;min-width:200px">
+          <div style="color:var(--accent);font-weight:500;margin-bottom:4px">pipeline/</div>
+          <div style="color:var(--text-2);font-size:12px">Full security pipeline with PII detection</div>
+        </a>
+        <a href="https://github.com/gleicon/tldt/tree/main/examples/openapi-client" target="_blank" rel="noopener" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-decoration:none;color:var(--text);font-size:13px;flex:1;min-width:200px">
+          <div style="color:var(--accent);font-weight:500;margin-bottom:4px">openapi-client/</div>
+          <div style="color:var(--text-2);font-size:12px">Fetch and summarize API documentation</div>
+        </a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -929,7 +1018,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
           GitHub
         </a>
-        <span style="font-size:12px;color:var(--text-3)">v1.0.0</span>
+        <span style="font-size:12px;color:var(--text-3)">v1.2.0</span>
       </div>
     </div>
   </div>

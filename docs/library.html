@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tldt Library API — Go Documentation</title>
+  <meta name="description" content="Complete Go library API documentation for tldt. Stateless, thread-safe text summarization, PII detection, and security pipeline." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06060a;
+      --surface: #0d0d12;
+      --surface-2: #13131a;
+      --border: #1e1e2a;
+      --border-hi: #2d2d3d;
+      --accent: #b5f23d;
+      --accent-dim: rgba(181,242,61,0.12);
+      --danger: #ff4757;
+      --danger-dim: rgba(255,71,87,0.1);
+      --warning: #ffa502;
+      --text: #e8e8f0;
+      --text-2: #8888a0;
+      --text-3: #44445a;
+      --mono: 'JetBrains Mono', 'Courier New', monospace;
+      --serif: 'Fraunces', Georgia, serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Nav */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(6,6,10,0.85);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1100px; margin: 0 auto;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { color: var(--accent); font-weight: 700; font-size: 15px; }
+    .nav-sub  { color: var(--text-3); font-size: 12px; margin-left: 10px; }
+    .nav-links { display: flex; align-items: center; gap: 20px; }
+    .nav-link {
+      color: var(--text-2); font-size: 12px; text-decoration: none;
+      transition: color .15s;
+    }
+    .nav-link:hover { color: var(--text); }
+    .nav-gh {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-2); font-size: 12px; text-decoration: none;
+      transition: all .15s;
+    }
+    .nav-gh:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Layout */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 80px 24px; position: relative; z-index: 1; }
+    .divider { height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); }
+
+    /* Hero */
+    .hero {
+      min-height: 40vh;
+      display: flex; align-items: center;
+      padding: 100px 24px 60px;
+      position: relative;
+    }
+    .hero-glow {
+      position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(181,242,61,0.05) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    h1.hero-title {
+      font-family: var(--serif);
+      font-size: clamp(42px, 6vw, 64px);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+    .hero-title .acc { color: var(--accent); font-style: italic; }
+
+    /* Section headers */
+    .section-label {
+      font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 12px;
+    }
+    h2.section-title {
+      font-family: var(--serif);
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700; line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+    h2.section-title .acc { color: var(--accent); font-style: italic; }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 13px;
+      margin: 20px 0;
+    }
+    .code-header {
+      display: flex; align-items: center;
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-2);
+    }
+    .code-body {
+      padding: 16px 20px;
+      overflow-x: auto;
+    }
+    .code-body pre {
+      margin: 0;
+      white-space: pre;
+      word-wrap: normal;
+    }
+
+    /* Syntax colors */
+    .p  { color: var(--accent); font-weight: 700; }
+    .c  { color: var(--text); }
+    .cm { color: var(--text-3); font-style: italic; }
+    .s  { color: #fbbf24; }
+    .kw { color: #c084fc; }
+    .ty { color: #7dd3fc; }
+    .fn { color: var(--accent); }
+    .num{ color: #fb923c; }
+
+    /* API reference */
+    .api-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .api-header {
+      background: var(--surface-2);
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .api-name {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .api-sig {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text-2);
+      margin-top: 8px;
+    }
+    .api-body {
+      padding: 20px;
+    }
+    .api-body p {
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .data-table th,
+    .data-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table th {
+      color: var(--text-2);
+      font-weight: 500;
+      background: var(--surface-2);
+    }
+    .data-table td {
+      color: var(--text);
+    }
+    .cell-name {
+      font-family: var(--mono);
+      color: var(--accent);
+    }
+
+    /* Links */
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Back to top */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-2);
+      font-size: 12px;
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .back-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* Sidebar for anchors */
+    .toc {
+      position: fixed;
+      right: 24px;
+      top: 100px;
+      width: 180px;
+      display: none;
+    }
+    @media (min-width: 1400px) {
+      .toc { display: block; }
+    }
+    .toc a {
+      display: block;
+      padding: 6px 0;
+      font-size: 12px;
+      color: var(--text-3);
+      border-left: 2px solid var(--border);
+      padding-left: 12px;
+    }
+    .toc a:hover,
+    .toc a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div style="display:flex;align-items:center;">
+      <span class="nav-logo">tl;dt</span>
+      <span class="nav-sub">/ library api</span>
+    </div>
+    <div class="nav-links">
+      <a href="index.html#examples" class="nav-link">examples</a>
+      <a href="index.html" class="nav-link">home</a>
+      <a href="https://github.com/gleicon/tldt" target="_blank" rel="noopener" class="nav-gh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="container" style="position:relative;z-index:1">
+    <h1 class="hero-title">
+      <span style="display:block;">Go Library</span>
+      <span style="display:block;" class="acc">API Reference</span>
+    </h1>
+    <p style="color:var(--text-2);font-size:14px;line-height:1.7;max-width:560px;margin-bottom:24px">
+      Complete reference for <code>github.com/gleicon/tldt/pkg/tldt</code>.
+      Stateless, thread-safe functions for text summarization, security screening,
+      and PII detection. Zero global mutable state.
+    </p>
+    <div class="code-block" style="max-width:700px">
+      <div class="code-header">go get</div>
+      <div class="code-body">
+        <pre><span class="p">$</span> <span class="c">go get</span> <span class="s">github.com/gleicon/tldt/pkg/tldt</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- QUICK START -->
+<section class="section" id="quickstart">
+  <div class="container">
+    <div class="section-label">quick start</div>
+    <h2 class="section-title">Basic <span class="acc">usage.</span></h2>
+
+    <div class="code-block">
+      <div class="code-header">Basic Summarization</div>
+      <div class="code-body">
+        <pre><span class="kw">package</span> <span class="c">main</span>
+
+<span class="kw">import</span> (
+    <span class="s">"fmt"</span>
+    <span class="s">"log"</span>
+
+    <span class="s">"github.com/gleicon/tldt/pkg/tldt"</span>
+)
+
+<span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="cm">// Simple summarization with defaults</span>
+    <span class="kw">result</span>, <span class="kw">err</span> := <span class="kw">tldt</span>.<span class="fn">Summarize</span>(<span class="s">"Your long text here..."</span>,
+        <span class="kw">tldt</span>.<span class="ty">SummarizeOptions</span>{})
+    <span class="kw">if</span> <span class="kw">err</span> != <span class="kw">nil</span> {
+        <span class="kw">log</span>.<span class="fn">Fatal</span>(<span class="kw">err</span>)
+    }
+
+    <span class="kw">fmt</span>.<span class="fn">Println</span>(<span class="kw">result</span>.<span class="kw">Summary</span>)
+    <span class="cm">// Output: The most representative sentences from the text</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">Security Pipeline</div>
+      <div class="code-body">
+        <pre><span class="cm">// Full pipeline for untrusted input before LLM context</span>
+<span class="kw">result</span>, <span class="kw">err</span> := <span class="kw">tldt</span>.<span class="fn">Pipeline</span>(<span class="s">"untrusted text"</span>, <span class="kw">tldt</span>.<span class="ty">PipelineOptions</span>{
+    <span class="kw">Sanitize</span>:    <span class="num">true</span>,  <span class="cm">// Strip invisible Unicode</span>
+    <span class="kw">SanitizePII</span>: <span class="num">true</span>,  <span class="cm">// Redact emails, API keys, JWTs</span>
+    <span class="kw">DetectPII</span>:   <span class="num">true</span>,  <span class="cm">// Report PII findings</span>
+    <span class="kw">Detect</span>: <span class="kw">tldt</span>.<span class="ty">DetectOptions</span>{
+        <span class="kw">OutlierThreshold</span>: <span class="num">0.85</span>,
+    },
+    <span class="kw">Summarize</span>: <span class="kw">tldt</span>.<span class="ty">SummarizeOptions</span>{
+        <span class="kw">Algorithm</span>: <span class="s">"ensemble"</span>,
+        <span class="kw">Sentences</span>: <span class="num">5</span>,
+    },
+})
+
+<span class="cm">// Access findings</span>
+<span class="kw">fmt</span>.<span class="fn">Printf</span>(<span class="s">"Redactions: %d\n"</span>, <span class="kw">result</span>.<span class="kw">Redactions</span>)
+<span class="kw">for</span> <span class="kw">_</span>, <span class="kw">f</span> := <span class="kw">range</span> <span class="kw">result</span>.<span class="kw">PIIFindings</span> {
+    <span class="kw">fmt</span>.<span class="fn">Printf</span>(<span class="s">"Found %s on line %d\n"</span>, <span class="kw">f</span>.<span class="kw">Pattern</span>, <span class="kw">f</span>.<span class="kw">Line</span>)
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FUNCTIONS -->
+<section class="section" id="functions">
+  <div class="container">
+    <div class="section-label">api reference</div>
+    <h2 class="section-title">Function <span class="acc">reference.</span></h2>
+
+    <div class="api-item" id="Summarize">
+      <div class="api-header">
+        <div class="api-name">func Summarize</div>
+        <div class="api-sig">func Summarize(text string, opts SummarizeOptions) (Result, error)</div>
+      </div>
+      <div class="api-body">
+        <p>Runs extractive summarization on text. Returns the summary and token statistics.</p>
+        <p><strong>Algorithms:</strong> "lexrank" (default), "textrank", "graph", "ensemble"</p>
+        <div class="code-block" style="margin:0">
+          <div class="code-body">
+            <pre><span class="kw">result</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="fn">Summarize</span>(<span class="s">"text"</span>, <span class="kw">tldt</span>.<span class="ty">SummarizeOptions</span>{
+    <span class="kw">Algorithm</span>: <span class="s">"ensemble"</span>,
+    <span class="kw">Sentences</span>: <span class="num">3</span>,
+})
+<span class="cm">// result.Summary, result.TokensIn, result.TokensOut, result.Reduction</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-item" id="Pipeline">
+      <div class="api-header">
+        <div class="api-name">func Pipeline</div>
+        <div class="api-sig">func Pipeline(text string, opts PipelineOptions) (PipelineResult, error)</div>
+      </div>
+      <div class="api-body">
+        <p>Complete processing pipeline. Runs stages in order: Sanitize (Unicode) → SanitizePII → DetectPII → Detect (injection) → Summarize.</p>
+        <p>Returns full results including summary, warnings, PII findings, and redaction counts.</p>
+      </div>
+    </div>
+
+    <div class="api-item" id="Fetch">
+      <div class="api-header">
+        <div class="api-name">func Fetch</div>
+        <div class="api-sig">func Fetch(url string, opts FetchOptions) (FetchResult, error)</div>
+      </div>
+      <div class="api-body">
+        <p>Fetches a URL, extracts article text using readability algorithm. Includes SSRF protection against private IPs and cloud metadata endpoints.</p>
+        <p>Returns HTTP metadata (status, content-type, final URL after redirects) alongside extracted text.</p>
+        <p><strong>Sentinel errors:</strong> ErrSSRFBlocked, ErrRedirectLimit, ErrHTTPError, ErrNonHTML</p>
+      </div>
+    </div>
+
+    <div class="api-item" id="Detect">
+      <div class="api-header">
+        <div class="api-name">func Detect</div>
+        <div class="api-sig">func Detect(text string, opts DetectOptions) (DetectResult, error)</div>
+      </div>
+      <div class="api-body">
+        <p>Detects prompt injection patterns without modifying text. Returns findings and warning strings for stderr output.</p>
+      </div>
+    </div>
+
+    <div class="api-item" id="Sanitize">
+      <div class="api-header">
+        <div class="api-name">func Sanitize</div>
+        <div class="api-sig">func Sanitize(text string) (string, SanitizeReport, error)</div>
+      </div>
+      <div class="api-body">
+        <p>Strips invisible Unicode characters and applies NFKC normalization. Reports what was removed.</p>
+      </div>
+    </div>
+
+    <div class="api-item" id="DetectPII">
+      <div class="api-header">
+        <div class="api-name">func DetectPII</div>
+        <div class="api-sig">func DetectPII(text string) []PIIFinding</div>
+      </div>
+      <div class="api-body">
+        <p>Scans text for PII/secrets: emails, API keys (Bearer, sk-, AIza, AKIA), JWTs, credit cards. Returns findings with pattern type, excerpt, and line number.</p>
+      </div>
+    </div>
+
+    <div class="api-item" id="SanitizePII">
+      <div class="api-header">
+        <div class="api-name">func SanitizePII</div>
+        <div class="api-sig">func SanitizePII(text string) (string, []PIIFinding)</div>
+      </div>
+      <div class="api-body">
+        <p>Redacts PII matches with [REDACTED:pattern] placeholders. Returns redacted text and findings.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- TYPES -->
+<section class="section" id="types">
+  <div class="container">
+    <div class="section-label">type reference</div>
+    <h2 class="section-title">Types and <span class="acc">options.</span></h2>
+
+    <div class="code-block">
+      <div class="code-header">SummarizeOptions</div>
+      <div class="code-body">
+        <pre><span class="kw">type</span> <span class="ty">SummarizeOptions</span> <span class="kw">struct</span> {
+    <span class="kw">Algorithm</span> <span class="ty">string</span>  <span class="cm">// "lexrank"|"textrank"|"graph"|"ensemble" (default: "lexrank")</span>
+    <span class="kw">Sentences</span> <span class="ty">int</span>     <span class="cm">// number of output sentences (default: 5)</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">PipelineOptions</div>
+      <div class="code-body">
+        <pre><span class="kw">type</span> <span class="ty">PipelineOptions</span> <span class="kw">struct</span> {
+    <span class="kw">Summarize</span>   <span class="ty">SummarizeOptions</span>
+    <span class="kw">Detect</span>      <span class="ty">DetectOptions</span>
+    <span class="kw">Sanitize</span>    <span class="ty">bool</span>  <span class="cm">// run Unicode sanitizer before detection/summarization</span>
+    <span class="kw">DetectPII</span>   <span class="ty">bool</span>  <span class="cm">// run PII detection stage (text unchanged)</span>
+    <span class="kw">SanitizePII</span> <span class="ty">bool</span>  <span class="cm">// run PII redaction stage (text redacted; implies detection)</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">PipelineResult</div>
+      <div class="code-body">
+        <pre><span class="kw">type</span> <span class="ty">PipelineResult</span> <span class="kw">struct</span> {
+    <span class="kw">Summary</span>     <span class="ty">string</span>
+    <span class="kw">TokensIn</span>    <span class="ty">int</span>
+    <span class="kw">TokensOut</span>   <span class="ty">int</span>
+    <span class="kw">Reduction</span>   <span class="ty">int</span>           <span class="cm">// percentage</span>
+    <span class="kw">Warnings</span>    []<span class="ty">string</span>      <span class="cm">// human-readable WARNING lines</span>
+    <span class="kw">Redactions</span>  <span class="ty">int</span>           <span class="cm">// count of PII redactions</span>
+    <span class="kw">PIIFindings</span> []<span class="ty">PIIFinding</span>  <span class="cm">// nil when no PII flags enabled</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">PIIFinding</div>
+      <div class="code-body">
+        <pre><span class="kw">type</span> <span class="ty">PIIFinding</span> <span class="kw">struct</span> {
+    <span class="kw">Pattern</span> <span class="ty">string</span>  <span class="cm">// "email", "api-key", "jwt", "credit-card"</span>
+    <span class="kw">Excerpt</span> <span class="ty">string</span>  <span class="cm">// truncated to 12 chars + "..."</span>
+    <span class="kw">Line</span>    <span class="ty">int</span>     <span class="cm">// 1-based line number</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">FetchResult</div>
+      <div class="code-body">
+        <pre><span class="kw">type</span> <span class="ty">FetchResult</span> <span class="kw">struct</span> {
+    <span class="kw">Text</span>        <span class="ty">string</span>  <span class="cm">// Extracted article text</span>
+    <span class="kw">StatusCode</span>  <span class="ty">int</span>     <span class="cm">// HTTP status code (after redirects)</span>
+    <span class="kw">ContentType</span> <span class="ty">string</span>  <span class="cm">// Response Content-Type header</span>
+    <span class="kw">FinalURL</span>    <span class="ty">string</span>  <span class="cm">// Final URL after all redirects</span>
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">Sentinel Errors</div>
+      <div class="code-body">
+        <pre><span class="kw">var</span> (
+    <span class="kw">ErrSSRFBlocked</span>   = <span class="kw">errors</span>.<span class="fn">New</span>(<span class="s">"tldt: SSRF blocked: private or reserved IP address"</span>)
+    <span class="kw">ErrRedirectLimit</span> = <span class="kw">errors</span>.<span class="fn">New</span>(<span class="s">"tldt: redirect limit exceeded"</span>)
+    <span class="kw">ErrHTTPError</span>     = <span class="kw">errors</span>.<span class="fn">New</span>(<span class="s">"tldt: HTTP error"</span>)
+    <span class="kw">ErrNonHTML</span>       = <span class="kw">errors</span>.<span class="fn">New</span>(<span class="s">"tldt: not HTML content"</span>)
+)
+
+<span class="cm">// Usage with errors.Is</span>
+<span class="kw">if</span> <span class="kw">errors</span>.<span class="fn">Is</span>(<span class="kw">err</span>, <span class="kw">tldt</span>.<span class="kw">ErrSSRFBlocked</span>) {
+    <span class="cm">// Handle SSRF block</span>
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- EXAMPLES -->
+<section class="section" id="examples">
+  <div class="container">
+    <div class="section-label">examples</div>
+    <h2 class="section-title">Usage <span class="acc">patterns.</span></h2>
+
+    <div class="code-block">
+      <div class="code-header">Error Handling</div>
+      <div class="code-body">
+        <pre><span class="kw">result</span>, <span class="kw">err</span> := <span class="kw">tldt</span>.<span class="fn">Fetch</span>(<span class="s">"https://example.com/doc"</span>, <span class="kw">tldt</span>.<span class="ty">FetchOptions</span>{})
+<span class="kw">if</span> <span class="kw">err</span> != <span class="kw">nil</span> {
+    <span class="kw">switch</span> {
+    <span class="kw">case</span> <span class="kw">errors</span>.<span class="fn">Is</span>(<span class="kw">err</span>, <span class="kw">tldt</span>.<span class="kw">ErrSSRFBlocked</span>):
+        <span class="kw">log</span>.<span class="fn">Fatal</span>(<span class="s">"SSRF protection triggered"</span>)
+    <span class="kw">case</span> <span class="kw">errors</span>.<span class="fn">Is</span>(<span class="kw">err</span>, <span class="kw">tldt</span>.<span class="kw">ErrRedirectLimit</span>):
+        <span class="kw">log</span>.<span class="fn">Fatal</span>(<span class="s">"Too many redirects"</span>)
+    <span class="kw">default</span>:
+        <span class="kw">log</span>.<span class="fn">Fatal</span>(<span class="kw">err</span>)
+    }
+}</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">Concurrency</div>
+      <div class="code-body">
+        <pre><span class="cm">// All tldt functions are safe for concurrent use</span>
+<span class="kw">var</span> <span class="kw">wg</span> <span class="ty">sync</span>.<span class="ty">WaitGroup</span>
+<span class="kw">for</span> <span class="kw">_</span>, <span class="kw">doc</span> := <span class="kw">range</span> <span class="kw">documents</span> {
+    <span class="kw">wg</span>.<span class="fn">Add</span>(<span class="num">1</span>)
+    <span class="kw">go</span> <span class="kw">func</span>(<span class="kw">text</span> <span class="ty">string</span>) {
+        <span class="kw">defer</span> <span class="kw">wg</span>.<span class="fn">Done</span>()
+        <span class="kw">result</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="fn">Summarize</span>(<span class="kw">text</span>,
+            <span class="kw">tldt</span>.<span class="ty">SummarizeOptions</span>{<span class="kw">Sentences</span>: <span class="num">3</span>})
+        <span class="cm">// Process result</span>
+    }(<span class="kw">doc</span>)
+}
+<span class="kw">wg</span>.<span class="fn">Wait</span>()</pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">Pre-LLM Processing</div>
+      <div class="code-body">
+        <pre><span class="cm">// Clean and summarize before sending to LLM</span>
+<span class="kw">func</span> <span class="fn">prepareForLLM</span>(<span class="kw">input</span> <span class="ty">string</span>) (<span class="ty">string</span>, <span class="ty">error</span>) {
+    <span class="kw">result</span>, <span class="kw">err</span> := <span class="kw">tldt</span>.<span class="fn">Pipeline</span>(<span class="kw">input</span>, <span class="kw">tldt</span>.<span class="ty">PipelineOptions</span>{
+        <span class="kw">Sanitize</span>:    <span class="num">true</span>,   <span class="cm">// Remove invisible characters</span>
+        <span class="kw">SanitizePII</span>: <span class="num">true</span>,   <span class="cm">// Redact secrets</span>
+        <span class="kw">DetectPII</span>:   <span class="num">true</span>,   <span class="cm">// Log what was found</span>
+        <span class="kw">Summarize</span>: <span class="kw">tldt</span>.<span class="ty">SummarizeOptions</span>{
+            <span class="kw">Algorithm</span>: <span class="s">"ensemble"</span>,
+            <span class="kw">Sentences</span>: <span class="num">10</span>,   <span class="cm">// Keep more context for LLM</span>
+        },
+    })
+    <span class="kw">if</span> <span class="kw">err</span> != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="s">""</span>, <span class="kw">err</span>
+    }
+
+    <span class="cm">// Log security findings</span>
+    <span class="kw">for</span> <span class="kw">_</span>, <span class="kw">f</span> := <span class="kw">range</span> <span class="kw">result</span>.<span class="kw">PIIFindings</span> {
+        <span class="kw">log</span>.<span class="fn">Printf</span>(<span class="s">"PII found: %s on line %d"</span>, <span class="kw">f</span>.<span class="kw">Pattern</span>, <span class="kw">f</span>.<span class="kw">Line</span>)
+    }
+
+    <span class="kw">return</span> <span class="kw">result</span>.<span class="kw">Summary</span>, <span class="kw">nil</span>
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FOOTER -->
+<section class="section" style="padding-bottom:60px">
+  <div class="container">
+    <a href="index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back to main site
+    </a>
+    <p style="color:var(--text-3);font-size:12px;margin-top:24px">
+      Version 1.2.0 · MIT License · <a href="https://github.com/gleicon/tldt">github.com/gleicon/tldt</a>
+    </p>
+  </div>
+</section>
+
+</body>
+</html>
