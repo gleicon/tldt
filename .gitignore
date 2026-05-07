@@ -3,3 +3,6 @@
 /tldt
 # Added by goreleaser init:
 dist/
+
+# Example binaries
+examples/*/*-example
