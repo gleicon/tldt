@@ -367,10 +367,11 @@ Plans:
 - [ ] 10-02-PLAN.md — Extend Pipeline with PII stage and PipelineOptions/Result fields (LIB-04)
 
 **Wave 1** *(parallel — no shared files)*
-- [ ] 10-01-PLAN.md — TDD: Add PIIFinding type, DetectPII wrapper, SanitizePII wrapper, 4 unit tests
+Plans:
+- [x] 10-01-PLAN.md — TDD: Add PIIFinding type, DetectPII wrapper, SanitizePII wrapper, 4 unit tests
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 10-02-PLAN.md — Extend PipelineOptions with DetectPII/SanitizePII bool, PipelineResult with PIIFindings, insert PII stage between Unicode sanitize and injection-detect, 3 Pipeline PII tests
+- [x] 10-02-PLAN.md — Extend PipelineOptions with DetectPII/SanitizePII bool, PipelineResult with PIIFindings, insert PII stage between Unicode sanitize and injection-detect, 3 Pipeline PII tests
 
 **UI hint**: no
 
@@ -382,7 +383,12 @@ Plans:
   1. `grep -r 'github.com/gleicon/tldt/internal' cmd/tldt/main.go` returns no matches — main.go has zero direct internal/ imports
   2. All flags present before the refactor (`--detect-pii`, `--sanitize-pii`, `--detect-injection`, `--sanitize`, `--url`, `--format`, `--algorithm`, `--sentences`, `--paragraphs`, `--level`, `--verbose`, `--explain`, `--rouge`, `--install-skill`, `--print-threshold`) continue to work identically after the refactor
   3. `go test ./...` passes all 344+ tests with no regressions
-**Plans**: TBD
+Plans:
+- [ ] 11-01-PLAN.md — Complete CLI refactor: extend pkg/tldt with sanitizer/summarizer wrappers, remove all internal/detector, internal/sanitizer, internal/summarizer imports from main.go
+
+**Wave 1**
+- [ ] 11-01-PLAN.md — Extend pkg/tldt with remaining wrappers (SanitizeAll, ReportInvisibles, DetectOutliers, NewSummarizer, TokenizeSentences, EvalROUGE, re-export interfaces), refactor cmd/tldt/main.go to use pkg/tldt exclusively
+
 **UI hint**: no
 
 ## v2.1.0 Progress
@@ -390,7 +396,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 9.1. Library Foundation *(INSERTED)* | 2/2 | Complete | 2026-05-06 |
-| 10. Library API Completion | 2/2 | Planned | - |
-| 11. CLI Refactor | 0/? | Not started | - |
+| 10. Library API Completion | 2/2 | Complete | 2026-05-06 |
+| 11. CLI Refactor | 0/1 | Not started | - |
 
-**Ready for Execution**: Phase 10 plans are complete and follow TDD patterns (RED→GREEN). Execute with `/gsd-execute-phase 10`.
+**Ready for Execution**: Phase 11 plans are ready. Execute with `/gsd-execute-phase 11`.

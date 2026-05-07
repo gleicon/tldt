@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1.0
 milestone_name: Library SDK
 status: planning
-stopped_at: Phase 10 complete - library API finished
-last_updated: "2026-05-06T18:30:00.000Z"
-last_activity: 2026-05-06 -- Phase 10 Library API Completion COMPLETE (2 plans executed, 2 waves); 360 tests pass; pkg/tldt has full PII API surface
+stopped_at: Phase 11 ready for execution - plan created
+last_updated: "2026-05-06T19:00:00.000Z"
+last_activity: 2026-05-06 -- Phase 11 planning COMPLETE (1 plan, 3 tasks); plan created for zero-internal-imports CLI refactor
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
-  percent: 66
+  percent: 80
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-02)
 
 **Core value:** Summarize long text (transcripts, articles, docs) into concise extractive summaries without consuming LLM tokens — pipe-safe CLI using LexRank/TextRank.
-**Current focus:** Milestone v1.2.0 OWASP Security Hardening — COMPLETE (all 2 phases, 7 plans)
+**Current focus:** Milestone v2.1.0 Library SDK — Phase 10 complete, Phase 11 planned
 
 ## Current Position
 
-Phase: 10 — Library API Completion *(COMPLETE)*
-Plan: 02 — Pipeline PII Stage Extension *(COMPLETE)*
-Status: Completed - Phase 10 Library API Completion DONE
-Last activity: 2026-05-06 — Phase 10 complete (2/2 plans, 2 waves); pkg/tldt has full PII API with DetectPII, SanitizePII, Pipeline PII stage; 360 tests pass
+Phase: 11 — CLI Refactor *(PLANNED, READY FOR EXECUTION)*
+Plan: 01 — Complete CLI refactor to zero internal imports
+Status: Phase 11 plan created and ready for execution
+Last activity: 2026-05-06 — Phase 11 planning complete; 1 plan with 3 tasks covering: pkg/tldt wrapper extensions, main.go atomic refactor, full test verification
 
 ### Roadmap Evolution
 - Phase 9.1 Library Foundation inserted (URGENT) after Phase 9 — pre-condition for Phase 10: route CLI core ops through pkg/tldt before adding PII API
@@ -117,3 +117,25 @@ Resume file: None — Phase 10 done, pkg/tldt library API complete
 - PipelineResult extended with `PIIFindings []PIIFinding` field
 - PII stage runs between Unicode sanitize and injection detect (order: sanitize → PII → inject-detect → summarize)
 - Library consumers can now do PII-aware summarization: `tldt.Pipeline(text, PipelineOptions{DetectPII: true, Summarize: tldt.SummarizeOptions{Sentences: 3}})`
+
+## Phase 11 Plan Summary
+
+**Planned:** 2026-05-06  
+**Plans:** 1 (11-01 CLI Refactor — Zero Internal Imports)  
+**Wave:** 1 (single atomic refactor)  
+**Requirements:** CLI-10, CLI-11  
+**Scope:**
+
+1. **Extend pkg/tldt** with remaining wrappers for main.go dependencies:
+   - Sanitizer: `SanitizeAll(text) string`, `ReportInvisibles(text) []InvisibleReport`
+   - Detector: `DefaultOutlierThreshold` constant, `DetectOutliers(sentences, simMatrix, threshold)` 
+   - Summarizer: `NewSummarizer(algo)`, `TokenizeSentences(text)`, `EvalROUGE(system, reference)`
+   - Types: `Summarizer`, `Explainer`, `MatrixSummarizer` interfaces, `ExplainInfo`, `SentenceScore`, `ROUGEScore`, `F1Score`
+
+2. **Refactor cmd/tldt/main.go** atomically:
+   - REMOVE imports: `internal/detector`, `internal/sanitizer`, `internal/summarizer`
+   - KEEP per D-05: `internal/config`, `internal/formatter`, `internal/installer`
+   - Replace all function calls with `tldt.X` equivalents
+   - Preserve all CLI flags and behavior
+
+3. **Verify**: All 360+ tests pass, zero behavioral regressions
