@@ -116,35 +116,35 @@
 
 ### Library Foundation (LIB-CORE)
 
-- [ ] **LIB-CORE-01**: `pkg/tldt.Summarize`, `Detect`, `Sanitize`, `Fetch`, and `Pipeline` are the primary public API surface — behavior matches the wrapped internal packages for all inputs covered by existing tests; `go test ./pkg/tldt/...` passes
-- [ ] **LIB-CORE-02**: A Go program that imports only `github.com/gleicon/tldt/pkg/tldt` (no `internal/` imports) can call `tldt.Summarize`, `tldt.Detect`, `tldt.Sanitize`, `tldt.Fetch`, and `tldt.Pipeline`; verified by at least one integration test in `pkg/tldt/tldt_test.go` that exercises the full round-trip from text input to PipelineResult with no internal package access
-- [ ] **LIB-CORE-03**: `cmd/tldt/main.go` does not directly import `internal/summarizer`, `internal/detector`, `internal/sanitizer`, or `internal/fetcher`; all summarize, detect, sanitize, and fetch operations in main.go route through the corresponding `pkg/tldt` public functions
+- [x] **LIB-CORE-01**: `pkg/tldt.Summarize`, `Detect`, `Sanitize`, `Fetch`, and `Pipeline` are the primary public API surface — behavior matches the wrapped internal packages for all inputs covered by existing tests; `go test ./pkg/tldt/...` passes (Phase 9.1)
+- [x] **LIB-CORE-02**: A Go program that imports only `github.com/gleicon/tldt/pkg/tldt` (no `internal/` imports) can call `tldt.Summarize`, `tldt.Detect`, `tldt.Sanitize`, `tldt.Fetch`, and `tldt.Pipeline`; verified by at least one integration test in `pkg/tldt/tldt_test.go` that exercises the full round-trip from text input to PipelineResult with no internal package access (Phase 9.1)
+- [x] **LIB-CORE-03**: `cmd/tldt/main.go` does not directly import `internal/summarizer`, `internal/detector`, `internal/sanitizer`, or `internal/fetcher`; all summarize, detect, sanitize, and fetch operations in main.go route through the corresponding `pkg/tldt` public functions (Phase 9.1, Phase 11)
 
 ### Library API (LIB)
 
-- [ ] **LIB-01**: `pkg/tldt` exports a `PIIFinding` type with fields `Pattern string`, `Excerpt string`, `Line int` — public wrapper over `detector.Finding` for library consumers
-- [ ] **LIB-02**: `pkg/tldt.DetectPII(text string) []PIIFinding` scans text for PII/secret patterns (email, api-key, jwt, credit-card) and returns findings; mirrors `detector.DetectPII` but with the public `PIIFinding` type
-- [ ] **LIB-03**: `pkg/tldt.SanitizePII(text string) (string, []PIIFinding)` redacts PII matches with `[REDACTED:<type>]` and returns the redacted string + findings slice
-- [ ] **LIB-04**: `PipelineOptions` gains `DetectPII bool` and `SanitizePII bool` fields; `PipelineResult` gains `PIIFindings []PIIFinding` field; `Pipeline` executes PII stage (sanitize-pii → detect-pii) between the Unicode sanitize and injection-detect stages
+- [x] **LIB-01**: `pkg/tldt` exports a `PIIFinding` type with fields `Pattern string`, `Excerpt string`, `Line int` — public wrapper over `detector.Finding` for library consumers (Phase 10)
+- [x] **LIB-02**: `pkg/tldt.DetectPII(text string) []PIIFinding` scans text for PII/secret patterns (email, api-key, jwt, credit-card) and returns findings; mirrors `detector.DetectPII` but with the public `PIIFinding` type (Phase 10)
+- [x] **LIB-03**: `pkg/tldt.SanitizePII(text string) (string, []PIIFinding)` redacts PII matches with `[REDACTED:<type>]` and returns the redacted string + findings slice (Phase 10)
+- [x] **LIB-04**: `PipelineOptions` gains `DetectPII bool` and `SanitizePII bool` fields; `PipelineResult` gains `PIIFindings []PIIFinding` field; `Pipeline` executes PII stage (sanitize-pii → detect-pii) between the Unicode sanitize and injection-detect stages (Phase 10)
 
 ### CLI Refactor (CLI)
 
-- [ ] **CLI-10**: `cmd/tldt/main.go` has zero direct `github.com/gleicon/tldt/internal/` imports — all logic routes through `pkg/tldt` functions (`Summarize`, `Detect`, `Sanitize`, `SanitizePII`, `DetectPII`, `Fetch`, `Pipeline`)
-- [ ] **CLI-11**: All existing CLI flags and behavioral contracts preserved after refactor: `--detect-pii`, `--sanitize-pii`, `--detect-injection`, `--sanitize`, `--url`, `--format`, `--algorithm`, `--sentences`, `--paragraphs`, `--level`, `--verbose`, `--explain`, `--rouge`, `--install-skill`, `--print-threshold`; full test suite (344+ tests) passes
+- [x] **CLI-10**: `cmd/tldt/main.go` has zero direct `github.com/gleicon/tldt/internal/` imports (except config, formatter, installer per D-05) — all logic routes through `pkg/tldt` functions (`Summarize`, `Detect`, `Sanitize`, `SanitizePII`, `DetectPII`, `Fetch`, `Pipeline`, `NewSummarizer`, `EvalROUGE`, `TokenizeSentences`, `DetectOutliers`, `SanitizeAll`, `ReportInvisibles`) (Phase 11)
+- [x] **CLI-11**: All existing CLI flags and behavioral contracts preserved after refactor: `--detect-pii`, `--sanitize-pii`, `--detect-injection`, `--sanitize`, `--url`, `--format`, `--algorithm`, `--sentences`, `--paragraphs`, `--level`, `--verbose`, `--explain`, `--rouge`, `--install-skill`, `--print-threshold`; full test suite (361 tests) passes (Phase 11)
 
 ## v2.1.0 Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIB-CORE-01 | Phase 9.1: Library Foundation | Pending |
-| LIB-CORE-02 | Phase 9.1: Library Foundation | Pending |
-| LIB-CORE-03 | Phase 9.1: Library Foundation | Pending |
-| LIB-01 | Phase 10: Library API Completion | Pending |
-| LIB-02 | Phase 10: Library API Completion | Pending |
-| LIB-03 | Phase 10: Library API Completion | Pending |
-| LIB-04 | Phase 10: Library API Completion | Pending |
-| CLI-10 | Phase 11: CLI Refactor | Pending |
-| CLI-11 | Phase 11: CLI Refactor | Pending |
+| LIB-CORE-01 | Phase 9.1: Library Foundation | Complete |
+| LIB-CORE-02 | Phase 9.1: Library Foundation | Complete |
+| LIB-CORE-03 | Phase 9.1: Library Foundation | Complete |
+| LIB-01 | Phase 10: Library API Completion | Complete |
+| LIB-02 | Phase 10: Library API Completion | Complete |
+| LIB-03 | Phase 10: Library API Completion | Complete |
+| LIB-04 | Phase 10: Library API Completion | Complete |
+| CLI-10 | Phase 11: CLI Refactor | Complete |
+| CLI-11 | Phase 11: CLI Refactor | Complete |
 
 ---
 

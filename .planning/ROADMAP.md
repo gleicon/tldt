@@ -325,8 +325,8 @@ v2.1.0 makes `pkg/tldt` the single authoritative API surface for embedding tldt 
 ### Phases
 
 - [x] **Phase 9.1: Library Foundation** *(INSERTED)* - Verify and stabilize pkg/tldt as a complete, externally-importable library for Summarize/Detect/Sanitize/Fetch/Pipeline; route core CLI operations through pkg/tldt; prove external usability with integration tests
-- [ ] **Phase 10: Library API Completion** - Extend pkg/tldt with PIIFinding type, DetectPII, SanitizePII, and PII stage in Pipeline; unit-test the new public API surface
-- [ ] **Phase 11: CLI Refactor** - Refactor cmd/tldt/main.go to route all logic through pkg/tldt; zero direct internal/ imports; all 344+ tests pass
+- [x] **Phase 10: Library API Completion** - Extend pkg/tldt with PIIFinding type, DetectPII, SanitizePII, and PII stage in Pipeline; unit-test the new public API surface
+- [x] **Phase 11: CLI Refactor** - Refactor cmd/tldt/main.go to route all logic through pkg/tldt; zero direct internal/ imports (except config/formatter/installer per D-05); all 361 tests pass
 
 ## Phase Details
 
@@ -397,6 +397,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 9.1. Library Foundation *(INSERTED)* | 2/2 | Complete | 2026-05-06 |
 | 10. Library API Completion | 2/2 | Complete | 2026-05-06 |
-| 11. CLI Refactor | 0/1 | Not started | - |
+| 11. CLI Refactor | 1/1 | Complete | 2026-05-06 |
 
-**Ready for Execution**: Phase 11 plans are ready. Execute with `/gsd-execute-phase 11`.
+**Milestone Status**: v2.1.0 Library SDK — COMPLETE. All 5 plans across 3 phases executed successfully.

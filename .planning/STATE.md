@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.1.0
 milestone_name: Library SDK
-status: planning
-stopped_at: Phase 11 ready for execution - plan created
-last_updated: "2026-05-06T19:00:00.000Z"
-last_activity: 2026-05-06 -- Phase 11 planning COMPLETE (1 plan, 3 tasks); plan created for zero-internal-imports CLI refactor
+status: complete
+stopped_at: Milestone v2.1.0 COMPLETE - All 3 phases executed
+last_updated: "2026-05-06T20:00:00.000Z"
+last_activity: 2026-05-06 -- Phase 11 CLI Refactor COMPLETE; 361 tests pass; zero internal imports (except config/formatter/installer per D-05); pkg/tldt is complete public API
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 11 — CLI Refactor *(PLANNED, READY FOR EXECUTION)*
-Plan: 01 — Complete CLI refactor to zero internal imports
-Status: Phase 11 plan created and ready for execution
-Last activity: 2026-05-06 — Phase 11 planning complete; 1 plan with 3 tasks covering: pkg/tldt wrapper extensions, main.go atomic refactor, full test verification
+Phase: COMPLETE — All v2.1.0 phases finished
+Status: Milestone v2.1.0 Library SDK COMPLETE
+Last activity: 2026-05-06 — Phase 11 CLI Refactor COMPLETE; pkg/tldt is production-ready public API
 
 ### Roadmap Evolution
 - Phase 9.1 Library Foundation inserted (URGENT) after Phase 9 — pre-condition for Phase 10: route CLI core ops through pkg/tldt before adding PII API
@@ -96,14 +95,14 @@ Last session: 2026-05-06T18:30:00.000Z
 Stopped at: Phase 10 COMPLETE — Both waves executed successfully with full TDD cycle preservation
 Resume file: None — Phase 10 done, pkg/tldt library API complete
 
-## Phase 9.1 Summary
+## Phase 9.1 Summary — COMPLETE
 
 **Completed:** 2026-05-06  
 **Plans:** 2/2 (9.1-01 Library Enhancement, 9.1-02 Partial CLI Refactor)  
 **Tests:** 353 passing, no regressions  
 **Key Result:** pkg/tldt is now a load-bearing public API — CLI routes Fetch and Detect operations through it, proving external embeddability before Phase 10 PII extensions
 
-## Phase 10 Summary
+## Phase 10 Summary — COMPLETE
 
 **Completed:** 2026-05-06  
 **Plans:** 2/2 (10-01 PIIFinding Type & Wrappers, 10-02 Pipeline PII Stage)  
@@ -118,24 +117,24 @@ Resume file: None — Phase 10 done, pkg/tldt library API complete
 - PII stage runs between Unicode sanitize and injection detect (order: sanitize → PII → inject-detect → summarize)
 - Library consumers can now do PII-aware summarization: `tldt.Pipeline(text, PipelineOptions{DetectPII: true, Summarize: tldt.SummarizeOptions{Sentences: 3}})`
 
-## Phase 11 Plan Summary
+## Phase 11 Summary — COMPLETE
 
-**Planned:** 2026-05-06  
-**Plans:** 1 (11-01 CLI Refactor — Zero Internal Imports)  
-**Wave:** 1 (single atomic refactor)  
-**Requirements:** CLI-10, CLI-11  
-**Scope:**
+**Completed:** 2026-05-06  
+**Plans:** 1/1 (11-01 CLI Refactor — Zero Internal Imports)  
+**Wave:** 1  
+**Tests:** 361 passing (1 new, 0 regressions)  
+**Requirements:** CLI-10, CLI-11 — SATISFIED
 
-1. **Extend pkg/tldt** with remaining wrappers for main.go dependencies:
-   - Sanitizer: `SanitizeAll(text) string`, `ReportInvisibles(text) []InvisibleReport`
-   - Detector: `DefaultOutlierThreshold` constant, `DetectOutliers(sentences, simMatrix, threshold)` 
-   - Summarizer: `NewSummarizer(algo)`, `TokenizeSentences(text)`, `EvalROUGE(system, reference)`
-   - Types: `Summarizer`, `Explainer`, `MatrixSummarizer` interfaces, `ExplainInfo`, `SentenceScore`, `ROUGEScore`, `F1Score`
+**Delivered:**
+- **Extended pkg/tldt** with remaining wrappers for CLI dependencies:
+  - Sanitizer: `SanitizeAll()`, `ReportInvisibles()`
+  - Detector: `DefaultOutlierThreshold` const, `DetectOutliers()`
+  - Summarizer: `NewSummarizer()`, `TokenizeSentences()`, `EvalROUGE()`
+  - Re-exported types: `Summarizer`, `Explainer`, `MatrixSummarizer`, `ExplainInfo`, `SentenceScore`, `ROUGEScore`, `F1Score`
 
-2. **Refactor cmd/tldt/main.go** atomically:
-   - REMOVE imports: `internal/detector`, `internal/sanitizer`, `internal/summarizer`
-   - KEEP per D-05: `internal/config`, `internal/formatter`, `internal/installer`
-   - Replace all function calls with `tldt.X` equivalents
-   - Preserve all CLI flags and behavior
+- **Refactored cmd/tldt/main.go** atomically:
+  - REMOVED imports: `internal/detector`, `internal/sanitizer`, `internal/summarizer`
+  - KEPT per D-05: `internal/config`, `internal/formatter`, `internal/installer`
+  - Replaced ~15 call sites with `tldt.X` equivalents
 
-3. **Verify**: All 360+ tests pass, zero behavioral regressions
+- **Zero behavioral regressions**: All 361 tests pass, all CLI flags preserved

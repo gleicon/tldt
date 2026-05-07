@@ -129,14 +129,23 @@ Let developers paste long articles/transcripts into AI coding agents with dramat
 - `Pipeline` is the primary embedding call: sanitize → detect injection → detect PII → summarize
 - All existing CLI behavior preserved (no user-facing regressions)
 
-### Active (v2.1.0)
+### Validated in Phase 9.1: Library Foundation
 
-- [ ] `pkg/tldt.DetectPII` exposes PII detection to library consumers (LIB-01)
-- [ ] `pkg/tldt.SanitizePII` exposes PII redaction to library consumers (LIB-02)
-- [ ] `Pipeline` includes PII stage; `PipelineOptions` has `DetectPII bool`, `SanitizePII bool` (LIB-03)
-- [ ] `PipelineResult` includes PII findings count and redacted flag (LIB-04)
-- [ ] `cmd/tldt/main.go` has zero direct `internal/` imports; uses only `pkg/tldt` (CLI-10)
-- [ ] All existing CLI flags and behavior preserved after refactor (CLI-11)
+- ✓ `pkg/tldt.Summarize`, `Detect`, `Sanitize`, `Fetch`, `Pipeline` are the primary public API surface — behavior matches wrapped internal packages (LIB-CORE-01)
+- ✓ A Go program importing only `pkg/tldt` can call all core functions; verified by integration tests with no internal package access (LIB-CORE-02)
+- ✓ `cmd/tldt/main.go` routes summarize, detect, sanitize, and fetch operations through `pkg/tldt` (LIB-CORE-03)
+
+### Validated in Phase 10: Library API Completion
+
+- ✓ `pkg/tldt.DetectPII` exposes PII detection to library consumers (LIB-01, LIB-02)
+- ✓ `pkg/tldt.SanitizePII` exposes PII redaction to library consumers (LIB-03)
+- ✓ `Pipeline` includes PII stage; `PipelineOptions` has `DetectPII bool`, `SanitizePII bool` (LIB-04)
+- ✓ `PipelineResult` includes `PIIFindings []PIIFinding` populated when PII detection enabled
+
+### Validated in Phase 11: CLI Refactor Final
+
+- ✓ `cmd/tldt/main.go` has zero direct `internal/` imports (except config, formatter, installer per D-05); uses only `pkg/tldt` (CLI-10)
+- ✓ All existing CLI flags and behavior preserved after refactor; 361 tests pass (CLI-11)
 
 ## Key Decisions
 
