@@ -52,6 +52,25 @@ go run main.go -url https://example.com/api/openapi.json -json
 
 **Key API:** `tldt.Fetch(url, tldt.FetchOptions{})` followed by `tldt.Pipeline(text, options)`
 
+### HTML Processor
+
+Converts HTML to clean Markdown using readability extraction, then summarizes. Useful for processing web pages from curl or saved HTML files.
+
+```bash
+cd examples/html-processor
+
+# Process HTML file
+go run main.go -f article.html
+
+# Pipe HTML from curl
+curl -s https://example.com/article | go run main.go
+
+# Process with specific sentence count
+cat saved_page.html | go run main.go -sentences 3
+```
+
+**Key API:** `tldt.ConvertHTML(html, tldt.HTMLConvertOptions{ExtractContent: true, IncludeTitle: true})`
+
 ## Running Examples
 
 Each example is self-contained. Navigate to the example directory and run:
