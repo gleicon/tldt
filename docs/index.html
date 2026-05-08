@@ -422,6 +422,7 @@
         <button class="tab-btn active" onclick="tab('core',this)">core</button>
         <button class="tab-btn" onclick="tab('formats',this)">output formats</button>
         <button class="tab-btn" onclick="tab('url',this)">url fetch</button>
+        <button class="tab-btn" onclick="tab('html',this)">html convert</button>
         <button class="tab-btn" onclick="tab('config',this)">config file</button>
         <button class="tab-btn" onclick="tab('skill',this)">claude code</button>
         <button class="tab-btn" onclick="tab('rouge',this)">rouge eval</button>
@@ -502,6 +503,23 @@
               <div class="cm"># HTML boilerplate stripped via readability algorithm</div>
               <div class="cm"># HTTP redirects followed automatically</div>
               <div class="cm"># 5MB fetch cap · 30s timeout · non-2xx = exit 1</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- html -->
+      <div id="tab-html" class="tab-panel">
+        <div class="term" style="max-width:680px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">html to markdown</span></div>
+          <div class="term-body">
+            <div><span class="p">$</span> <span class="c">curl</span> <span class="fl">-s</span> <span class="s">https://example.com/article</span> <span style="color:var(--text-3)">|</span> <span class="c">tldt</span> <span class="fl">--from-html</span></div>
+            <div style="margin-top:6px"><span class="p">$</span> <span class="c">cat</span> saved_page.html <span style="color:var(--text-3)">|</span> <span class="c">tldt</span> <span class="fl">--from-html</span> <span class="fl">--sentences</span> <span class="num">5</span></div>
+            <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">-f</span> article.html <span class="fl">--from-html</span> <span class="fl">--sanitize</span> <span class="fl">--detect-pii</span></div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;">
+              <div class="cm"># Converts HTML to clean Markdown before summarization</div>
+              <div class="cm"># Uses readability to extract main content (strips nav, ads, boilerplate)</div>
+              <div class="cm"># html-to-markdown for clean formatting · reports size reduction</div>
             </div>
           </div>
         </div>
@@ -653,6 +671,20 @@
           </div>
         </div>
       </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="font-family:var(--serif);font-size:18px;margin-bottom:12px">HTML Processing</div>
+        <div class="term" style="font-size:12px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div><span class="cm">// Convert HTML to Markdown and summarize</span></div>
+            <div><span class="kw">html</span>, <span class="kw">_</span> := <span class="kw">os</span>.<span class="kw">ReadFile</span>(<span class="s">"article.html"</span>)</div>
+            <div><span class="kw">md</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">ConvertHTML</span>(<span class="kw">string</span>(<span class="kw">html</span>),</div>
+            <div style="margin-left:28px"><span class="kw">tldt</span>.<span class="kw">HTMLConvertOptions</span>{})</div>
+            <div style="margin-top:8px"><span class="kw">result</span>, <span class="kw">_</span> := <span class="kw">tldt</span>.<span class="kw">Summarize</span>(<span class="kw">md</span>, opts)</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="reveal" style="border:1px solid var(--border);border-radius:8px;padding:20px">
@@ -676,6 +708,10 @@
         <a href="https://github.com/gleicon/tldt/tree/main/examples/openapi-client" target="_blank" rel="noopener" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-decoration:none;color:var(--text);font-size:13px;flex:1;min-width:200px">
           <div style="color:var(--accent);font-weight:500;margin-bottom:4px">openapi-client/</div>
           <div style="color:var(--text-2);font-size:12px">Fetch and summarize API documentation</div>
+        </a>
+        <a href="https://github.com/gleicon/tldt/tree/main/examples/html-processor" target="_blank" rel="noopener" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-decoration:none;color:var(--text);font-size:13px;flex:1;min-width:200px">
+          <div style="color:var(--accent);font-weight:500;margin-bottom:4px">html-processor/</div>
+          <div style="color:var(--text-2);font-size:12px">Convert HTML to Markdown and summarize</div>
         </a>
       </div>
     </div>
