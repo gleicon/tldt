@@ -1,7 +1,10 @@
-.PHONY: build test test-uat install install-skill clean deps lint run help
+.PHONY: build test test-uat install install-skill clean deps lint run help wasm demo demo-build wasm-clean
 
 BINARY := tldt
 CMD     := ./cmd/tldt
+WASM_DIR := ./wasm
+DOCS_DIR := ./docs
+GOROOT   := $(shell go env GOROOT)
 
 ## build: compile binary to ./tldt
 build:
@@ -55,9 +58,10 @@ deps:
 	go mod tidy
 	go mod verify
 
-## clean: remove compiled binary
+## clean: remove compiled binary and WASM files
 clean:
 	rm -f $(BINARY)
+	rm -f $(DOCS_DIR)/tldt.wasm $(DOCS_DIR)/wasm_exec.js
 
 ## lint: run go vet
 lint:
@@ -79,6 +83,38 @@ test-uat:
 ## bench: run benchmarks
 bench:
 	go test -bench=. -benchmem ./...
+
+## wasm: build WebAssembly binary for browser demo
+wasm:
+	@echo "Building WASM binary..."
+	GOOS=js GOARCH=wasm go build -o $(DOCS_DIR)/tldt.wasm $(WASM_DIR)
+
+## wasm-exec: copy wasm_exec.js runtime to docs
+wasm-exec:
+	@echo "Copying wasm_exec.js..."
+	@if [ -f "$(GOROOT)/misc/wasm/wasm_exec.js" ]; then \
+		cp "$(GOROOT)/misc/wasm/wasm_exec.js" $(DOCS_DIR)/wasm_exec.js; \
+	elif [ -f "$(GOROOT)/lib/wasm/wasm_exec.js" ]; then \
+		cp "$(GOROOT)/lib/wasm/wasm_exec.js" $(DOCS_DIR)/wasm_exec.js; \
+	else \
+		echo "ERROR: wasm_exec.js not found in $(GOROOT)"; \
+		exit 1; \
+	fi
+
+## demo-build: build WASM and copy runtime files
+demo-build: wasm wasm-exec
+	@echo "Demo build complete. Files in $(DOCS_DIR)/:"
+	@ls -lh $(DOCS_DIR)/tldt.wasm $(DOCS_DIR)/wasm_exec.js 2>/dev/null || echo "  (check files)"
+
+## demo: build demo and serve locally for testing
+demo: demo-build
+	@echo "Starting local server for demo..."
+	@echo "Open: http://localhost:8080/demo.html"
+	@cd $(DOCS_DIR) && python3 -m http.server 8080 2>/dev/null || python -m SimpleHTTPServer 8080 2>/dev/null || (echo "Install Python or serve docs/ manually" && exit 1)
+
+## wasm-clean: remove WASM build artifacts
+wasm-clean:
+	rm -f $(DOCS_DIR)/tldt.wasm $(DOCS_DIR)/wasm_exec.js
 
 ## release: tag a release (usage: make release VERSION=v1.0.0)
 release:
