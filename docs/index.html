@@ -292,6 +292,7 @@
     <div class="nav-links">
       <a href="#features" class="nav-link">features</a>
       <a href="#examples" class="nav-link">examples</a>
+      <a href="#embedded-skills" class="nav-link">embedded skills</a>
       <a href="library.html" class="nav-link">library api</a>
       <a href="#defense" class="nav-link">injection defense</a>
       <a href="#algorithms" class="nav-link">algorithms</a>
@@ -572,21 +573,24 @@
             </div>
           </div>
           <div class="term">
-            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">how the hook works</span></div>
+            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">embedded templates</span></div>
             <div class="term-body" style="font-size:12px;line-height:1.9">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <span style="background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:3px;font-size:10px">SKILL</span>
-                <span class="out">use <span style="color:var(--text)">/tldt</span> inside Claude Code session</span>
+                <span style="background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:3px;font-size:10px">SKILL.md</span>
+                <span class="out">Claude Code skill (manual /tldt command)</span>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+              <div style="padding:8px 10px;background:var(--surface-2);border-radius:4px;margin-bottom:12px">
+                <div class="out">~/.claude/skills/tldt/SKILL.md</div>
+                <div class="cm">Invokes: echo "text" | tldt --verbose</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
                 <span style="background:rgba(124,211,252,0.1);color:#7dd3fc;padding:2px 7px;border-radius:3px;font-size:10px">HOOK</span>
-                <span class="out">auto-fires when paste exceeds threshold</span>
+                <span class="out">Auto-trigger on UserPromptSubmit</span>
               </div>
-              <div style="padding:10px 12px;background:var(--surface-2);border-radius:4px">
-                <div class="out">paste 3,200 token block →</div>
-                <div style="color:var(--accent)">hook fires automatically</div>
-                <div class="out">~3,200 → ~480 tokens saved</div>
-                <div class="out">summary enters AI context</div>
+              <div style="padding:8px 10px;background:var(--surface-2);border-radius:4px">
+                <div class="out">~/.claude/hooks/tldt-hook.sh</div>
+                <div class="cm">Auto-summarizes when tokens > threshold</div>
+                <div class="cm">Runs: --sanitize --detect-injection --detect-pii</div>
               </div>
             </div>
           </div>
@@ -713,6 +717,96 @@
           <div style="color:var(--accent);font-weight:500;margin-bottom:4px">html-processor/</div>
           <div style="color:var(--text-2);font-size:12px">Convert HTML to Markdown and summarize</div>
         </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- EMBEDDED SKILLS -->
+<section class="section" id="embedded-skills">
+  <div class="container">
+    <div class="reveal" style="margin-bottom:40px">
+      <div class="section-label">ai assistant integration</div>
+      <h2 class="section-title">Embedded skills,<br><span class="acc">compiled in.</span></h2>
+      <p style="color:var(--text-2);margin-top:16px;max-width:560px;font-size:14px;line-height:1.85">
+        The tldt binary contains embedded skill templates for Claude Code and other AI assistants.
+        Install once, use anywhere — the skill and hook travel with the binary.
+      </p>
+    </div>
+
+    <div class="reveal" style="display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));margin-bottom:40px">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="background:var(--accent-dim);color:var(--accent);padding:3px 10px;border-radius:4px;font-size:12px">SKILL.md</span>
+          <span style="font-family:var(--serif);font-size:18px">Manual Command Skill</span>
+        </div>
+        <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:16px">
+          Claude Code skill for manual invocations. Type <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">/tldt</code> followed by long text.
+        </p>
+        <div class="term" style="font-size:12px;margin-bottom:16px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div class="cm"># Install location</div>
+            <div>~/.claude/skills/tldt/SKILL.md</div>
+            <div style="margin-top:8px" class="cm"># What it does</div>
+            <div>echo "$ARGUMENTS" | tldt --verbose</div>
+            <div style="margin-top:8px" class="cm"># Returns: token savings + summary</div>
+          </div>
+        </div>
+        <p style="color:var(--text-3);font-size:12px;line-height:1.6">
+          The skill file is embedded in the binary at compile time and extracted during <span style="color:var(--text-2)">--install-skill</span>.
+        </p>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:8px;padding:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="background:rgba(124,211,252,0.1);color:#7dd3fc;padding:3px 10px;border-radius:4px;font-size:12px">HOOK</span>
+          <span style="font-family:var(--serif);font-size:18px">Auto-Trigger Hook</span>
+        </div>
+        <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:16px">
+          UserPromptSubmit hook that fires automatically when pasted text exceeds the token threshold.
+        </p>
+        <div class="term" style="font-size:12px;margin-bottom:16px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body">
+            <div class="cm"># Install location</div>
+            <div>~/.claude/hooks/tldt-hook.sh</div>
+            <div style="margin-top:8px" class="cm"># Security preprocessing</div>
+            <div>--sanitize --detect-injection --detect-pii</div>
+            <div style="margin-top:8px" class="cm"># Output guard</div>
+            <div>re-runs detection on summary before context injection</div>
+          </div>
+        </div>
+        <p style="color:var(--text-3);font-size:12px;line-height:1.6">
+          Configurable threshold via <span style="color:var(--text-2)">~/.tldt.toml [hook] threshold = 2000</span>.
+        </p>
+      </div>
+    </div>
+
+    <div class="reveal" style="border:1px solid var(--border);border-radius:8px;padding:20px">
+      <div style="font-family:var(--serif);font-size:16px;margin-bottom:12px">Multi-Assistant Support</div>
+      <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:16px">
+        The installer detects and installs to multiple AI assistant directories. Only Claude Code supports the auto-trigger hook; other assistants receive the skill file only.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="background:var(--surface-2);padding:10px 14px;border-radius:6px;font-size:12px">
+          <div style="color:var(--accent);font-weight:500;margin-bottom:4px">Claude Code</div>
+          <div style="color:var(--text-3)">~/.claude/skills + hooks + settings.json</div>
+        </div>
+        <div style="background:var(--surface-2);padding:10px 14px;border-radius:6px;font-size:12px">
+          <div style="color:#7dd3fc;font-weight:500;margin-bottom:4px">Cursor</div>
+          <div style="color:var(--text-3)">~/.cursor/skills (skill only)</div>
+        </div>
+        <div style="background:var(--surface-2);padding:10px 14px;border-radius:6px;font-size:12px">
+          <div style="color:#fbbf24;font-weight:500;margin-bottom:4px">OpenCode</div>
+          <div style="color:var(--text-3)">~/.config/opencode/skills</div>
+        </div>
+        <div style="background:var(--surface-2);padding:10px 14px;border-radius:6px;font-size:12px">
+          <div style="color:#c084fc;font-weight:500;margin-bottom:4px">Agents</div>
+          <div style="color:var(--text-3)">~/.agents/skills</div>
+        </div>
       </div>
     </div>
   </div>
