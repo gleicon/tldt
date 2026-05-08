@@ -284,11 +284,12 @@ func TestDetectOutliers_OffTopicInjection(t *testing.T) {
 	sentences := []string{"A", "B", "C", "injection"}
 	// First 3 sentences highly similar; sentence 3 is outlier (low sim to all)
 	matrix := buildUniformMatrix(4, 0.80)
-	// Override row/col 3 to have near-zero similarity
+	// Override row/col 3 to have near-zero similarity (outlier_score > 0.99 threshold)
+	// With similarity 0.005, meanSim=0.005, outlier_score=0.995 > 0.99
 	for j := 0; j < 4; j++ {
 		if j != 3 {
-			matrix[3][j] = 0.02
-			matrix[j][3] = 0.02
+			matrix[3][j] = 0.005
+			matrix[j][3] = 0.005
 		}
 	}
 	findings := DetectOutliers(sentences, matrix, DefaultOutlierThreshold)

@@ -52,8 +52,13 @@ const DefaultDetectionThreshold = 0.70
 
 // DefaultOutlierThreshold is the outlier_score above which a sentence is flagged.
 // outlier_score(i) = 1 - mean(sim[i][j] for j ≠ i).
-// Higher = lower similarity to neighbors = more off-topic.
-const DefaultOutlierThreshold = 0.85
+// Higher = lower similarity to neighbors = more out-topic.
+//
+// Calibration: Normal text produces outlier scores around 0.96-0.99 due to
+// TF-IDF cosine similarity properties. A threshold of 0.99 catches only
+// sentences with mean similarity < 0.01 (extremely anomalous) while avoiding
+// false positives on legitimate text.
+const DefaultOutlierThreshold = 0.99
 
 // --- Pattern detection ---
 

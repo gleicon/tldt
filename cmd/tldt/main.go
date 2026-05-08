@@ -39,6 +39,7 @@ func main() {
 	injectionThreshold := flag.Float64("injection-threshold", tldt.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
 	detectPII    := flag.Bool("detect-pii", false, "report PII and secret patterns (email, API keys, JWTs, credit cards) to stderr (advisory)")
 	sanitizePII  := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
+	fromHTML      := flag.Bool("from-html", false, "convert HTML input to Markdown before summarization (uses readability + html-to-markdown)")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: tldt [--print-threshold] [--install-skill [--skill-dir path] [--target app]]")
 		fmt.Fprintln(os.Stderr, "       tldt [-f file] [--url url] [-algorithm lexrank|textrank|graph|ensemble] [-sentences N] [--detect-pii] [--sanitize-pii]")
@@ -126,6 +127,27 @@ func main() {
 	}
 	if isEmpty {
 		os.Exit(0)
+	}
+
+	// --from-html: convert HTML to Markdown before processing.
+	if *fromHTML {
+		converted, err := tldt.ConvertHTML(text, tldt.HTMLConvertOptions{
+			ExtractContent: true,
+			IncludeTitle:   true,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "html-convert: %v\n", err)
+			os.Exit(1)
+		}
+		// Report conversion stats
+		srcLen := len(text)
+		dstLen := len(converted)
+		reduction := 0
+		if srcLen > 0 {
+			reduction = (srcLen - dstLen) * 100 / srcLen
+		}
+		fmt.Fprintf(os.Stderr, "html-convert: %d → %d bytes (%d%% reduction)\n", srcLen, dstLen, reduction)
+		text = converted
 	}
 
 	// --sanitize: strip invisible Unicode and NFKC-normalize before summarization.

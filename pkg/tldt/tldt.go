@@ -17,6 +17,7 @@ import (
 
 	"github.com/gleicon/tldt/internal/detector"
 	"github.com/gleicon/tldt/internal/fetcher"
+	"github.com/gleicon/tldt/internal/htmlmd"
 	"github.com/gleicon/tldt/internal/sanitizer"
 	"github.com/gleicon/tldt/internal/summarizer"
 )
@@ -336,6 +337,47 @@ func DetectOutliers(sentences []string, simMatrix [][]float64, threshold float64
 // This is the single entry point for the --sanitize CLI flag.
 func SanitizeAll(text string) string {
 	return sanitizer.SanitizeAll(text)
+}
+
+// HTMLConvertOptions configures HTML to Markdown conversion behavior.
+type HTMLConvertOptions struct {
+	// ExtractContent applies readability algorithm to extract main article
+	// content before converting to Markdown. This removes navigation,
+	// ads, sidebars, and other boilerplate.
+	// Default: true
+	ExtractContent bool
+
+	// IncludeTitle adds the article title as an H1 heading at the start.
+	// Default: true
+	IncludeTitle bool
+
+	// MaxLength limits the output length. 0 means no limit.
+	// Default: 0
+	MaxLength int
+}
+
+// ConvertHTML converts HTML content to clean Markdown text.
+// It uses the readability algorithm to extract the main article content,
+// then converts to clean Markdown suitable for summarization.
+//
+// This is useful when processing HTML from curl commands, web scraping,
+// or saved HTML files. The conversion strips navigation, ads, and other
+// boilerplate, leaving clean Markdown text.
+//
+// Example:
+//
+//	html := "<html><body><h1>Title</h1><p>Content...</p></body></html>"
+//	md, err := tldt.ConvertHTML(html, tldt.HTMLConvertOptions{
+//	    ExtractContent: true,
+//	    IncludeTitle: true,
+//	})
+func ConvertHTML(html string, opts HTMLConvertOptions) (string, error) {
+	htmlOpts := htmlmd.Options{
+		ExtractContent: opts.ExtractContent,
+		IncludeTitle:   opts.IncludeTitle,
+		MaxLength:      opts.MaxLength,
+	}
+	return htmlmd.ConvertString(html, htmlOpts)
 }
 
 // ReportInvisibles returns a description of every codepoint that would be stripped
