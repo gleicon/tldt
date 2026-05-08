@@ -122,7 +122,16 @@ func resolveTargets(homeDir string, opts Options) []installTarget {
 		if opts.Target != "" && opts.Target != "all" && opts.Target != o.name {
 			continue // --target restricts to specific app
 		}
-		if _, err := os.Stat(o.detectDir); err == nil {
+		_, err := os.Stat(o.detectDir)
+		dirExists := err == nil
+		// Auto-create directory when explicitly targeted (e.g., --target opencode)
+		// This enables seamless first-time installation for OpenCode, Cursor, Agents
+		if opts.Target == o.name && !dirExists {
+			if err := os.MkdirAll(o.detectDir, 0755); err == nil {
+				dirExists = true
+			}
+		}
+		if dirExists {
 			targets = append(targets, installTarget{
 				name:      o.name,
 				skillDest: o.skillDest,

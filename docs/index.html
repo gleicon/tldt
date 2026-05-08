@@ -561,33 +561,30 @@
       <div id="tab-skill" class="tab-panel">
         <div class="g2">
           <div class="term">
-            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">Claude Code</span></div>
+            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">Auto-Detect Mode</span></div>
             <div class="term-body" style="font-size:12px;line-height:1.9">
-              <div class="cm"># Auto-detected if ~/.claude exists</div>
+              <div class="cm"># Install to all assistants with existing directories</div>
               <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill</span></div>
-              <div style="margin-top:8px" class="cm"># Or force specific target</div>
-              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
+              <div style="margin-top:8px" class="cm"># Safe to run repeatedly — no directories created</div>
               <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-                <div class="out">~/.claude/skills/tldt/SKILL.md</div>
-                <div class="out">~/.claude/hooks/tldt-hook.sh</div>
-                <div class="out">~/.claude/settings.json <span class="cm">(hook registration)</span></div>
+                <div class="out">Detects: ~/.claude, ~/.cursor, ~/.config/opencode, ~/.agents</div>
               </div>
-              <div style="margin-top:8px" class="cm"># Use /tldt in Claude Code</div>
-              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"text to summarize..."</span></div>
+              <div style="margin-top:8px" class="cm"># Install all assistants (auto-creates dirs)</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">all</span></div>
             </div>
           </div>
           <div class="term">
-            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">OpenCode</span></div>
+            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">Targeted Mode</span></div>
             <div class="term-body" style="font-size:12px;line-height:1.9">
-              <div class="cm"># Create directory first (auto-trigger only for Claude)</div>
-              <div><span class="p">$</span> <span class="c">mkdir -p</span> <span class="s">~/.config/opencode</span></div>
-              <div style="margin-top:8px" class="cm"># Install to OpenCode only</div>
+              <div class="cm"># Auto-creates directory if missing — all assistants</div>
               <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">opencode</span></div>
+              <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">cursor</span></div>
+              <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">agents</span></div>
               <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-                <div class="out">~/.config/opencode/skills/tldt/SKILL.md</div>
-                <div class="cm"><span style="color:#fbbf24">SKILL.md only</span> — no auto-trigger hook</div>
+                <div class="out">Creates: ~/.config/opencode/skills/tldt/SKILL.md</div>
+                <div class="cm">Same behavior for Cursor, Agents — SKILL.md only</div>
               </div>
-              <div style="margin-top:8px" class="cm"># Use /tldt in OpenCode</div>
+              <div style="margin-top:8px" class="cm"># Use /tldt in any assistant</div>
               <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"text to summarize..."</span></div>
             </div>
           </div>
@@ -595,18 +592,22 @@
         <div class="term" style="margin-top:20px">
           <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">What gets installed</span></div>
           <div class="term-body" style="font-size:12px;line-height:1.9">
-            <div class="cm"># Embedded templates (compiled into binary via go:embed)</div>
-            <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+            <div style="display:flex;gap:24px;flex-wrap:wrap">
               <div>
                 <span style="background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:3px;font-size:10px">SKILL.md</span>
-                <div class="out" style="margin-top:4px">Manual /tldt command</div>
-                <div class="cm">All assistants</div>
+                <div class="out" style="margin-top:4px">All assistants</div>
+                <div class="cm">Manual /tldt command</div>
               </div>
               <div>
                 <span style="background:rgba(124,211,252,0.1);color:#7dd3fc;padding:2px 7px;border-radius:3px;font-size:10px">tldt-hook.sh</span>
-                <div class="out" style="margin-top:4px">Auto-trigger hook</div>
-                <div class="cm">Claude Code only</div>
+                <div class="out" style="margin-top:4px">Claude Code only</div>
+                <div class="cm">Auto-trigger on UserPromptSubmit</div>
               </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+              <div class="cm"># Claude Code gets the full treatment</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
+              <div style="margin-top:4px" class="out">SKILL.md + tldt-hook.sh + settings.json registration</div>
             </div>
           </div>
         </div>
@@ -806,66 +807,63 @@
       <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
         <div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="color:var(--accent);font-weight:600;font-size:14px">Claude Code</span>
-            <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:3px;font-size:10px">SKILL + HOOK</span>
+            <span style="color:var(--accent);font-weight:600;font-size:14px">Auto-Detect Mode</span>
+            <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:3px;font-size:10px">NON-DESTRUCTIVE</span>
           </div>
           <p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:12px">
-            Auto-detected if <code style="background:var(--surface-2);padding:1px 4px;border-radius:2px">~/.claude</code> exists. Installs skill + auto-trigger hook + settings.json registration.
+            Installs to all assistants with <strong>existing directories</strong>. Safe to run repeatedly — won't create new directories.
           </p>
           <div class="term" style="font-size:11px">
             <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
             <div class="term-body" style="padding:12px">
-              <div class="cm"># Auto-detect and install</div>
+              <div class="cm"># Install to all detected assistants</div>
               <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill</span></div>
-              <div style="margin-top:6px" class="cm"># Or force specific target</div>
-              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
-              <div style="margin-top:6px" class="cm"># Use /tldt in Claude Code</div>
-              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"long text to summarize..."</span></div>
+              <div style="margin-top:6px" class="cm"># Detects: ~/.claude, ~/.cursor, ~/.config/opencode, ~/.agents</div>
             </div>
           </div>
           <p style="color:var(--text-3);font-size:11px;margin-top:8px">
-            Installs: <code style="background:var(--surface-2);padding:1px 4px">SKILL.md</code> + <code style="background:var(--surface-2);padding:1px 4px">tldt-hook.sh</code> + settings.json
+            Only installs where directories already exist. No directories created.
           </p>
         </div>
 
         <div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <span style="color:#fbbf24;font-weight:600;font-size:14px">OpenCode</span>
-            <span style="background:rgba(251,191,36,0.1);color:#fbbf24;padding:2px 8px;border-radius:3px;font-size:10px">SKILL ONLY</span>
+            <span style="color:#fbbf24;font-weight:600;font-size:14px">Targeted Mode</span>
+            <span style="background:rgba(251,191,36,0.1);color:#fbbf24;padding:2px 8px;border-radius:3px;font-size:10px">AUTO-CREATE</span>
           </div>
           <p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:12px">
-            Directory must exist first. Auto-trigger hook is Claude Code specific. Only SKILL.md is installed.
+            Specify an assistant — directory is <strong>auto-created</strong> if needed. Perfect for first-time setup.
           </p>
           <div class="term" style="font-size:11px">
             <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
             <div class="term-body" style="padding:12px">
-              <div class="cm"># Create directory first</div>
-              <div><span class="p">$</span> <span class="c">mkdir -p</span> <span class="s">~/.config/opencode</span></div>
-              <div style="margin-top:6px" class="cm"># Install to OpenCode only</div>
+              <div class="cm"># Auto-creates directory, installs skill</div>
               <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">opencode</span></div>
-              <div style="margin-top:6px" class="cm"># Use /tldt in OpenCode</div>
-              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"long text to summarize..."</span></div>
+              <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">cursor</span></div>
+              <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">agents</span></div>
+              <div style="margin-top:6px"><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">all</span></div>
             </div>
           </div>
           <p style="color:var(--text-3);font-size:11px;margin-top:8px">
-            Installs: <code style="background:var(--surface-2);padding:1px 4px">SKILL.md</code> only (no auto-trigger hook)
+            Creates directory if missing. Same behavior for all assistants.
           </p>
         </div>
       </div>
 
       <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
         <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:12px">
-          <strong>Important:</strong> The installer checks if the base directory exists. For OpenCode, you must create 
-          <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">~/.config/opencode</code> first. 
-          Claude Code is auto-detected if <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">~/.claude</code> exists.
+          <strong>Important:</strong> Only <strong>Claude Code</strong> supports auto-trigger hooks (UserPromptSubmit). 
+          Other assistants receive <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">SKILL.md</code> only — 
+          use <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">/tldt</code> for manual summarization.
         </p>
         <div class="term" style="font-size:11px">
           <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
           <div class="term-body" style="padding:12px">
-            <div class="cm"># Install to all detected assistants</div>
-            <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">all</span></div>
-            <div style="margin-top:6px" class="cm"># Install to custom directory</div>
-            <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --skill-dir</span> <span class="s">/path/to/skills</span></div>
+            <div class="cm"># Claude Code: full installation with hook</div>
+            <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
+            <div style="margin-top:6px" class="cm"># Install: SKILL.md + tldt-hook.sh + settings.json</div>
+            <div style="margin-top:6px" class="cm"># Use in Claude Code:</div>
+            <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"long text to summarize..."</span></div>
           </div>
         </div>
       </div>
