@@ -561,36 +561,51 @@
       <div id="tab-skill" class="tab-panel">
         <div class="g2">
           <div class="term">
-            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">install skill + hook</span></div>
-            <div class="term-body">
-              <div class="cm"># auto-detect Claude Code, Cursor, OpenCode dirs</div>
+            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">Claude Code</span></div>
+            <div class="term-body" style="font-size:12px;line-height:1.9">
+              <div class="cm"># Auto-detected if ~/.claude exists</div>
               <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill</span></div>
-              <div style="margin-top:8px" class="cm"># target specific app</div>
-              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target claude</span></div>
-              <div style="margin-top:8px" class="cm"># check current threshold</div>
-              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--print-threshold</span></div>
-              <div class="out">2000</div>
+              <div style="margin-top:8px" class="cm"># Or force specific target</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                <div class="out">~/.claude/skills/tldt/SKILL.md</div>
+                <div class="out">~/.claude/hooks/tldt-hook.sh</div>
+                <div class="out">~/.claude/settings.json <span class="cm">(hook registration)</span></div>
+              </div>
+              <div style="margin-top:8px" class="cm"># Use /tldt in Claude Code</div>
+              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"text to summarize..."</span></div>
             </div>
           </div>
           <div class="term">
-            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">embedded templates</span></div>
+            <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">OpenCode</span></div>
             <div class="term-body" style="font-size:12px;line-height:1.9">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <div class="cm"># Create directory first (auto-trigger only for Claude)</div>
+              <div><span class="p">$</span> <span class="c">mkdir -p</span> <span class="s">~/.config/opencode</span></div>
+              <div style="margin-top:8px" class="cm"># Install to OpenCode only</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">opencode</span></div>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+                <div class="out">~/.config/opencode/skills/tldt/SKILL.md</div>
+                <div class="cm"><span style="color:#fbbf24">SKILL.md only</span> — no auto-trigger hook</div>
+              </div>
+              <div style="margin-top:8px" class="cm"># Use /tldt in OpenCode</div>
+              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"text to summarize..."</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="term" style="margin-top:20px">
+          <div class="term-bar"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div><span class="term-title">What gets installed</span></div>
+          <div class="term-body" style="font-size:12px;line-height:1.9">
+            <div class="cm"># Embedded templates (compiled into binary via go:embed)</div>
+            <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+              <div>
                 <span style="background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:3px;font-size:10px">SKILL.md</span>
-                <span class="out">Claude Code skill (manual /tldt command)</span>
+                <div class="out" style="margin-top:4px">Manual /tldt command</div>
+                <div class="cm">All assistants</div>
               </div>
-              <div style="padding:8px 10px;background:var(--surface-2);border-radius:4px;margin-bottom:12px">
-                <div class="out">~/.claude/skills/tldt/SKILL.md</div>
-                <div class="cm">Invokes: echo "text" | tldt --verbose</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <span style="background:rgba(124,211,252,0.1);color:#7dd3fc;padding:2px 7px;border-radius:3px;font-size:10px">HOOK</span>
-                <span class="out">Auto-trigger on UserPromptSubmit</span>
-              </div>
-              <div style="padding:8px 10px;background:var(--surface-2);border-radius:4px">
-                <div class="out">~/.claude/hooks/tldt-hook.sh</div>
-                <div class="cm">Auto-summarizes when tokens > threshold</div>
-                <div class="cm">Runs: --sanitize --detect-injection --detect-pii</div>
+              <div>
+                <span style="background:rgba(124,211,252,0.1);color:#7dd3fc;padding:2px 7px;border-radius:3px;font-size:10px">tldt-hook.sh</span>
+                <div class="out" style="margin-top:4px">Auto-trigger hook</div>
+                <div class="cm">Claude Code only</div>
               </div>
             </div>
           </div>
@@ -782,6 +797,77 @@
         <p style="color:var(--text-3);font-size:12px;line-height:1.6">
           Configurable threshold via <span style="color:var(--text-2)">~/.tldt.toml [hook] threshold = 2000</span>.
         </p>
+      </div>
+    </div>
+
+    <div class="reveal" style="border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:24px">
+      <div style="font-family:var(--serif);font-size:16px;margin-bottom:16px">Installation</div>
+      
+      <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="color:var(--accent);font-weight:600;font-size:14px">Claude Code</span>
+            <span style="background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:3px;font-size:10px">SKILL + HOOK</span>
+          </div>
+          <p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:12px">
+            Auto-detected if <code style="background:var(--surface-2);padding:1px 4px;border-radius:2px">~/.claude</code> exists. Installs skill + auto-trigger hook + settings.json registration.
+          </p>
+          <div class="term" style="font-size:11px">
+            <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+            <div class="term-body" style="padding:12px">
+              <div class="cm"># Auto-detect and install</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill</span></div>
+              <div style="margin-top:6px" class="cm"># Or force specific target</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">claude</span></div>
+              <div style="margin-top:6px" class="cm"># Use /tldt in Claude Code</div>
+              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"long text to summarize..."</span></div>
+            </div>
+          </div>
+          <p style="color:var(--text-3);font-size:11px;margin-top:8px">
+            Installs: <code style="background:var(--surface-2);padding:1px 4px">SKILL.md</code> + <code style="background:var(--surface-2);padding:1px 4px">tldt-hook.sh</code> + settings.json
+          </p>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="color:#fbbf24;font-weight:600;font-size:14px">OpenCode</span>
+            <span style="background:rgba(251,191,36,0.1);color:#fbbf24;padding:2px 8px;border-radius:3px;font-size:10px">SKILL ONLY</span>
+          </div>
+          <p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:12px">
+            Directory must exist first. Auto-trigger hook is Claude Code specific. Only SKILL.md is installed.
+          </p>
+          <div class="term" style="font-size:11px">
+            <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+            <div class="term-body" style="padding:12px">
+              <div class="cm"># Create directory first</div>
+              <div><span class="p">$</span> <span class="c">mkdir -p</span> <span class="s">~/.config/opencode</span></div>
+              <div style="margin-top:6px" class="cm"># Install to OpenCode only</div>
+              <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">opencode</span></div>
+              <div style="margin-top:6px" class="cm"># Use /tldt in OpenCode</div>
+              <div><span class="p">$</span> <span class="c">/tldt</span> <span class="s">"long text to summarize..."</span></div>
+            </div>
+          </div>
+          <p style="color:var(--text-3);font-size:11px;margin-top:8px">
+            Installs: <code style="background:var(--surface-2);padding:1px 4px">SKILL.md</code> only (no auto-trigger hook)
+          </p>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+        <p style="color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:12px">
+          <strong>Important:</strong> The installer checks if the base directory exists. For OpenCode, you must create 
+          <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">~/.config/opencode</code> first. 
+          Claude Code is auto-detected if <code style="background:var(--surface-2);padding:2px 6px;border-radius:3px">~/.claude</code> exists.
+        </p>
+        <div class="term" style="font-size:11px">
+          <div class="term-bar" style="padding:8px 12px"><div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div></div>
+          <div class="term-body" style="padding:12px">
+            <div class="cm"># Install to all detected assistants</div>
+            <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --target</span> <span class="s">all</span></div>
+            <div style="margin-top:6px" class="cm"># Install to custom directory</div>
+            <div><span class="p">$</span> <span class="c">tldt</span> <span class="fl">--install-skill --skill-dir</span> <span class="s">/path/to/skills</span></div>
+          </div>
+        </div>
       </div>
     </div>
 
