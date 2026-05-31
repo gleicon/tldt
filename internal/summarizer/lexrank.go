@@ -329,6 +329,9 @@ func selectTopN(scores []float64, n int, sentences []string) []string {
 	if n > len(ranked) {
 		n = len(ranked)
 	}
+	if n < 0 {
+		n = 0
+	}
 	top := make([]int, n)
 	for i := 0; i < n; i++ {
 		top[i] = ranked[i].idx

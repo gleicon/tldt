@@ -304,3 +304,16 @@ func TestTextRank_SummarizeExplain_SimilarityPairsCount(t *testing.T) {
 		t.Errorf("SimilarityPairs = %d, want %d", info.SimilarityPairs, wantPairs)
 	}
 }
+
+// TestSelectTopN_NegativeNoPanic pins the R1 defensive clamp: the select helpers
+// must not panic when asked for a negative count (they clamp to an empty result).
+// Guards library consumers that call Summarize with a negative n directly.
+func TestSelectTopN_NegativeNoPanic(t *testing.T) {
+	text := "First sentence here. Second sentence here. Third sentence here."
+	if got, err := (&LexRank{}).Summarize(text, -1); err != nil || len(got) != 0 {
+		t.Errorf("LexRank.Summarize(n=-1) = (%v, %v), want (empty, nil) with no panic", got, err)
+	}
+	if got, err := (&TextRank{}).Summarize(text, -1); err != nil || len(got) != 0 {
+		t.Errorf("TextRank.Summarize(n=-1) = (%v, %v), want (empty, nil) with no panic", got, err)
+	}
+}

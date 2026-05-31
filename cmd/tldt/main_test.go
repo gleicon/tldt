@@ -848,6 +848,23 @@ func TestMain_DetectInjection(t *testing.T) {
 	}
 }
 
+// TestMain_NegativeSentencesRejected pins the R1 fix: a non-positive --sentences
+// must produce a clean error exit, not a panic.
+func TestMain_NegativeSentencesRejected(t *testing.T) {
+	input := "First sentence here. Second sentence here. Third sentence here."
+	for _, algo := range []string{"lexrank", "textrank", "ensemble", "graph"} {
+		t.Run(algo, func(t *testing.T) {
+			_, stderr, ok := run(t, input, "--algorithm", algo, "--sentences", "-1")
+			if ok {
+				t.Errorf("--sentences -1 (%s): want non-zero exit, got success", algo)
+			}
+			if !strings.Contains(stderr, "--sentences must be >= 1") {
+				t.Errorf("--sentences -1 (%s): stderr = %q, want it to mention the >= 1 rule", algo, stderr)
+			}
+		})
+	}
+}
+
 // ── --detect-pii and --sanitize-pii integration tests ─────────────────────────
 
 // piiText has 3 sentences; one contains an email address for PII detection tests.

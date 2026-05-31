@@ -98,6 +98,13 @@ func powerIterateDamped(matrix [][]float64, damping, epsilon float64, maxIter in
 
 // trSelectTopN selects the top-n sentences by score and returns them in document order.
 func trSelectTopN(scores []float64, n int, sentences []string) []string {
+	// Clamp n to [0, len] so the function never panics on out-of-range counts.
+	if n < 0 {
+		n = 0
+	}
+	if n > len(sentences) {
+		n = len(sentences)
+	}
 	indices := make([]int, len(sentences))
 	for i := range indices {
 		indices[i] = i

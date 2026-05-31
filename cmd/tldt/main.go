@@ -195,6 +195,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Sentence count must be positive — covers CLI flag, level preset, and config.
+	if effectiveSentences < 1 {
+		fmt.Fprintf(os.Stderr, "--sentences must be >= 1 (got %d)\n", effectiveSentences)
+		os.Exit(1)
+	}
+
 	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
