@@ -1,11 +1,3 @@
-// Package tldt provides an embeddable Go API for text summarization,
-// prompt injection detection, and Unicode sanitization. It wraps the
-// internal packages and is the only public API surface of the tldt module.
-//
-// All functions are stateless -- no global mutable state. Options are passed
-// explicitly via plain structs; zero-value fields receive sensible defaults.
-//
-// Import path: github.com/gleicon/tldt/pkg/tldt
 package tldt
 
 import (
@@ -36,7 +28,7 @@ const DefaultOutlierThreshold = detector.DefaultOutlierThreshold
 
 // DetectOptions controls detection behavior.
 type DetectOptions struct {
-	OutlierThreshold float64 // default: 0.85 (DefaultOutlierThreshold)
+	OutlierThreshold float64 // default: 0.99 (DefaultOutlierThreshold)
 }
 
 // FetchOptions controls URL fetching behavior.

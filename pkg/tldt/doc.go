@@ -24,7 +24,7 @@
 //	result, err := tldt.Pipeline(untrustedText, tldt.PipelineOptions{
 //	    Sanitize:    true,  // strip invisible Unicode
 //	    SanitizePII: true,  // redact emails, API keys, JWTs
-//	    Detect:      tldt.DetectOptions{OutlierThreshold: 0.85},
+//	    Detect:      tldt.DetectOptions{OutlierThreshold: 0.99},
 //	    Summarize:   tldt.SummarizeOptions{Algorithm: "ensemble", Sentences: 3},
 //	})
 //	if err != nil {

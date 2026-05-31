@@ -73,9 +73,14 @@ tldt -f article.txt --format markdown
 | `--rouge <file>` | — | Print ROUGE-1/2/L scores to stderr vs reference file |
 | `--sanitize` | off | Strip invisible Unicode and NFKC-normalize before summarizing |
 | `--detect-injection` | off | Report prompt injection patterns and encoding anomalies to stderr |
-| `--injection-threshold` | `0.85` | Outlier score [0,1] above which sentences are flagged |
+| `--injection-threshold` | `0.99` | Outlier score [0,1] above which sentences are flagged |
+| `--detect-pii` | off | Report PII/secrets (email, API keys, JWTs, credit cards) to stderr |
+| `--sanitize-pii` | off | Redact PII in input with `[REDACTED:<type>]` before summarizing |
+| `--from-html` | off | Convert HTML input to Markdown before summarizing |
 | `--print-threshold` | off | Print configured hook token threshold to stdout and exit |
-| `--install-skill` | off | Install tldt Claude Code skill and UserPromptSubmit hook |
+| `--install-skill` | off | Install tldt skill and UserPromptSubmit hook |
+| `--skill-dir <dir>` | — | Override skill install directory |
+| `--target <app>` | — | Install target: `claude`, `cursor`, `opencode`, `agents`, or `all` |
 
 ---
 
@@ -241,15 +246,13 @@ All detection output goes to **stderr only** — stdout always contains just the
 | Pattern | Direct overrides (`ignore all previous instructions`), role injection, delimiter injection (`[INST]`, `<system>`), jailbreaks (DAN mode), exfiltration requests |
 | Encoding | Base64 payloads (entropy-gated), `\x`-escaped hex sequences, raw hex strings, abnormal control character density |
 | Outlier | Sentences statistically dissimilar from document neighbors (off-topic injection) — uses LexRank cosine similarity matrix |
-| Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o`, etc. — UTS#39 lookup (Unicode 17.0, ~700 entries) |
+| Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o`, etc. — UTS#39 lookup (Unicode 17.0, ~700 entries). NFKC normalization alone cannot collapse these; they require the lookup table. |
 
 Tune the outlier threshold:
 
 ```bash
 cat doc.txt | tldt --detect-injection --injection-threshold 0.90   # stricter
 ```
-
-**Cross-script homoglyphs** (Cyrillic `а` vs Latin `a`) are caught by the confusables layer, which uses the UTS#39 `confusables.txt` database (Unicode 17.0, embedded in the binary). NFKC normalization alone cannot collapse these — they require a lookup table.
 
 ---
 

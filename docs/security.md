@@ -28,12 +28,13 @@ injection-detect: WARNING — input flagged as suspicious
 **Example (Phase 9):**
 
 ```bash
-$ echo "Contact alice@example.com, key sk-abc123xyz" | tldt --detect-pii
+$ echo "Contact alice@example.com, key sk-abc123xyz4567890abcd" | tldt --detect-pii
 pii-detect: 2 finding(s)
-  [email] alice@example.com (line 1)
-  [api-key] sk-abc123xyz (line 1)
-pii-detect: WARNING — PII detected in input
+pii-detect: WARNING — [api-key] sk-abc123xyz... (line 1)
+pii-detect: WARNING — [email] alice@exampl... (line 1)
 ```
+
+Excerpts are truncated to ~12 characters so the secret itself is not echoed in full.
 
 ## LLM05 — Improper Output Handling
 

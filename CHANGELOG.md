@@ -44,6 +44,6 @@ All functions are stateless and safe for concurrent use.
 - Pure Go implementation with no external API dependencies
 - Deterministic output: identical input produces identical output
 - Pipe-safe: stdout contains only summary text when redirected
-- 361 unit tests covering all algorithms and edge cases
+- Comprehensive unit test suite covering all algorithms and edge cases
 
 [1.0.0]: https://github.com/gleicon/tldt/releases/tag/v1.0.0
