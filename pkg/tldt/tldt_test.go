@@ -412,6 +412,46 @@ func TestPipeline_SanitizePII(t *testing.T) {
 	}
 }
 
+// TestPipeline_SanitizeCountsInvisible verifies that Sanitize:true populates
+// Redactions from invisible-char removals: an input with a zero-width space must
+// yield Redactions > 0.
+func TestPipeline_SanitizeCountsInvisible(t *testing.T) {
+	text := "hello\u200bworld. " + testArticle // zero-width space injected
+	result, err := Pipeline(text, PipelineOptions{
+		Sanitize:  true,
+		Summarize: SummarizeOptions{Sentences: 2},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline: unexpected error: %v", err)
+	}
+	if result.Redactions == 0 {
+		t.Error("Pipeline Sanitize: expected Redactions > 0 for input with zero-width char")
+	}
+	if strings.TrimSpace(result.Summary) == "" {
+		t.Error("Pipeline Sanitize: expected non-empty summary")
+	}
+}
+
+// TestPipeline_SanitizePIIRedactionsZero pins the semantic that Redactions counts
+// invisible-char removals, NOT PII redactions: with SanitizePII:true (and Sanitize
+// off), PII findings are populated but Redactions stays 0.
+func TestPipeline_SanitizePIIRedactionsZero(t *testing.T) {
+	text := "Contact alice@example.com for details. " + testArticle
+	result, err := Pipeline(text, PipelineOptions{
+		SanitizePII: true,
+		Summarize:   SummarizeOptions{Sentences: 2},
+	})
+	if err != nil {
+		t.Fatalf("Pipeline: unexpected error: %v", err)
+	}
+	if result.Redactions != 0 {
+		t.Errorf("Pipeline SanitizePII: Redactions counts invisible-char removals only; want 0, got %d", result.Redactions)
+	}
+	if len(result.PIIFindings) == 0 {
+		t.Error("Pipeline SanitizePII: expected non-empty PIIFindings")
+	}
+}
+
 func TestPipeline_NoPII(t *testing.T) {
 	result, err := Pipeline(testArticle, PipelineOptions{
 		Summarize: SummarizeOptions{Sentences: 2},

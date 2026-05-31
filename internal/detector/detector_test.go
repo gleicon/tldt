@@ -674,6 +674,56 @@ func TestSanitizePII_MultipleTypes(t *testing.T) {
 	}
 }
 
+// validJWTForSanitize is a structurally valid three-segment JWT used to exercise
+// SanitizePII alongside other adjacent PII types.
+const validJWTForSanitize = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+// TestSanitizePII_OverlappingAdjacent feeds several PII types packed together
+// (email, sk- API key, JWT, 16-digit card) and asserts the redaction is complete
+// and well-formed: no original PII substring survives, and no [REDACTED: token is
+// nested inside another redaction token.
+func TestSanitizePII_OverlappingAdjacent(t *testing.T) {
+	const (
+		email  = "alice@example.com"
+		apiKey = "sk-abc12345678901234567890"
+		card   = "4111111111111111"
+	)
+	input := email + " " + apiKey + " " + validJWTForSanitize + " " + card
+
+	redacted, findings := SanitizePII(input)
+	if len(findings) == 0 {
+		t.Fatal("SanitizePII: expected findings for packed PII input, got none")
+	}
+
+	// (a) None of the original PII substrings survive.
+	for _, secret := range []string{email, apiKey, validJWTForSanitize, card} {
+		if strings.Contains(redacted, secret) {
+			t.Errorf("SanitizePII: original PII %q survived in output: %q", secret, redacted)
+		}
+	}
+
+	// (b) No [REDACTED: token is nested inside another. Walk each redaction token
+	// from its opening "[REDACTED:" to the next "]" and ensure that span contains
+	// no further "[REDACTED:" marker.
+	const open = "[REDACTED:"
+	rest := redacted
+	for {
+		i := strings.Index(rest, open)
+		if i < 0 {
+			break
+		}
+		body := rest[i+len(open):]
+		end := strings.Index(body, "]")
+		if end < 0 {
+			t.Fatalf("SanitizePII: unterminated redaction token in output: %q", redacted)
+		}
+		if strings.Contains(body[:end], open) {
+			t.Errorf("SanitizePII: nested redaction token in output: %q", redacted)
+		}
+		rest = body[end+1:]
+	}
+}
+
 func TestDetectPII_CategoryField(t *testing.T) {
 	inputs := []string{
 		"alice@example.com",

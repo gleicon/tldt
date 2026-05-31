@@ -133,6 +133,37 @@ func TestFetch_NonHTMLContentType(t *testing.T) {
 	})
 }
 
+// TestFetch_MaxBytesCap verifies the maxBytes cap truncates the response body:
+// content that appears only beyond the cap must not survive into the extracted text.
+func TestFetch_MaxBytesCap(t *testing.T) {
+	const marker = "SENTINELPASTCAP" // appears only well beyond the small cap
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Open the document well within the first 64 bytes, then pad far past the
+		// cap before emitting the marker so a truncated read cannot include it.
+		_, _ = fmt.Fprint(w, "<html><body><article><p>Lead. ")
+		_, _ = fmt.Fprint(w, strings.Repeat("padding word here. ", 2000))
+		_, _ = fmt.Fprintf(w, "%s appears only past the byte cap.</p></article></body></html>", marker)
+	}))
+	defer ts.Close()
+
+	const smallCap = 64
+	withLookup(publicLookup, func() {
+		text, err := Fetch(ts.URL, testTimeout, smallCap)
+		if err != nil {
+			// A tiny cap may yield no extractable article; that is also acceptable
+			// truncation behavior. What must never happen is the marker surviving.
+			if strings.Contains(err.Error(), marker) {
+				t.Fatalf("Fetch: marker leaked into error despite cap: %v", err)
+			}
+			return
+		}
+		if strings.Contains(text, marker) {
+			t.Errorf("Fetch: content beyond maxBytes=%d cap leaked into text (found %q)", smallCap, marker)
+		}
+	})
+}
+
 // TestBlockPrivateIP is a unit test for the blockPrivateIP helper directly.
 // No DNS lookup needed — passes raw IP strings.
 func TestBlockPrivateIP(t *testing.T) {

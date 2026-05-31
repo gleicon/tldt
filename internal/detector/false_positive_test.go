@@ -2,6 +2,7 @@ package detector
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/gleicon/tldt/internal/summarizer"
@@ -112,10 +113,11 @@ Yes, we've been studying how these models handle reasoning tasks under uncertain
 	}
 }
 
-// TestOutlierThresholdCalibration helps identify optimal threshold values
+// TestOutlierThresholdCalibration asserts that raising the outlier threshold
+// never INCREASES the number of flagged sentences. A higher threshold demands a
+// higher outlier score to flag, so the flagged count must be monotonically
+// non-increasing. A regression that inverted the comparison would violate this.
 func TestOutlierThresholdCalibration(t *testing.T) {
-	// This test documents outlier rates at different thresholds
-	// to help calibrate DefaultOutlierThreshold
 	text := `The quick brown fox jumps over the lazy dog.
 This pangram contains every letter of the English alphabet.
 Pangrams are often used to display typefaces and test equipment.
@@ -130,19 +132,25 @@ Computer programmers use pangrams to test font rendering systems.`
 	if err != nil {
 		t.Skipf("SummarizeWithMatrix failed: %v", err)
 	}
+	if len(matrix) == 0 {
+		t.Skip("Empty matrix returned")
+	}
 
 	sentences := summarizer.TokenizeSentences(text)
 	if len(sentences) < 2 {
 		t.Skip("Need at least 2 sentences")
 	}
 
+	// Ascending thresholds → flagged count must be non-increasing.
 	thresholds := []float64{0.70, 0.75, 0.80, 0.85, 0.90, 0.95}
-
-	t.Logf("Threshold calibration for %d sentences:", len(sentences))
+	prevCount := len(sentences) + 1 // start above any possible count
 	for _, thresh := range thresholds {
-		outliers := DetectOutliers(sentences, matrix, thresh)
-		rate := float64(len(outliers)) / float64(len(sentences))
-		t.Logf("  Threshold %.2f: %d outliers (%.1f%%)", thresh, len(outliers), rate*100)
+		count := len(DetectOutliers(sentences, matrix, thresh))
+		if count > prevCount {
+			t.Errorf("threshold %.2f flagged %d outliers, but a lower threshold flagged only %d; "+
+				"flagged count must be non-increasing as threshold rises", thresh, count, prevCount)
+		}
+		prevCount = count
 	}
 }
 
@@ -227,11 +235,18 @@ Strong standard library. Cross-platform compilation. Built-in testing framework.
 
 			t.Logf("%s: n=%d, mean=%.3f, min=%.3f, max=%.3f", name, len(scores), mean, min, max)
 
-			// TF-IDF cosine similarity produces high outlier scores (0.95-1.0) on
-			// diverse short text because sentences don't share vocabulary.
-			// This is expected behavior - the algorithm is designed to find
-			// similar sentences, not to establish baseline similarity.
-			// Only flag if mean is impossibly high (>0.999) indicating calculation error.
+			// Every outlier score is 1 - meanSimilarity. With a well-formed
+			// cosine similarity matrix, each score must lie in [0.0, 1.0] and be
+			// finite. A similarity-matrix regression (NaN, negative, or > 1
+			// similarities) would push a score out of range and be caught here.
+			for i, s := range scores {
+				if math.IsNaN(s) {
+					t.Errorf("%s: outlier score[%d] is NaN", name, i)
+				}
+				if s < 0.0 || s > 1.0 {
+					t.Errorf("%s: outlier score[%d] = %f, out of range [0.0, 1.0]", name, i, s)
+				}
+			}
 		})
 	}
 }

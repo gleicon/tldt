@@ -77,6 +77,37 @@ func TestTokenizeSentences_MultiParagraph(t *testing.T) {
 	}
 }
 
+// TestTokenizeSentences_AbbreviationsAndDecimals pins the CURRENT splitting
+// behavior for abbreviations and decimals. These assertions document reality
+// (the regexp splits on "<punct> <uppercase>"), not a desired fix: "Dr. Smith"
+// and "U.S. Army" each split into two, while "3.14 pi" stays whole because no
+// uppercase follows the period.
+func TestTokenizeSentences_AbbreviationsAndDecimals(t *testing.T) {
+	cases := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{"abbrev_title", "Dr. Smith", []string{"Dr.", "Smith"}},
+		{"abbrev_acronym", "U.S. Army", []string{"U.S.", "Army"}},
+		{"decimal_lowercase", "3.14 pi", []string{"3.14 pi"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := TokenizeSentences(tc.text)
+			if len(got) != len(tc.want) {
+				t.Fatalf("TokenizeSentences(%q) = %#v (len %d), want %#v (len %d)",
+					tc.text, got, len(got), tc.want, len(tc.want))
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Errorf("TokenizeSentences(%q)[%d] = %q, want %q", tc.text, i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
 // ── tokenizeWords ────────────────────────────────────────────────────────────
 
 func TestTokenizeWords_Basic(t *testing.T) {
@@ -165,5 +196,26 @@ func TestNormalizeWord_AlreadyNormal(t *testing.T) {
 	got := normalizeWord("hello")
 	if got != "hello" {
 		t.Errorf("normalizeWord(already normal) = %q, want %q", got, "hello")
+	}
+}
+
+// TestNormalizeWord_Hyphens pins the CURRENT hyphen handling: a hyphen between
+// alphanumeric runs is preserved, a leading hyphen is dropped, and a trailing
+// hyphen is trimmed.
+func TestNormalizeWord_Hyphens(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"state-of-the-art", "state-of-the-art"},
+		{"co-op", "co-op"},
+		{"a-1-b", "a-1-b"},
+		{"foo-bar-", "foo-bar"},
+		{"-lead", "lead"},
+	}
+	for _, tc := range cases {
+		if got := normalizeWord(tc.in); got != tc.want {
+			t.Errorf("normalizeWord(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
