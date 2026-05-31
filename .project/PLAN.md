@@ -2,6 +2,14 @@
 
 Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 
+## Now
+
+**State** — Audit's main work is shipped: 9 commits on `cleanup` (`a6e4591`→`852f6b0`), all behavior-preserving A-groups + approved behavior-changing R1/R2/R4. Tree is green (lint 0, `test -race` all pass, golden I/O identical, API identical, `go.mod` unchanged). Two "Ending cleanup" tasks remain in the roadmap and are **not yet started**.
+
+**Next** — Strip leaked planning IDs from code comments (GSD `CFG-/SUM-/D-/INP-/SEC-/LIB-/Pitfall N/Phase N` + the audit's own `R1/R2/R4` in new test comments) across ~9 non-test + 2 test files; keep the explanation, drop the reference; commit as one behavior-preserving group, verify build+lint+golden. Then run the final `/ds-*` pass (deslop, code-quality, go-review, bug-review, security-review) over the diff.
+
+**Open questions** — (1) Should the comment cleanup also drop the `R1/R2/R4` audit IDs (current plan: yes)? (2) Fix the 3 examples' pre-existing stale `go.mod` via `go mod tidy` (R15), or leave as flagged? Awaiting user "go".
+
 ## Roadmap
 
 ### Baseline
