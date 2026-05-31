@@ -22,7 +22,7 @@ type MatrixSummarizer interface {
 
 // Summarize returns the top n sentences from text ranked by eigenvector centrality
 // using IDF-modified cosine similarity. Sentences are returned in document order.
-// Returns nil, nil for empty input. Caps n to sentence count silently (SUM-04).
+// Returns nil, nil for empty input. Caps n to sentence count silently.
 func (l *LexRank) Summarize(text string, n int) ([]string, error) {
 	result, _, err := l.SummarizeWithMatrix(text, n)
 	return result, err
@@ -315,7 +315,7 @@ type scored struct {
 	score float64
 }
 
-// selectTopN selects the top n sentences by score and returns them in document order (SUM-05).
+// selectTopN selects the top n sentences by score and returns them in document order.
 // Uses sort.SliceStable for deterministic tie-breaking.
 func selectTopN(scores []float64, n int, sentences []string) []string {
 	ranked := make([]scored, len(scores))
@@ -336,7 +336,7 @@ func selectTopN(scores []float64, n int, sentences []string) []string {
 	for i := 0; i < n; i++ {
 		top[i] = ranked[i].idx
 	}
-	// Restore document order (SUM-05)
+	// Restore document order
 	sort.Ints(top)
 	result := make([]string, n)
 	for i, idx := range top {

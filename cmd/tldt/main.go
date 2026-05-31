@@ -130,23 +130,23 @@ func main() {
 	}
 	flag.Parse()
 
-	// Load config file — silent fallback to defaults on any error (CFG-03).
+	// Load config file — silent fallback to defaults on any error.
 	cfgPath, _ := config.ConfigPath()
 	cfg := config.Load(cfgPath)
 
-	// Detect which flags the user explicitly provided (CFG-02).
+	// Detect which flags the user explicitly provided.
 	// flag.Visit (NOT flag.VisitAll) visits only explicitly-set flags.
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
 
-	// --print-threshold: print configured hook token threshold to stdout and exit (D-10, D-12)
+	// --print-threshold: print configured hook token threshold to stdout and exit
 	// Prints bare integer only — no label — so hook script can capture it directly.
 	if *printThreshold {
 		fmt.Println(cfg.Hook.Threshold)
 		os.Exit(0)
 	}
 
-	// --install-skill: write skill + hook templates and patch settings.json, then exit (D-13, D-16)
+	// --install-skill: write skill + hook templates and patch settings.json, then exit
 	if *installSkill {
 		if err := installer.Install(installer.Options{
 			SkillDir: *skillDir,
@@ -164,11 +164,11 @@ func main() {
 	effectiveFormat := cfg.Format
 	effectiveLevel := cfg.Level
 
-	// --level flag overrides config level (CFG-04).
+	// --level flag overrides config level.
 	if flagsSet["level"] {
 		effectiveLevel = *level
 	}
-	// Validate --level value if set (Pitfall 5 from research).
+	// Validate --level value if set.
 	if effectiveLevel != "" {
 		if n, ok := config.LevelPresets[effectiveLevel]; ok {
 			effectiveSentences = n
@@ -177,11 +177,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	// Explicit --sentences always wins over level preset (CFG-02, CFG-05).
+	// Explicit --sentences always wins over level preset.
 	if flagsSet["sentences"] {
 		effectiveSentences = *sentences
 	}
-	// Explicit --algorithm and --format override config values (CFG-02).
+	// Explicit --algorithm and --format override config values.
 	if flagsSet["algorithm"] {
 		effectiveAlgorithm = *algorithm
 	}
@@ -247,16 +247,16 @@ func main() {
 		text = stripped
 	}
 
-	// --sanitize-pii: redact PII and secrets before summarization (D-06).
+	// --sanitize-pii: redact PII and secrets before summarization.
 	// Implies detection: redaction count always reported to stderr.
-	// --sanitize-pii and --sanitize stack independently (D-07).
+	// --sanitize-pii and --sanitize stack independently.
 	if *sanitizePII {
 		redacted, findings := tldt.SanitizePII(text)
 		fmt.Fprintf(os.Stderr, "pii-detect: %d redaction(s) applied\n", len(findings))
 		text = redacted
 	}
 
-	// --detect-pii: advisory PII scan; never modifies text or blocks summarization (mirrors SEC-07 contract, D-05).
+	// --detect-pii: advisory PII scan; never modifies text or blocks summarization.
 	// When --sanitize-pii is also set, this block runs on the already-redacted text — findings will be empty
 	// (since redaction already replaced matches). This is correct behavior: detection post-redaction is safe.
 	if *detectPII {
@@ -378,7 +378,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "rouge-l  P=%.4f R=%.4f F1=%.4f\n", scores.ROUGEL.Precision, scores.ROUGEL.Recall, scores.ROUGEL.F1)
 	}
 
-	// Token stats to stderr (TOK-01, TOK-02, TOK-03, D-09, D-10)
+	// Token stats to stderr.
 	charsOut := len(strings.Join(result, " "))
 	tokIn := charsIn / 4
 	tokOut := charsOut / 4
@@ -449,7 +449,7 @@ func groupIntoParagraphs(sentences []string, n int) string {
 		return strings.Join(sentences, "\n")
 	}
 	if n > len(sentences) {
-		n = len(sentences) // D-06: silent cap
+		n = len(sentences) // silent cap
 	}
 	size := len(sentences) / n
 	rem := len(sentences) % n
@@ -471,7 +471,7 @@ func groupIntoParagraphs(sentences []string, n int) string {
 
 // resolveInputBytes reads raw input bytes from --url, stdin pipe, -f file, or positional args.
 func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, error) {
-	// --url branch: highest priority — most explicit input source (INP-01, INP-02)
+	// --url branch: highest priority — most explicit input source
 	if urlStr != "" {
 		fresult, err := tldt.Fetch(urlStr, tldt.FetchOptions{
 			Timeout:  30 * time.Second,

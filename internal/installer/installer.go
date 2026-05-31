@@ -69,7 +69,7 @@ func Install(opts Options) error {
 // Claude Code is always included. Optional apps are included if their
 // base directory exists. opts.SkillDir overrides all detection.
 func resolveTargets(homeDir string, opts Options) []installTarget {
-	// --skill-dir override: single custom target, no hook registration (D-17)
+	// --skill-dir override: single custom target, no hook registration
 	if opts.SkillDir != "" {
 		return []installTarget{{
 			name:      "custom",
@@ -77,7 +77,7 @@ func resolveTargets(homeDir string, opts Options) []installTarget {
 		}}
 	}
 
-	// Claude Code: always install (D-16); hook registered only here
+	// Claude Code: always install; hook registered only here
 	hookDest := filepath.Join(homeDir, ".claude", "hooks", "tldt-hook.sh")
 	targets := []installTarget{{
 		name:         "claude",
@@ -95,7 +95,7 @@ func resolveTargets(homeDir string, opts Options) []installTarget {
 		// but skip optional if target doesn't match
 	}
 
-	// Optional apps: detect by base directory existence (D-18)
+	// Optional apps: detect by base directory existence
 	optional := []struct {
 		name      string
 		detectDir string
@@ -173,7 +173,7 @@ func installHookFile(destPath string) error {
 // with an empty object if missing), merges the tldt UserPromptSubmit hook entry,
 // and writes back using a temp-file-then-rename strategy for atomicity.
 // Idempotent: if hookCmd is already registered, returns nil without modifying the file.
-// hookCmd MUST be an absolute expanded path (not $HOME/...) per Pitfall 6.
+// hookCmd MUST be an absolute expanded path (not $HOME/...).
 func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 	data, err := os.ReadFile(settingsPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -236,7 +236,7 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 		return fmt.Errorf("marshaling settings.json: %w", err)
 	}
 
-	// Atomic write: temp file then rename (Pitfall 4 mitigation)
+	// Atomic write: temp file then rename
 	tmpPath := settingsPath + ".tmp"
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
 		return fmt.Errorf("creating settings.json directory: %w", err)

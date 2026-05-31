@@ -6,7 +6,7 @@ type Ensemble struct{}
 
 // Summarize runs LexRank and TextRank independently, averages their per-sentence
 // scores, and returns the top n sentences in document order.
-// Returns nil, nil for empty input. Caps n to sentence count (SUM-04).
+// Returns nil, nil for empty input. Caps n to sentence count.
 func (e *Ensemble) Summarize(text string, n int) ([]string, error) {
 	sentences := TokenizeSentences(text)
 	if len(sentences) == 0 {

@@ -184,7 +184,7 @@ func TestSentinelErrors_Exported(t *testing.T) {
 	}
 }
 
-// --- Edge case integration tests (D-01 coverage) ---
+// --- Edge case integration tests ---
 
 func TestSummarize_EmptyInput(t *testing.T) {
 	result, err := Summarize("", SummarizeOptions{Sentences: 3})
@@ -326,7 +326,7 @@ func TestSentinelErrors_AllDefined(t *testing.T) {
 	}
 }
 
-// --- PII Detection Tests (Plan 10-01) ---
+// --- PII Detection Tests ---
 
 func TestDetectPII_NoFindings(t *testing.T) {
 	findings := DetectPII("hello world no pii here")
@@ -376,7 +376,7 @@ func TestSanitizePII_EmailRedacted(t *testing.T) {
 	}
 }
 
-// --- Pipeline PII Integration Tests (Plan 10-02) ---
+// --- Pipeline PII Integration Tests ---
 
 func TestPipeline_DetectPII(t *testing.T) {
 	text := "Contact alice@example.com for details.\n" + testArticle

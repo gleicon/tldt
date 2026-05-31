@@ -305,7 +305,7 @@ func TestTextRank_SummarizeExplain_SimilarityPairsCount(t *testing.T) {
 	}
 }
 
-// TestSelectTopN_NegativeNoPanic pins the R1 defensive clamp: the select helpers
+// TestSelectTopN_NegativeNoPanic pins the defensive clamp: the select helpers
 // must not panic when asked for a negative count (they clamp to an empty result).
 // Guards library consumers that call Summarize with a negative n directly.
 func TestSelectTopN_NegativeNoPanic(t *testing.T) {

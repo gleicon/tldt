@@ -59,7 +59,7 @@ func Load(cfgPath string) Config {
 	if cfg.Sentences <= 0 {
 		cfg.Sentences = DefaultConfig().Sentences
 	}
-	// Guard: zero/negative threshold falls back to default (D-11)
+	// Guard: zero/negative threshold falls back to default.
 	if cfg.Hook.Threshold <= 0 {
 		cfg.Hook.Threshold = DefaultConfig().Hook.Threshold
 	}

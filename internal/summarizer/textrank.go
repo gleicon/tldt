@@ -219,7 +219,7 @@ func (t *TextRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo,
 
 // Summarize implements the Summarizer interface using TextRank.
 // Returns up to n sentences from text in original document order.
-// Returns nil, nil for empty input. Caps n to sentence count (SUM-04).
+// Returns nil, nil for empty input. Caps n to sentence count.
 func (t *TextRank) Summarize(text string, n int) ([]string, error) {
 	sentences := TokenizeSentences(text)
 	if len(sentences) == 0 {

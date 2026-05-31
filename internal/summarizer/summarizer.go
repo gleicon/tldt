@@ -4,7 +4,7 @@ import "fmt"
 
 // Summarizer is the common interface for all extractive summarization algorithms.
 // Summarize returns up to n sentences from text in original document order.
-// If n > sentence count, all sentences are returned (SUM-04).
+// If n > sentence count, all sentences are returned.
 type Summarizer interface {
 	Summarize(text string, n int) ([]string, error)
 }

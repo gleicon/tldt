@@ -536,7 +536,7 @@ func TestMain_RougeFileNotFound(t *testing.T) {
 }
 
 func TestMain_VerboseJSON_NoTokenStats(t *testing.T) {
-	// -verbose with -format json must NOT print token stats (TOK-02)
+	// -verbose with -format json must NOT print token stats
 	_, stderr, ok := run(t, shortText, "-verbose", "-format", "json", "-sentences", "2")
 	if !ok {
 		t.Fatal("verbose+json: binary exited non-zero")
@@ -583,7 +583,7 @@ func TestMain_NoInput_ExitsNonZero(t *testing.T) {
 // ── --url flag integration tests ──────────────────────────────────────────────
 //
 // NOTE: httptest.NewServer binds to 127.0.0.1 (loopback). After SSRF hardening
-// (Phase 8, Plan 01), the fetcher blocks loopback addresses at the initial pre-check.
+// the fetcher blocks loopback addresses at dial time.
 // Tests that previously used httptest to serve HTML/404/redirect/non-HTML content are
 // replaced with SSRF-focused binary integration tests that verify SSRF errors surface
 // correctly through the CLI binary. The underlying fetcher behaviors (404, redirect,
@@ -685,7 +685,7 @@ func TestMain_ConfigFileDefaults(t *testing.T) {
 }
 
 func TestMain_ConfigOverrideSentences(t *testing.T) {
-	// Config sets sentences=7, CLI --sentences 2 must override (CFG-02)
+	// Config sets sentences=7, CLI --sentences 2 must override
 	writeConfig(t, "sentences = 7\n")
 	stdout, _, ok := run(t, shortText, "--sentences", "2")
 	if !ok {
@@ -698,7 +698,7 @@ func TestMain_ConfigOverrideSentences(t *testing.T) {
 }
 
 func TestMain_ConfigOverrideAlgorithm(t *testing.T) {
-	// Config sets algorithm="textrank", CLI --algorithm lexrank must override (CFG-02)
+	// Config sets algorithm="textrank", CLI --algorithm lexrank must override
 	writeConfig(t, "algorithm = \"textrank\"\n")
 	_, _, ok := run(t, shortText, "--algorithm", "lexrank", "--sentences", "2")
 	if !ok {
@@ -707,7 +707,7 @@ func TestMain_ConfigOverrideAlgorithm(t *testing.T) {
 }
 
 func TestMain_ConfigMissing(t *testing.T) {
-	// No .tldt.toml in HOME — should silently use built-in defaults (CFG-03)
+	// No .tldt.toml in HOME — should silently use built-in defaults
 	t.Setenv("HOME", t.TempDir())
 	stdout, _, ok := run(t, shortText, "--sentences", "2")
 	if !ok {
@@ -719,7 +719,7 @@ func TestMain_ConfigMissing(t *testing.T) {
 }
 
 func TestMain_ConfigMalformed(t *testing.T) {
-	// Malformed TOML in .tldt.toml — should silently use built-in defaults (CFG-03)
+	// Malformed TOML in .tldt.toml — should silently use built-in defaults
 	writeConfig(t, "algorithm = bad toml [[[")
 	stdout, _, ok := run(t, shortText, "--sentences", "2")
 	if !ok {
@@ -731,7 +731,7 @@ func TestMain_ConfigMalformed(t *testing.T) {
 }
 
 func TestMain_LevelLite(t *testing.T) {
-	// --level lite produces exactly 10 sentences (CFG-04: lite = least compression)
+	// --level lite produces exactly 10 sentences (lite = least compression)
 	stdout, _, ok := run(t, longText, "--level", "lite")
 	if !ok {
 		t.Fatal("--level lite: binary exited non-zero")
@@ -743,7 +743,7 @@ func TestMain_LevelLite(t *testing.T) {
 }
 
 func TestMain_LevelStandard(t *testing.T) {
-	// --level standard produces exactly 5 sentences (CFG-04)
+	// --level standard produces exactly 5 sentences
 	stdout, _, ok := run(t, longText, "--level", "standard")
 	if !ok {
 		t.Fatal("--level standard: binary exited non-zero")
@@ -755,7 +755,7 @@ func TestMain_LevelStandard(t *testing.T) {
 }
 
 func TestMain_LevelAggressive(t *testing.T) {
-	// --level aggressive produces exactly 3 sentences (CFG-04: aggressive = most compression)
+	// --level aggressive produces exactly 3 sentences (aggressive = most compression)
 	stdout, _, ok := run(t, longText, "--level", "aggressive")
 	if !ok {
 		t.Fatal("--level aggressive: binary exited non-zero")
@@ -767,7 +767,7 @@ func TestMain_LevelAggressive(t *testing.T) {
 }
 
 func TestMain_LevelInvalid(t *testing.T) {
-	// --level bogus must exit non-zero with descriptive error (T-05-06)
+	// --level bogus must exit non-zero with descriptive error
 	_, stderr, ok := run(t, shortText, "--level", "bogus")
 	if ok {
 		t.Error("--level bogus: want non-zero exit")
@@ -778,7 +778,7 @@ func TestMain_LevelInvalid(t *testing.T) {
 }
 
 func TestMain_LevelOverriddenBySentences(t *testing.T) {
-	// Config sets level="aggressive" (3), CLI --sentences 2 must override (CFG-05)
+	// Config sets level="aggressive" (3), CLI --sentences 2 must override
 	writeConfig(t, "level = \"aggressive\"\n")
 	stdout, _, ok := run(t, longText, "--sentences", "2")
 	if !ok {
@@ -791,7 +791,7 @@ func TestMain_LevelOverriddenBySentences(t *testing.T) {
 }
 
 func TestMain_ConfigLevelDefault(t *testing.T) {
-	// Config sets level="lite" — running with no flags should produce 10 sentences (CFG-05: lite = least compression)
+	// Config sets level="lite" — running with no flags should produce 10 sentences (lite = least compression)
 	writeConfig(t, "level = \"lite\"\n")
 	stdout, _, ok := run(t, longText)
 	if !ok {
@@ -848,7 +848,7 @@ func TestMain_DetectInjection(t *testing.T) {
 	}
 }
 
-// TestMain_NegativeSentencesRejected pins the R1 fix: a non-positive --sentences
+// TestMain_NegativeSentencesRejected pins the negative-sentences fix: a non-positive --sentences
 // must produce a clean error exit, not a panic.
 func TestMain_NegativeSentencesRejected(t *testing.T) {
 	input := "First sentence here. Second sentence here. Third sentence here."

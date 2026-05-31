@@ -154,7 +154,7 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error)
 	}
 
 	// 5. Content-Type guard — use Contains because real headers are
-	// "text/html; charset=utf-8" (Pitfall 2 in research).
+	// "text/html; charset=utf-8".
 	ct := resp.Header.Get("Content-Type")
 	if !strings.Contains(ct, "text/html") {
 		return Result{}, fmt.Errorf("unsupported content type %q at %q (expected text/html): %w", ct, rawURL, ErrNonHTML)
@@ -165,9 +165,8 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error)
 	limited := io.LimitReader(resp.Body, maxBytes)
 
 	// 7. Extract article text — strips nav/ads/footers via Readability scoring.
-	// Use FromReader, NOT FromURL: FromURL bypasses our size cap and client
-	// (Pitfall 4 in research). Second arg is *url.URL for relative-link
-	// resolution, not a raw string (Pitfall 5 in research).
+	// Use FromReader, NOT FromURL: FromURL bypasses our size cap and client.
+	// Second arg is *url.URL for relative-link resolution, not a raw string.
 	article, err := readability.FromReader(limited, u)
 	if err != nil {
 		return Result{}, fmt.Errorf("extracting content from %q: %w", rawURL, err)

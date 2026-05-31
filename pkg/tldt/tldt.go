@@ -381,7 +381,7 @@ func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
 		text = SanitizeAll(text)
 	}
 
-	// Step 2: PII stage (between sanitize and inject-detect per LIB-04)
+	// Step 2: PII stage (between sanitize and inject-detect)
 	if opts.SanitizePII {
 		redacted, findings := detector.SanitizePII(text)
 		piiFindings = toPublicPIIFindings(findings)
