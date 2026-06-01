@@ -4,11 +4,17 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 
 ## Now
 
-**State** — ALL audit recommendations applied. 16 follow-up commits on `cleanup` (`163cd34`→`47712ec`): comment-ID strip, R15, R3, R6, R5, R7(A), R8, R9, R10, R11, R12, R13, R14, C1, C2/C3, plus doc updates. Combined with the earlier 9 commits, the whole audit (A-groups, R1–R15, C1–C3) is shipped. Tree green on every commit: lint 0, `test -race` all pass, 15/15 golden byte-identical, `pkg/tldt` API stable. Nothing from sections B/C remains open — see AUDIT.md "Section B + C — ALL APPLIED".
+**State** — Branch `cleanup` COMPLETE and ready for a draft PR into `gleicon/tldt:main`. The full behavior-preserving audit (A-groups, R1–R15, C1–C3) plus the final 6-review `/ds-*` pass are shipped, followed by four maintainer-requested follow-ups. Tree green on every commit: lint 0, `go test -race ./...` all pass, 15/15 golden byte-identical, `pkg/tldt` API additive-only (`FetchRaw` added; nothing removed/changed).
 
-**Next** — AUDIT COMPLETE + two maintainer-requested follow-ups shipped. Pre-pass (`18f2f32`), stray-binary untrack (`fa54cc0`), 6-review final pass (`e10f3b9`), **S1 redaction coverage** (`2b8b3f6`: Slack pattern + high-entropy base64 fed into scanPII, docs synced), and **FetchRaw** (`93053d7`: hardened JSON/non-HTML fetch primitive; closes the openapi example's SSRF gap). No roadmap items remain. Branch `cleanup` ready to merge to `main`. Remaining recommend-only residuals (G1/G2/G7–G9/Q1/Q4/B1/B2/T3) are minor/optional — see AUDIT.md "Final review pass" table.
+**Latest follow-ups (after the audit):**
+- `e10f3b9` — final-review pass: 4 behavior-preserving fixes (vocabSize local, 2 test-quality fixes, example enc.Encode).
+- `2b8b3f6` — **S1** redaction coverage: `slack-token` pattern + shared `highEntropyBase64()` fed into `scanPII` (redacted as `[REDACTED:secret]`); AWS/generic skipped (FP risk; entropy gate >4.5 controls FPs); CLI/README/security.md/library.html synced.
+- `93053d7` — **FetchRaw**: hardened JSON/non-HTML fetch primitive (shared `doHardenedRequest`); `Fetch` byte-identical; openapi example switched onto it → gains SSRF protection.
+- `a6e1066` — stripped leaked GSD lingo ("Phase 9") from `docs/security.md` + `docs/index.html`.
 
-**Open questions** — None blocking. Optional residuals tabled in AUDIT.md for a future pass. Maintainer prior choices: R7 option A, R6 incl. SSN+Luhn, R13 full legacy removal, C1–C3, S1 option 2+Slack, FetchRaw additive API.
+**Next** — Create the draft PR (`lucindo:cleanup` → `gleicon/tldt:main`). No roadmap items remain. Remaining recommend-only residuals (G1/G2/G7–G9/Q1/Q4/B1/B2/T3) are minor/optional — see AUDIT.md "Final review pass" table.
+
+**Open questions** — None blocking. Maintainer prior choices: R7 option A, R6 incl. SSN+Luhn, R13 full legacy removal, C1–C3, S1 option 2+Slack, FetchRaw additive API, `.project/` kept tracked.
 
 ## Roadmap
 
@@ -68,3 +74,10 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
   5. [x] `/ds-test-quality-review` — PASS; security paths well-covered. 2 test-only fixes applied (T1/T2).
   6. [x] `/ds-deslop` — PASS; code clean (prior deslop did the work). 1 trivial fix (D2), 4 candidates refuted.
   - [x] Consolidated into AUDIT.md "Final review pass"; 4 behavior-preserving fixes applied (`e10f3b9`), rest recommended.
+
+### Maintainer-requested follow-ups (post-review)
+- [x] **S1** redaction coverage (commit `2b8b3f6`): `slack-token` pattern + shared `highEntropyBase64()` feeding `scanPII` so `--sanitize-pii` redacts Slack tokens and prefix-less high-entropy secrets as `[REDACTED:secret]`. AWS/generic standalone patterns skipped (FP risk). Docs synced. Golden + API parity held.
+- [x] **FetchRaw** (commit `93053d7`): extracted `doHardenedRequest` shared by `Fetch`/`FetchRaw`; `Fetch` byte-identical; `pkg/tldt.FetchRaw` wrapper; openapi example switched off its unprotected `http.Client`. Tests: raw-body, non-2xx, byte cap, dial-time SSRF. API addition is additive.
+- [x] **GSD doc lingo strip** (commit `a6e1066`): removed "Phase 9" from `docs/security.md` (→ bare Mitigation/Example) and `docs/index.html` (status → "mitigated"). Swept docs/README/code — no other planning lingo remains.
+- [x] **`.project/` checkpoint**: refreshed PLAN/AUDIT/PROJECT to final state; deleted stale `handoff.md`. `.project/` stays tracked (goes with the PR).
+- [ ] Open draft PR `lucindo:cleanup` → `gleicon/tldt:main`.

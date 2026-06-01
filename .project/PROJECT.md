@@ -20,7 +20,7 @@
 | Path | Holds |
 |------|-------|
 | `cmd/tldt/` | CLI entry point (`main.go`) — flag parsing, input resolution (stdin/`-f`/`--url`/positional), wires `pkg/tldt`. `main_test.go` runs subprocess tests. |
-| `pkg/tldt/` | Public embeddable API — `Summarize`, `Detect`, `Sanitize`, `Fetch`, `DetectPII`, `SanitizePII`, and `Pipeline` (sanitize→inject→PII→summarize). Only public surface; wraps `internal/`. |
+| `pkg/tldt/` | Public embeddable API — `Summarize`, `Detect`, `Sanitize`, `Fetch` (HTML→text), `FetchRaw` (hardened raw fetch for JSON/non-HTML), `DetectPII`, `SanitizePII`, and `Pipeline` (sanitize→inject→PII→summarize). Only public surface; wraps `internal/`. |
 | `internal/summarizer/` | Native ranking algorithms: `lexrank`, `textrank`, `ensemble`, `graph` (didasy wrapper), `rouge` evaluation, `tokenizer`, sentence `graph`, `explain` diagnostics. |
 | `internal/detector/` | Prompt-injection / encoding-anomaly detection + Unicode confusables (`data/confusables.txt`). |
 | `internal/sanitizer/` | Invisible-Unicode stripping + NFKC normalization; PII/secret detection & redaction. |
