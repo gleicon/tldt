@@ -58,7 +58,7 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 - [x] R15 (commit 20d1c23): `go mod tidy` examples basic/pipeline/openapi-client (pre-existing stale go.mod). main module untouched.
 - [x] R3 (commit 9228002): SSRF blocklist — unspecified/CGNAT/NAT64/benchmark; IPv4-mapped covered by regression tests.
 - [x] R6 (commit 27ec822): PII coverage — modern sk-/GitHub/PEM/SSN + Luhn credit-card; detect/redact kept consistent.
-- [ ] Reviewing remaining B/C items one-by-one with maintainer (R5 in progress; then R7–R14, C1–C3).
+- [x] Reviewed and applied ALL remaining B/C items one-by-one with maintainer: R3,R5,R6,R7(A),R8,R9,R10,R11,R12,R13,R14 + C1,C2,C3 (commits 9228002→68c1f01). See AUDIT.md "Section B + C — ALL APPLIED". Tree green throughout; golden + API parity held on every commit.
 - [ ] **Pre-pass hygiene (before reviews):** run `go fix ./...` across all modules, then resolve every gopls hint: `gopls check -severity=hint $(find . -name "*.go")`. Apply behavior-preserving fixes; verify build + lint + `test -race` + golden I/O + API unchanged. Commit as its own group.
 - [ ] Final `/ds-*` pass over the full audit diff — **run sequentially, one command at a time** (may delegate each to an agent, but never in parallel). **`/ds-deslop` runs LAST.** Order:
   1. [ ] `/ds-code-quality-review` — maintainability of the changes

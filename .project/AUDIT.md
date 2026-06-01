@@ -16,12 +16,28 @@ All ✅ A groups applied + approved ⚠️ R1/R2/R4. Each group committed separa
 
 **Note on A2.2:** the `trRowNormalize`/`trSelectTopN` *function collapse* (CQ-6) was reduced to fixing the false comments only; the structural dedup belongs with the deferred 🔁 C refactors (test/call-site churn). The `tr*` functions remain.
 
-### Remaining recommendations (not applied — your call)
-Still open from section B: **R3** (SSRF blocklist gaps: `0.0.0.0`, IPv4-mapped, NAT64, CGNAT), **R5** (SanitizePII single-pass), **R6** (PII coverage: `sk-proj`/gh/AWS/PEM/SSN/Luhn), **R7** (`Detect` unused opts + nil error — API change), **R8** (UTF-8 byte-slice truncation in excerpts/`htmlmd` MaxLength), **R9** (installer `--target` installs claude anyway), **R10** (explain `Selected` keyed by string), **R11** (graph contract), **R12** (htmlmd swallows error), **R13** (legacy `src/` removal). Plus 🔁 C1–C3 refactors (deferred).
+### Section B + C — ALL APPLIED (follow-up pass, maintainer-approved one by one)
+Every section-B recommendation and section-C refactor was reviewed and applied. Each committed separately on `cleanup`, verified (build + vet + golangci-lint + `test -race` + golden I/O + API parity) before commit.
 
-Discovered during apply:
-- **R14 (BUG-5):** the `examples/openapi-client` happy path fetches a `swagger.json`, but `Fetch` only accepts `text/html` (now `ErrNonHTML`) — the documented example fails at runtime.
-- **R15:** `examples/basic`, `examples/pipeline`, `examples/openapi-client` have stale `go.mod` (`go mod tidy` needed) and don't build — **pre-existing**, unrelated to audit changes (their modules were never touched). `examples/html-processor` builds.
+| Commit | Item |
+|--------|------|
+| `163cd34` | Strip leaked planning IDs from code comments |
+| `20d1c23` | **R15** `go mod tidy` examples basic/pipeline/openapi-client (pre-existing stale go.mod) |
+| `9228002` | **R3** SSRF blocklist: unspecified/CGNAT/NAT64/benchmark (IPv4-mapped already covered, regression-tested) |
+| `27ec822` | **R6** PII coverage: modern `sk-`/GitHub/PEM/SSN + Luhn credit-card |
+| `f481c31` | **R5** single-pass span-based PII redaction (findings == redactions) |
+| `e4f5c66` | **R7** (option A) `Detect` honors `OutlierThreshold`; CLI de-duplicated, output byte-identical |
+| `ec70fc9` | **R8** rune-aware truncation (6 detector copies → one helper; explain + htmlmd) |
+| `4e73e13` | **R9** installer `--target <app>` installs only that app, not Claude |
+| `d17ee56` | **R10** explain `Selected` by rank/index, not text (duplicate-safe) |
+| `90dfdef` | **R11** graph honors the Summarizer contract at edges |
+| `33885e2` | **R12** htmlmd raw-HTML fallback documented as intentional (keep + comment) |
+| `74fd3dc` | **R13** removed legacy `src/`, `assets/`, `SSL/` (maintainer reversed D-2) |
+| `4e65071` | **R14** openapi-client fetches JSON via net/http (verified live) |
+| `54a28a9` | **C1** collapse duplicated LexRank/TextRank scoring pipelines (−74 lines) |
+| `68c1f01` | **C2/C3** decompose `main` (399→168 lines): usage/runSecurityStages/summarize/writeOutput |
+
+Judgement calls: R7 took option A (complete the feature) but landed byte-identical output + identical API by having the CLI consume `Detect`'s outliers instead of its own pass. R6 included SSN + Luhn per maintainer. R13 deleted legacy code PROJECT.md had deliberately retained, at maintainer request. Nothing from section B/C remains open.
 
 ---
 
