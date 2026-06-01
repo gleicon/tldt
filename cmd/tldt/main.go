@@ -73,47 +73,8 @@ func main() {
 	}
 
 	// Resolve effective parameters: config -> level preset -> explicit flags.
-	effectiveAlgorithm := cfg.Algorithm
-	effectiveSentences := cfg.Sentences
-	effectiveFormat := cfg.Format
-	effectiveLevel := cfg.Level
-
-	// --level flag overrides config level.
-	if flagsSet["level"] {
-		effectiveLevel = *level
-	}
-	// Validate --level value if set.
-	if effectiveLevel != "" {
-		if n, ok := config.LevelPresets[effectiveLevel]; ok {
-			effectiveSentences = n
-		} else {
-			fmt.Fprintf(os.Stderr, "unknown --level %q: valid values are lite, standard, aggressive\n", effectiveLevel)
-			os.Exit(1)
-		}
-	}
-	// Explicit --sentences always wins over level preset.
-	if flagsSet["sentences"] {
-		effectiveSentences = *sentences
-	}
-	// Explicit --algorithm and --format override config values.
-	if flagsSet["algorithm"] {
-		effectiveAlgorithm = *algorithm
-	}
-	if flagsSet["format"] {
-		effectiveFormat = *format
-	}
-	// Validate effectiveFormat — covers both CLI flag and config file paths.
-	validFormats := map[string]bool{"text": true, "json": true, "markdown": true}
-	if !validFormats[effectiveFormat] {
-		fmt.Fprintf(os.Stderr, "unknown --format %q: valid values are text, json, markdown\n", effectiveFormat)
-		os.Exit(1)
-	}
-
-	// Sentence count must be positive — covers CLI flag, level preset, and config.
-	if effectiveSentences < 1 {
-		fmt.Fprintf(os.Stderr, "--sentences must be >= 1 (got %d)\n", effectiveSentences)
-		os.Exit(1)
-	}
+	effectiveAlgorithm, effectiveSentences, effectiveFormat := resolveSettings(
+		cfg, flagsSet, *level, *algorithm, *format, *sentences)
 
 	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
@@ -186,6 +147,53 @@ func main() {
 	}
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
+}
+
+// resolveSettings merges the effective algorithm, sentence count, and output
+// format from config, an optional level preset, and explicit flags (flags win).
+// It validates the result and exits the process on an unknown level/format or a
+// non-positive sentence count.
+func resolveSettings(cfg config.Config, flagsSet map[string]bool, level, algorithm, format string, sentences int) (algo string, n int, outFormat string) {
+	algo = cfg.Algorithm
+	n = cfg.Sentences
+	outFormat = cfg.Format
+	effectiveLevel := cfg.Level
+
+	// --level flag overrides config level.
+	if flagsSet["level"] {
+		effectiveLevel = level
+	}
+	if effectiveLevel != "" {
+		preset, ok := config.LevelPresets[effectiveLevel]
+		if !ok {
+			fmt.Fprintf(os.Stderr, "unknown --level %q: valid values are lite, standard, aggressive\n", effectiveLevel)
+			os.Exit(1)
+		}
+		n = preset
+	}
+	// Explicit flags always win over config/level preset.
+	if flagsSet["sentences"] {
+		n = sentences
+	}
+	if flagsSet["algorithm"] {
+		algo = algorithm
+	}
+	if flagsSet["format"] {
+		outFormat = format
+	}
+
+	// Validate format — covers both CLI flag and config file paths.
+	validFormats := map[string]bool{"text": true, "json": true, "markdown": true}
+	if !validFormats[outFormat] {
+		fmt.Fprintf(os.Stderr, "unknown --format %q: valid values are text, json, markdown\n", outFormat)
+		os.Exit(1)
+	}
+	// Sentence count must be positive — covers CLI flag, level preset, and config.
+	if n < 1 {
+		fmt.Fprintf(os.Stderr, "--sentences must be >= 1 (got %d)\n", n)
+		os.Exit(1)
+	}
+	return algo, n, outFormat
 }
 
 // securityOpts selects which preprocessing/advisory stages runSecurityStages runs.

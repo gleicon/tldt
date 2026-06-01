@@ -2,7 +2,6 @@ package tldt
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -109,8 +108,8 @@ type FetchResult struct {
 var (
 	ErrSSRFBlocked   = fetcher.ErrSSRFBlocked
 	ErrRedirectLimit = fetcher.ErrRedirectLimit
-	ErrHTTPError     = errors.New("tldt: HTTP error")
-	ErrNonHTML       = errors.New("tldt: not HTML content")
+	ErrHTTPError     = fetcher.ErrHTTPError
+	ErrNonHTML       = fetcher.ErrNonHTML
 )
 
 // --- Default helpers ---
@@ -261,17 +260,9 @@ func Fetch(ctx context.Context, urlStr string, opts FetchOptions) (FetchResult, 
 
 	res, err := fetcher.Fetch(ctx, urlStr, opts.Timeout, opts.MaxBytes)
 	if err != nil {
-		// Map fetcher sentinels to the package's public sentinels via errors.Is.
-		switch {
-		case errors.Is(err, fetcher.ErrHTTPError):
-			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w: %v", ErrHTTPError, err)
-		case errors.Is(err, fetcher.ErrNonHTML):
-			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w: %v", ErrNonHTML, err)
-		default:
-			// ErrSSRFBlocked / ErrRedirectLimit (re-exported) and any other error
-			// pass through unchanged for the caller to match with errors.Is.
-			return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
-		}
+		// The fetcher error already wraps a sentinel (re-exported above); add
+		// call-site context and let callers match with errors.Is.
+		return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
 	}
 
 	return FetchResult{
@@ -300,11 +291,6 @@ func FetchRaw(ctx context.Context, urlStr string, opts FetchOptions) ([]byte, Fe
 
 	body, res, err := fetcher.FetchRaw(ctx, urlStr, opts.Timeout, opts.MaxBytes)
 	if err != nil {
-		if errors.Is(err, fetcher.ErrHTTPError) {
-			return nil, FetchResult{}, fmt.Errorf("tldt.FetchRaw: %w: %v", ErrHTTPError, err)
-		}
-		// ErrSSRFBlocked / ErrRedirectLimit (re-exported) and any other error
-		// pass through unchanged for the caller to match with errors.Is.
 		return nil, FetchResult{}, fmt.Errorf("tldt.FetchRaw: %w", err)
 	}
 
