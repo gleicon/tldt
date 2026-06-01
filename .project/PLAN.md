@@ -80,4 +80,4 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 - [x] **FetchRaw** (commit `8754267`): extracted `doHardenedRequest` shared by `Fetch`/`FetchRaw`; `Fetch` byte-identical; `pkg/tldt.FetchRaw` wrapper; openapi example switched off its unprotected `http.Client`. Tests: raw-body, non-2xx, byte cap, dial-time SSRF. API addition is additive.
 - [x] **GSD doc lingo strip** (commit `8e2a44e`): removed "Phase 9" from `docs/security.md` (→ bare Mitigation/Example) and `docs/index.html` (status → "mitigated"). Swept docs/README/code — no other planning lingo remains.
 - [x] **`.project/` checkpoint**: refreshed PLAN/AUDIT/PROJECT to final state; deleted stale `handoff.md`. `.project/` stays tracked (goes with the PR).
-- [ ] Open draft PR `lucindo:cleanup` → `gleicon/tldt:main`.
+- [x] Open draft PR `lucindo:cleanup` → `gleicon/tldt:main` — **PR #1** (https://github.com/gleicon/tldt/pull/1). Note: S1 test fixtures (fake Slack token + AWS-example key) tripped GitHub push protection; commits `fbfbc58..` were rewritten with de-contiguated fixtures (local backup tag `backup-cleanup-presecret`).
