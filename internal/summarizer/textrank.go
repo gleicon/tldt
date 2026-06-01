@@ -184,10 +184,6 @@ func (t *TextRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo,
 
 	result := trSelectTopN(scores, n, sentences)
 
-	selectedSet := make(map[string]bool, len(result))
-	for _, s := range result {
-		selectedSet[s] = true
-	}
 	type ranked struct {
 		idx   int
 		score float64
@@ -208,7 +204,7 @@ func (t *TextRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo,
 		info.Scores[i] = SentenceScore{
 			Index:    i,
 			Score:    scores[i],
-			Selected: selectedSet[s],
+			Selected: rankOf[i] <= n, // by rank/index, not text — duplicate-safe
 			Rank:     rankOf[i],
 			Preview:  s,
 		}

@@ -145,11 +145,7 @@ func (l *LexRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo, 
 
 	result := selectTopN(scores, n, sentences)
 
-	// Build per-sentence score list with rank and selection flag
-	selectedSet := make(map[string]bool, len(result))
-	for _, s := range result {
-		selectedSet[s] = true
-	}
+	// Build per-sentence score list with rank and selection flag.
 	type ranked struct {
 		idx   int
 		score float64
@@ -171,7 +167,7 @@ func (l *LexRank) SummarizeExplain(text string, n int) ([]string, *ExplainInfo, 
 		info.Scores[i] = SentenceScore{
 			Index:    i,
 			Score:    scores[i],
-			Selected: selectedSet[s],
+			Selected: rankOf[i] <= n, // by rank/index, not text — duplicate-safe
 			Rank:     rankOf[i],
 			Preview:  s,
 		}

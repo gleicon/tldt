@@ -167,6 +167,37 @@ func TestLexRank_SummarizeExplain_CapN(t *testing.T) {
 	}
 }
 
+func TestSummarizeExplain_DuplicateSentencesSelectedByIndex(t *testing.T) {
+	// A sentence repeated verbatim must not cause every copy to be flagged
+	// Selected — selection is by rank/index, so exactly SelectedN are marked.
+	text := "The quick brown fox jumps over things. A lazy dog sleeps all day long. " +
+		"The quick brown fox jumps over things. Birds fly high above the white clouds. " +
+		"The quick brown fox jumps over things."
+	for _, tc := range []struct {
+		name string
+		ex   Explainer
+	}{
+		{"lexrank", &LexRank{}},
+		{"textrank", &TextRank{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, info, err := tc.ex.SummarizeExplain(text, 2)
+			if err != nil {
+				t.Fatalf("SummarizeExplain: %v", err)
+			}
+			selected := 0
+			for _, s := range info.Scores {
+				if s.Selected {
+					selected++
+				}
+			}
+			if selected != info.SelectedN {
+				t.Errorf("%s: %d sentences marked Selected, want SelectedN=%d (duplicate over-selection)", tc.name, selected, info.SelectedN)
+			}
+		})
+	}
+}
+
 // ── TextRank.SummarizeExplain missing branches ────────────────────────────────
 
 func TestTextRank_SummarizeExplain_Empty(t *testing.T) {
