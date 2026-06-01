@@ -41,6 +41,33 @@ Judgement calls: R7 took option A (complete the feature) but landed byte-identic
 
 ---
 
+### Pre-pass + final review pass (post-audit hygiene)
+
+**gopls/`go fix` pre-pass** (`18f2f32`): `go fix ./...` across all 5 modules — `interface{}`→`any`, C-style loops→range-int, `strings.Split`→`strings.SplitSeq`. Zero gopls hints remain. **Stray binaries** (`fa54cc0`): untracked 4 `examples/*/tldt-example-*` build artifacts + fixed `.gitignore` (they never matched the `*-example` pattern).
+
+**Final `/ds-*` pass** — all six reviews run sequentially (deslop last), each delegated and verified by repro. Whole audit diff (`main..HEAD`) reviewed for maintainability, Go idioms, correctness, security, test quality, slop. **Headline: the audit is sound.** SSRF DNS-rebinding TOCTOU genuinely closed; sentinel `errors.Is` mapping works for all 4 public sentinels; Luhn + outlier math verified by repro; ReDoS structurally impossible (RE2); installer hook path not attacker-influenced; C1 collapse deletes duplication (and fixed a latent text-keyed selection bug). No critical/blocker findings.
+
+Four behavior-preserving fixes applied (`e10f3b9`), verified build+lint+`test -race`+15/15 golden+API-parity:
+- `lexrank.go` drop redundant `vocabSize` local · `detector_test.go` exclusive-threshold boundary test (guards `>`→`>=`) · `tldt_test.go` `TestDetect_OutlierFinding` now compares strict vs permissive thresholds (was passing zero-value default, proving nothing) · `openapi-client/main.go` handle discarded `enc.Encode` error.
+
+**Recommend-only residuals (maintainer's call — behavior-changing or scope decisions):**
+
+| # | Sev | Location | Recommendation |
+|---|-----|----------|----------------|
+| S1 | **High** | `detector.go` `piiPatterns`/`scanPII` | `--sanitize-pii` does NOT redact Slack tokens (`xoxb-…`), AWS *secret* keys (40-char no-prefix), or generic high-entropy base64 — `DetectEncoding` flags them only to advisory stderr. Coverage narrower than the README "API keys/secrets" promise (R6 scope was maintainer-chosen). Fix: add patterns, OR feed `DetectEncoding` high-entropy spans into `scanPII`, OR narrow the doc claim. |
+| G1 | minor | `fetcher.go:145` `Fetch` | No precondition on `maxBytes>0`/`timeout>0`; a *negative* `maxBytes` bypasses the `pkg/tldt` default-fill (triggers only on `==0`) → misleading "no readable text" error. Add a boundary assert. |
+| G7–G9 | minor | `installer.go` | Fail-loudly gaps: `MkdirAll` error swallowed → silent skip on explicit `--target`; type-assertion `ok` discarded → malformed user `hooks`/`UserPromptSubmit` silently clobbered; `hookCmd` not validated absolute despite doc "MUST". |
+| B2 | minor | `fetcher.go:71` `safeDialContext` | Returns `(nil,nil)` if `lookupHost` yields empty+nil (test-seam-only; real resolver never does). Optional defensive guard. |
+| G2 | minor | `fetcher.go` `Fetch` | No `context.Context` param → caller can't cancel in-flight fetch. API-design choice. |
+| Q1 | minor | `main.go:74–115` | Effective-config resolution (~42 lines) could extract `resolveSettings()`; `main()` is ~167 lines. Optional (C2/C3 already decomposed the heavy logic). |
+| Q4 | minor | `tldt.go:108–112` | Sentinel re-export style split (2 aliased, 2 redefined+remapped). Functionally correct (`errors.Is` works) — style only. |
+| B1 | note | `detector.go:237` | base64 re-padding drops a token ending in `=`. **Pre-existing, advisory-only, NOT an audit regression** (new formula is math-identical to old loop). Fixing changes stderr for some inputs. |
+| — | note | `fetcher.go` `FinalURL`/SSRF errors | Surface resolved internal IP/host in errors — harmless in single-user CLI; doc note for library consumers embedding `Fetch` in a multi-tenant service. |
+
+Refuted (not slop / not bugs, don't re-flag): `keepRawMatrix` flag (bivalued, avoids n² alloc) · ensemble one-line wrappers · `_ = flag.Bool("detect-injection")` (intentional CLI-compat) · example unwrapped errors · `DetectPII` vs `SanitizePII` count divergence on nested matches (by design, documented).
+
+---
+
 
 Baseline: build/vet/`test -race` green · golangci-lint 19 issues (17 errcheck, 2 staticcheck) · 8 files not gofmt-clean.
 Reviews run: bug, security, go-idiom, code-quality, test-quality, doc-quality, deslop. Findings deduped across reviews and classified.

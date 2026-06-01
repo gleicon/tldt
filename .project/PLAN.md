@@ -6,9 +6,9 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 
 **State** — ALL audit recommendations applied. 16 follow-up commits on `cleanup` (`163cd34`→`47712ec`): comment-ID strip, R15, R3, R6, R5, R7(A), R8, R9, R10, R11, R12, R13, R14, C1, C2/C3, plus doc updates. Combined with the earlier 9 commits, the whole audit (A-groups, R1–R15, C1–C3) is shipped. Tree green on every commit: lint 0, `test -race` all pass, 15/15 golden byte-identical, `pkg/tldt` API stable. Nothing from sections B/C remains open — see AUDIT.md "Section B + C — ALL APPLIED".
 
-**Next** — Run the gopls/`go fix` pre-pass: `go fix ./...` across all modules, then resolve every gopls hint (`gopls check -severity=hint $(find . -name "*.go")`) — accumulated hints are rangeint modernization + `interface{}`→`any` (installer `PatchSettingsJSON`, openapi-client struct). Apply behavior-preserving fixes, verify build+lint+`test -race`+golden+API, commit as its own group. THEN the final `/ds-*` review pass — sequential, one command at a time, **deslop last** (order in Roadmap).
+**Next** — AUDIT COMPLETE. Pre-pass (`18f2f32`), stray-binary untrack (`fa54cc0`), and the full 6-review final pass (`e10f3b9`, 4 behavior-preserving fixes) all shipped. No roadmap items remain. Decision for maintainer: act on the recommend-only residuals in AUDIT.md "Final review pass" — chiefly **S1 (High): `--sanitize-pii` redaction coverage is narrower than the README promise** (Slack/AWS-secret/base64 secrets pass through). Everything else is minor/optional. Branch `cleanup` ready to merge to `main` once S1 is decided.
 
-**Open questions** — None blocking. Maintainer chose: R7 option A, R6 incl. SSN+Luhn, R13 full legacy removal, C1–C3 done now. The gopls pre-pass + final reviews are the only remaining roadmap items.
+**Open questions** — Only S1 (redaction-coverage vs doc-promise) needs a product call: expand patterns, feed DetectEncoding spans into scanPII, or narrow the doc. Maintainer prior choices: R7 option A, R6 incl. SSN+Luhn, R13 full legacy removal, C1–C3 done.
 
 ## Roadmap
 
@@ -59,12 +59,12 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 - [x] R3 (commit 9228002): SSRF blocklist — unspecified/CGNAT/NAT64/benchmark; IPv4-mapped covered by regression tests.
 - [x] R6 (commit 27ec822): PII coverage — modern sk-/GitHub/PEM/SSN + Luhn credit-card; detect/redact kept consistent.
 - [x] Reviewed and applied ALL remaining B/C items one-by-one with maintainer: R3,R5,R6,R7(A),R8,R9,R10,R11,R12,R13,R14 + C1,C2,C3 (commits 9228002→68c1f01). See AUDIT.md "Section B + C — ALL APPLIED". Tree green throughout; golden + API parity held on every commit.
-- [ ] **Pre-pass hygiene (before reviews):** run `go fix ./...` across all modules, then resolve every gopls hint: `gopls check -severity=hint $(find . -name "*.go")`. Apply behavior-preserving fixes; verify build + lint + `test -race` + golden I/O + API unchanged. Commit as its own group.
-- [ ] Final `/ds-*` pass over the full audit diff — **run sequentially, one command at a time** (may delegate each to an agent, but never in parallel). **`/ds-deslop` runs LAST.** Order:
-  1. [ ] `/ds-code-quality-review` — maintainability of the changes
-  2. [ ] `/ds-go-review` — Go idioms (fetcher transport/SSRF, error wrapping, clamps, new PII paths)
-  3. [ ] `/ds-bug-review` — correctness of the behavior-changing commits (R1/R2/R3/R4/R5/R6)
-  4. [ ] `/ds-security-review` — re-verify SSRF dial path + blocklist (R2/R3) and PII detect/redact surface (R4/R6)
-  5. [ ] `/ds-test-quality-review` — coverage of the new behavior
-  6. [ ] `/ds-deslop` — slop in new/edited code (LAST)
-  - [ ] Consolidate residual findings into AUDIT.md; apply behavior-preserving fixes, recommend the rest
+- [x] **Pre-pass hygiene** (commit 18f2f32): `go fix ./...` across all 5 modules — `interface{}`→`any`, C-style loops→range-int, `strings.Split`→`strings.SplitSeq`. Zero gopls hints remain anywhere. Verified build+vet+lint(0), `test -race` all pass, 15/15 golden byte-identical, `pkg/tldt` API func/type set unchanged. Rebuilt example binaries (tracked artifacts) restored, not committed.
+- [x] Final `/ds-*` pass over the full audit diff — all six run sequentially (deslop last), each delegated:
+  1. [x] `/ds-code-quality-review` — PASS; C1/C2/C3 delete duplication, no file near 1k, no spaghetti.
+  2. [x] `/ds-go-review` — PASS; SSRF dial path + DetectOutliers idiomatic; 1 major (example enc.Encode) + minor nits.
+  3. [x] `/ds-bug-review` — PASS; SSRF/Luhn/outlier/clamps verified by repro. 1 reproduced advisory-only edge (base64 re-pad).
+  4. [x] `/ds-security-review` — PASS; TOCTOU closed, ReDoS impossible, installer safe. 1 High coverage gap (S1).
+  5. [x] `/ds-test-quality-review` — PASS; security paths well-covered. 2 test-only fixes applied (T1/T2).
+  6. [x] `/ds-deslop` — PASS; code clean (prior deslop did the work). 1 trivial fix (D2), 4 candidates refuted.
+  - [x] Consolidated into AUDIT.md "Final review pass"; 4 behavior-preserving fixes applied (`e10f3b9`), rest recommended.
