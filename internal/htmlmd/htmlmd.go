@@ -77,7 +77,12 @@ func Convert(r io.Reader, opts Options) (string, error) {
 		// Use readability to extract main article content
 		article, err := readability.FromReader(bytes.NewReader(htmlBytes), nil)
 		if err != nil {
-			// Fallback: use raw HTML if readability fails
+			// Intentional graceful degradation: readability legitimately fails on
+			// input that isn't a single article (HTML fragments, listing/index
+			// pages, malformed markup). Rather than fail the whole conversion, fall
+			// back to converting the raw HTML — htmlBytes is already non-empty
+			// (checked above), so this still yields best-effort Markdown. The error
+			// is deliberately tolerated, not an oversight.
 			textContent = string(htmlBytes)
 		} else {
 			// Build HTML from extracted content
