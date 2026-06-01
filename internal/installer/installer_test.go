@@ -203,6 +203,47 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 	}
 }
 
+func TestResolveTargets_SpecificOptionalExcludesClaude(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "tldt-target-opencode-*")
+	if err != nil {
+		t.Fatalf("creating temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	targets := resolveTargets(tmpDir, Options{Target: "opencode"})
+	if len(targets) != 1 {
+		t.Fatalf("--target opencode: got %d targets, want 1: %+v", len(targets), targets)
+	}
+	if targets[0].name != "opencode" {
+		t.Errorf("--target opencode: target name = %q, want \"opencode\"", targets[0].name)
+	}
+	for _, tg := range targets {
+		if tg.name == "claude" {
+			t.Error("--target opencode must not install Claude (no hook, no settings patch)")
+		}
+		if tg.hookDest != "" || tg.settingsPath != "" {
+			t.Errorf("--target opencode: %q should have no hook/settings, got hook=%q settings=%q", tg.name, tg.hookDest, tg.settingsPath)
+		}
+	}
+}
+
+func TestResolveTargets_TargetClaudeOnly(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "tldt-target-claude-*")
+	if err != nil {
+		t.Fatalf("creating temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	// Even with an optional app present, --target claude installs only claude.
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".cursor"), 0755); err != nil {
+		t.Fatalf("creating .cursor dir: %v", err)
+	}
+	targets := resolveTargets(tmpDir, Options{Target: "claude"})
+	if len(targets) != 1 || targets[0].name != "claude" {
+		t.Errorf("--target claude: got %+v, want exactly [claude]", targets)
+	}
+}
+
 func TestResolveTargets_SkillDirOverride(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "tldt-skilldir-*")
 	if err != nil {

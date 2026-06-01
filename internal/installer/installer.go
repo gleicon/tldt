@@ -66,8 +66,10 @@ func Install(opts Options) error {
 }
 
 // resolveTargets returns the list of coding assistant install targets.
-// Claude Code is always included. Optional apps are included if their
-// base directory exists. opts.SkillDir overrides all detection.
+// Claude Code is included on the default run, --target all, or --target claude;
+// a specific optional --target installs only that app. Optional apps are included
+// if their base directory exists (or is explicitly targeted). opts.SkillDir
+// overrides all detection.
 func resolveTargets(homeDir string, opts Options) []installTarget {
 	// --skill-dir override: single custom target, no hook registration
 	if opts.SkillDir != "" {
@@ -77,22 +79,20 @@ func resolveTargets(homeDir string, opts Options) []installTarget {
 		}}
 	}
 
-	// Claude Code: always install; hook registered only here
-	hookDest := filepath.Join(homeDir, ".claude", "hooks", "tldt-hook.sh")
-	targets := []installTarget{{
-		name:         "claude",
-		skillDest:    filepath.Join(homeDir, ".claude", "skills", "tldt", "SKILL.md"),
-		hookDest:     hookDest,
-		settingsPath: filepath.Join(homeDir, ".claude", "settings.json"),
-	}}
-
-	// Filter by --target if set
-	if opts.Target != "" && opts.Target != "all" {
-		if opts.Target == "claude" {
-			return targets
-		}
-		// Only the named target — claude base is still always included
-		// but skip optional if target doesn't match
+	// Claude Code is included on the default/all run or when explicitly targeted.
+	// It is the only target that registers the UserPromptSubmit hook. A specific
+	// optional target (e.g. --target opencode) must NOT drag in Claude.
+	var targets []installTarget
+	if opts.Target == "" || opts.Target == "all" || opts.Target == "claude" {
+		targets = append(targets, installTarget{
+			name:         "claude",
+			skillDest:    filepath.Join(homeDir, ".claude", "skills", "tldt", "SKILL.md"),
+			hookDest:     filepath.Join(homeDir, ".claude", "hooks", "tldt-hook.sh"),
+			settingsPath: filepath.Join(homeDir, ".claude", "settings.json"),
+		})
+	}
+	if opts.Target == "claude" {
+		return targets
 	}
 
 	// Optional apps: detect by base directory existence
