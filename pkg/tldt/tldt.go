@@ -279,6 +279,38 @@ func Fetch(urlStr string, opts FetchOptions) (FetchResult, error) {
 	}, nil
 }
 
+// FetchRaw retrieves a URL with the same SSRF, redirect, and size protection as
+// Fetch but returns the raw response body and HTTP metadata — no content-type
+// gate, no text extraction. Use it to safely fetch JSON or other non-HTML
+// resources. The returned FetchResult.Text is empty; the body is the []byte.
+//
+// Errors are wrapped with context: use errors.Is() to check for sentinel errors
+// (ErrSSRFBlocked, ErrRedirectLimit, ErrHTTPError). ErrNonHTML never occurs.
+func FetchRaw(urlStr string, opts FetchOptions) ([]byte, FetchResult, error) {
+	if opts.Timeout == 0 {
+		opts.Timeout = 30 * time.Second
+	}
+	if opts.MaxBytes == 0 {
+		opts.MaxBytes = 5 * 1024 * 1024
+	}
+
+	body, res, err := fetcher.FetchRaw(urlStr, opts.Timeout, opts.MaxBytes)
+	if err != nil {
+		if errors.Is(err, fetcher.ErrHTTPError) {
+			return nil, FetchResult{}, fmt.Errorf("tldt.FetchRaw: %w: %v", ErrHTTPError, err)
+		}
+		// ErrSSRFBlocked / ErrRedirectLimit (re-exported) and any other error
+		// pass through unchanged for the caller to match with errors.Is.
+		return nil, FetchResult{}, fmt.Errorf("tldt.FetchRaw: %w", err)
+	}
+
+	return body, FetchResult{
+		StatusCode:  res.StatusCode,
+		ContentType: res.ContentType,
+		FinalURL:    res.FinalURL,
+	}, nil
+}
+
 // --- Detector Types ---
 
 // Finding describes a single injection detection signal from DetectOutliers.

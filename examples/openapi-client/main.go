@@ -21,9 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -47,39 +45,6 @@ type Info struct {
 	Version     string `json:"version"`
 }
 
-// httpResult holds a fetched body alongside response metadata.
-type httpResult struct {
-	Text        string
-	StatusCode  int
-	ContentType string
-	FinalURL    string
-}
-
-// fetchJSON retrieves url with a timeout and a response-size cap, returning the
-// raw body. Unlike tldt.Fetch (which extracts article text from HTML), it leaves
-// the body untouched — suitable for JSON API documents.
-func fetchJSON(url string, timeout time.Duration, maxBytes int64) (httpResult, error) {
-	client := &http.Client{Timeout: timeout}
-	resp, err := client.Get(url)
-	if err != nil {
-		return httpResult{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return httpResult{}, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
-	if err != nil {
-		return httpResult{}, err
-	}
-	return httpResult{
-		Text:        string(data),
-		StatusCode:  resp.StatusCode,
-		ContentType: resp.Header.Get("Content-Type"),
-		FinalURL:    resp.Request.URL.String(),
-	}, nil
-}
-
 func main() {
 	url := flag.String("url", "https://petstore.swagger.io/v2/swagger.json", "OpenAPI/Swagger JSON URL")
 	sanitize := flag.Bool("sanitize", true, "Strip invisible Unicode")
@@ -95,24 +60,28 @@ func main() {
 	fmt.Println()
 
 	// Fetch the OpenAPI document. tldt.Fetch extracts article text from HTML and
-	// rejects non-HTML content, so OpenAPI/Swagger JSON is retrieved here with a
-	// plain net/http client (timeout + response-size cap).
-	fetchResult, err := fetchJSON(*url, *timeout, 10*1024*1024)
+	// rejects non-HTML content, so OpenAPI/Swagger JSON is retrieved with
+	// tldt.FetchRaw — the same SSRF/redirect/size-hardened transport, minus the
+	// HTML gate and extraction.
+	body, meta, err := tldt.FetchRaw(*url, tldt.FetchOptions{
+		Timeout:  *timeout,
+		MaxBytes: 10 * 1024 * 1024,
+	})
 	if err != nil {
 		log.Fatalf("Failed to fetch URL: %v", err)
 	}
 
-	fmt.Printf("Fetched: %d bytes\n", len(fetchResult.Text))
-	fmt.Printf("Content-Type: %s\n", fetchResult.ContentType)
-	fmt.Printf("Status: %d\n", fetchResult.StatusCode)
-	if fetchResult.FinalURL != *url {
-		fmt.Printf("Final URL: %s\n", fetchResult.FinalURL)
+	fmt.Printf("Fetched: %d bytes\n", len(body))
+	fmt.Printf("Content-Type: %s\n", meta.ContentType)
+	fmt.Printf("Status: %d\n", meta.StatusCode)
+	if meta.FinalURL != *url {
+		fmt.Printf("Final URL: %s\n", meta.FinalURL)
 	}
 	fmt.Println()
 
 	// Parse as OpenAPI to extract metadata
 	var apiDoc OpenAPI
-	if err := json.Unmarshal([]byte(fetchResult.Text), &apiDoc); err == nil {
+	if err := json.Unmarshal(body, &apiDoc); err == nil {
 		fmt.Printf("API Title: %s\n", apiDoc.Info.Title)
 		fmt.Printf("Version: %s\n", apiDoc.Info.Version)
 		if apiDoc.Host != "" {
@@ -127,7 +96,7 @@ func main() {
 
 	// Process through tldt pipeline
 	fmt.Println("Processing through tldt pipeline...")
-	result, err := tldt.Pipeline(fetchResult.Text, tldt.PipelineOptions{
+	result, err := tldt.Pipeline(string(body), tldt.PipelineOptions{
 		Sanitize:    *sanitize,
 		DetectPII:   *detectPII,
 		SanitizePII: *sanitizePII,
@@ -158,7 +127,7 @@ func main() {
 		}{
 			APITitle:      apiDoc.Info.Title,
 			APIVersion:    apiDoc.Info.Version,
-			OriginalSize:  len(fetchResult.Text),
+			OriginalSize:  len(body),
 			SummaryTokens: result.TokensOut,
 			Reduction:     result.Reduction,
 			Warnings:      result.Warnings,

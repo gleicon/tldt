@@ -135,30 +135,26 @@ type Result struct {
 	FinalURL    string // final URL after any redirects
 }
 
-// Fetch fetches rawURL and returns the main article text plus response metadata.
-// timeout applies to the entire HTTP round-trip (http.Client level).
-// maxBytes caps the response body read to prevent memory exhaustion.
-//
-// Only http and https schemes are accepted. Non-2xx status codes (ErrHTTPError)
-// and non-HTML content types (ErrNonHTML) are returned as errors. HTTP redirects
-// are followed with SSRF + 5-hop guard.
-func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error) {
-	// 1. Validate scheme — block file://, ftp://, etc.
+// doHardenedRequest performs an SSRF-, redirect-, and timeout-hardened GET of
+// rawURL and returns the live 2xx response together with the parsed request URL
+// (for relative-link resolution). SSRF validation runs at dial time via
+// safeDialContext for the initial request and every redirect hop, closing the
+// DNS-rebinding TOCTOU; CheckRedirect enforces the 5-hop cap. The caller owns
+// resp.Body and must close it. Only http and https schemes are accepted; a
+// non-2xx status returns ErrHTTPError (with the body already closed).
+func doHardenedRequest(rawURL string, timeout time.Duration) (*http.Response, *url.URL, error) {
+	// Validate scheme — block file://, ftp://, etc.
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return Result{}, fmt.Errorf("invalid URL %q: %w", rawURL, err)
+		return nil, nil, fmt.Errorf("invalid URL %q: %w", rawURL, err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return Result{}, fmt.Errorf("unsupported URL scheme %q: only http and https are allowed", u.Scheme)
+		return nil, nil, fmt.Errorf("unsupported URL scheme %q: only http and https are allowed", u.Scheme)
 	}
 
-	// 2. HTTP client. SSRF validation happens at dial time via safeDialContext
-	// (runs for the initial request and every redirect hop, closing the
-	// DNS-rebinding TOCTOU). CheckRedirect only enforces the 5-hop cap.
-	transport := &http.Transport{DialContext: safeDialContext}
 	client := &http.Client{
 		Timeout:   timeout,
-		Transport: transport,
+		Transport: &http.Transport{DialContext: safeDialContext},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return fmt.Errorf("too many redirects (%d) fetching %q: %w", len(via), req.URL, ErrRedirectLimit)
@@ -169,34 +165,47 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, rawURL, nil)
 	if err != nil {
-		return Result{}, fmt.Errorf("building request for %q: %w", rawURL, err)
+		return nil, nil, fmt.Errorf("building request for %q: %w", rawURL, err)
 	}
 	req.Header.Set("User-Agent", "tldt/2.0 (https://github.com/gleicon/tldt)")
 
-	// 3. Execute — net/http.Client follows redirects with SSRF + 5-hop guard.
 	resp, err := client.Do(req)
 	if err != nil {
-		return Result{}, fmt.Errorf("fetching %q: %w", rawURL, err)
+		return nil, nil, fmt.Errorf("fetching %q: %w", rawURL, err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		_ = resp.Body.Close()
+		return nil, nil, fmt.Errorf("HTTP %d fetching %q: %w", resp.StatusCode, rawURL, ErrHTTPError)
+	}
+	return resp, u, nil
+}
+
+// Fetch fetches rawURL and returns the main article text plus response metadata.
+// timeout applies to the entire HTTP round-trip (http.Client level).
+// maxBytes caps the response body read to prevent memory exhaustion.
+//
+// Only http and https schemes are accepted. Non-2xx status codes (ErrHTTPError)
+// and non-HTML content types (ErrNonHTML) are returned as errors. HTTP redirects
+// are followed with SSRF + 5-hop guard.
+func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error) {
+	resp, u, err := doHardenedRequest(rawURL, timeout)
+	if err != nil {
+		return Result{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// 4. Non-2xx status is always an error.
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Result{}, fmt.Errorf("HTTP %d fetching %q: %w", resp.StatusCode, rawURL, ErrHTTPError)
-	}
-
-	// 5. Content-Type guard — use Contains because real headers are
+	// Content-Type guard — use Contains because real headers are
 	// "text/html; charset=utf-8".
 	ct := resp.Header.Get("Content-Type")
 	if !strings.Contains(ct, "text/html") {
 		return Result{}, fmt.Errorf("unsupported content type %q at %q (expected text/html): %w", ct, rawURL, ErrNonHTML)
 	}
 
-	// 6. Cap response body to prevent memory exhaustion (DoS mitigation).
+	// Cap response body to prevent memory exhaustion (DoS mitigation).
 	// io.LimitReader is belt-and-suspenders on top of the client timeout.
 	limited := io.LimitReader(resp.Body, maxBytes)
 
-	// 7. Extract article text — strips nav/ads/footers via Readability scoring.
+	// Extract article text — strips nav/ads/footers via Readability scoring.
 	// Use FromReader, NOT FromURL: FromURL bypasses our size cap and client.
 	// Second arg is *url.URL for relative-link resolution, not a raw string.
 	article, err := readability.FromReader(limited, u)
@@ -212,6 +221,29 @@ func Fetch(rawURL string, timeout time.Duration, maxBytes int64) (Result, error)
 		Text:        text,
 		StatusCode:  resp.StatusCode,
 		ContentType: ct,
+		FinalURL:    resp.Request.URL.String(),
+	}, nil
+}
+
+// FetchRaw fetches rawURL with the same SSRF, redirect, and size hardening as
+// Fetch but applies no content-type gate and no text extraction: it returns the
+// raw response body (capped at maxBytes) plus response metadata. Use it for JSON
+// or other non-HTML resources. The returned Result.Text is empty; the body is
+// the []byte return value.
+func FetchRaw(rawURL string, timeout time.Duration, maxBytes int64) ([]byte, Result, error) {
+	resp, _, err := doHardenedRequest(rawURL, timeout)
+	if err != nil {
+		return nil, Result{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	if err != nil {
+		return nil, Result{}, fmt.Errorf("reading body from %q: %w", rawURL, err)
+	}
+	return body, Result{
+		StatusCode:  resp.StatusCode,
+		ContentType: resp.Header.Get("Content-Type"),
 		FinalURL:    resp.Request.URL.String(),
 	}, nil
 }

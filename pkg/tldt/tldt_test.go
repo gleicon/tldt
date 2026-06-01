@@ -275,6 +275,20 @@ func TestFetch_InvalidURL(t *testing.T) {
 	}
 }
 
+func TestFetchRaw_SSRFBlocked(t *testing.T) {
+	// FetchRaw must carry the same SSRF protection as Fetch through the public API.
+	_, _, err := FetchRaw("http://192.168.1.1/admin", FetchOptions{})
+	if err == nil {
+		t.Fatal("FetchRaw SSRF: expected error for private IP, got nil")
+	}
+	if !errors.Is(err, ErrSSRFBlocked) {
+		t.Errorf("FetchRaw SSRF: expected errors.Is(err, ErrSSRFBlocked) = true, got false. Error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "tldt.FetchRaw") {
+		t.Errorf("FetchRaw SSRF: expected error to contain 'tldt.FetchRaw', got: %v", err)
+	}
+}
+
 func TestDetect_EmptyInput(t *testing.T) {
 	result, err := Detect("", DetectOptions{})
 	if err != nil {

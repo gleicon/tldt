@@ -339,3 +339,76 @@ func TestSafeDialContext_BlocksResolvedPrivateIP(t *testing.T) {
 		}
 	})
 }
+
+func TestFetchRaw_ReturnsRawBody(t *testing.T) {
+	const payload = `{"openapi":"3.0.0","info":{"title":"Demo"}}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, payload)
+	}))
+	defer ts.Close()
+
+	withBlockIP(allowAllIPs, func() {
+		body, meta, err := FetchRaw(ts.URL, testTimeout, testMaxBytes)
+		if err != nil {
+			t.Fatalf("FetchRaw: unexpected error: %v", err)
+		}
+		// Unlike Fetch, no content-type gate and no extraction: the body is verbatim.
+		if string(body) != payload {
+			t.Errorf("FetchRaw: body = %q, want %q", body, payload)
+		}
+		if meta.StatusCode != http.StatusOK {
+			t.Errorf("FetchRaw: StatusCode = %d, want 200", meta.StatusCode)
+		}
+		if !strings.Contains(meta.ContentType, "application/json") {
+			t.Errorf("FetchRaw: ContentType = %q, want application/json", meta.ContentType)
+		}
+		if meta.Text != "" {
+			t.Errorf("FetchRaw: Text should be empty (raw mode), got %q", meta.Text)
+		}
+	})
+}
+
+func TestFetchRaw_RejectsNon2xx(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	withBlockIP(allowAllIPs, func() {
+		if _, _, err := FetchRaw(ts.URL, testTimeout, testMaxBytes); !errors.Is(err, ErrHTTPError) {
+			t.Errorf("FetchRaw: expected ErrHTTPError for 404, got %v", err)
+		}
+	})
+}
+
+// TestFetchRaw_SSRFBlocksResolvedPrivateIP pins that FetchRaw inherits the same
+// dial-time SSRF guard as Fetch — the reason the example switched off its own
+// unprotected http.Client.
+func TestFetchRaw_SSRFBlocksResolvedPrivateIP(t *testing.T) {
+	withLookup(privateLookup("10.0.0.1"), func() {
+		_, _, err := FetchRaw("http://rebind.invalid/swagger.json", testTimeout, testMaxBytes)
+		if !errors.Is(err, ErrSSRFBlocked) {
+			t.Errorf("FetchRaw must enforce SSRF on the resolved IP, got %v", err)
+		}
+	})
+}
+
+func TestFetchRaw_MaxBytesCap(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, strings.Repeat("A", 10000))
+	}))
+	defer ts.Close()
+
+	const smallCap = 128
+	withBlockIP(allowAllIPs, func() {
+		body, _, err := FetchRaw(ts.URL, testTimeout, smallCap)
+		if err != nil {
+			t.Fatalf("FetchRaw: unexpected error: %v", err)
+		}
+		if int64(len(body)) > smallCap {
+			t.Errorf("FetchRaw: body len = %d exceeds cap %d", len(body), smallCap)
+		}
+	})
+}
