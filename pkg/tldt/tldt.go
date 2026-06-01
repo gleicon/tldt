@@ -173,9 +173,42 @@ func Summarize(text string, opts SummarizeOptions) (Result, error) {
 }
 
 // Detect runs injection and encoding detection on text without summarizing.
-// Returns findings and human-readable warning lines.
+// It runs pattern, encoding, and confusable detection, then statistical outlier
+// detection: a LexRank similarity matrix is built over text and any sentence
+// whose mean similarity to the rest falls below opts.OutlierThreshold is flagged
+// as an outlier finding. A zero/negative threshold uses DefaultOutlierThreshold.
+// Building the similarity matrix is O(n^2) in the sentence count.
+//
+// Outlier findings are appended to Report.Findings; Report.MaxScore and
+// Report.Suspicious continue to reflect injection-pattern confidence only,
+// because an outlier score is a dissimilarity metric on a different scale.
+//
+// Returns the findings plus human-readable warning lines. An error is returned
+// only if the similarity matrix cannot be built.
 func Detect(text string, opts DetectOptions) (DetectResult, error) {
 	report := detector.Analyze(text)
+
+	threshold := opts.OutlierThreshold
+	if threshold <= 0 {
+		threshold = DefaultOutlierThreshold
+	}
+	sentences := summarizer.TokenizeSentences(text)
+	if len(sentences) > 0 {
+		lr, err := summarizer.New("lexrank")
+		if err != nil {
+			return DetectResult{}, fmt.Errorf("tldt.Detect: %w", err)
+		}
+		ms, ok := lr.(summarizer.MatrixSummarizer)
+		if !ok {
+			return DetectResult{}, fmt.Errorf("tldt.Detect: lexrank does not provide a similarity matrix")
+		}
+		_, matrix, err := ms.SummarizeWithMatrix(text, len(sentences))
+		if err != nil {
+			return DetectResult{}, fmt.Errorf("tldt.Detect: outlier matrix: %w", err)
+		}
+		report.Findings = append(report.Findings, detector.DetectOutliers(sentences, matrix, threshold)...)
+	}
+
 	var warnings []string
 	if report.Suspicious {
 		warnings = append(warnings, "injection-detect: WARNING -- input flagged as suspicious")

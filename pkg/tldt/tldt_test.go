@@ -93,6 +93,27 @@ func TestDetect_InjectionFound(t *testing.T) {
 	}
 }
 
+func TestDetect_OutlierFinding(t *testing.T) {
+	// One sentence is wildly off-topic relative to the rest; at the default
+	// outlier threshold Detect must flag it. This pins that Detect honors
+	// opts.OutlierThreshold (previously the option was ignored).
+	text := "The cat sat on the mat. The cat played with yarn. The cat slept all day. " +
+		"Quantum chromodynamics governs the strong nuclear force via gluon exchange."
+	result, err := Detect(text, DetectOptions{OutlierThreshold: DefaultOutlierThreshold})
+	if err != nil {
+		t.Fatalf("Detect: unexpected error: %v", err)
+	}
+	found := false
+	for _, f := range result.Report.Findings {
+		if f.Category == "outlier" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Detect: expected an outlier finding, got %+v", result.Report.Findings)
+	}
+}
+
 func TestSanitize_CleanText(t *testing.T) {
 	text := "Hello, world!"
 	cleaned, report, err := Sanitize(text)

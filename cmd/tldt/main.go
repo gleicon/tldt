@@ -287,9 +287,19 @@ func main() {
 			os.Exit(1)
 		}
 		report := dresult.Report
-		if len(report.Findings) > 0 {
-			fmt.Fprintf(os.Stderr, "injection-detect: %d finding(s), max confidence %.2f\n", len(report.Findings), report.MaxScore)
-			for _, f := range report.Findings {
+		// Outlier findings use a dissimilarity score on a different scale than
+		// pattern confidence, so report them in their own block.
+		var patternFindings, outlierFindings []tldt.Finding
+		for _, f := range report.Findings {
+			if f.Category == "outlier" {
+				outlierFindings = append(outlierFindings, f)
+			} else {
+				patternFindings = append(patternFindings, f)
+			}
+		}
+		if len(patternFindings) > 0 {
+			fmt.Fprintf(os.Stderr, "injection-detect: %d finding(s), max confidence %.2f\n", len(patternFindings), report.MaxScore)
+			for _, f := range patternFindings {
 				fmt.Fprintf(os.Stderr, "  [%s] %s (score=%.2f): %s\n", f.Category, f.Pattern, f.Score, f.Excerpt)
 			}
 			if report.Suspicious {
@@ -297,6 +307,12 @@ func main() {
 			}
 		} else {
 			fmt.Fprintln(os.Stderr, "injection-detect: no findings")
+		}
+		if len(outlierFindings) > 0 {
+			fmt.Fprintf(os.Stderr, "injection-detect: %d outlier sentence(s) above threshold %.2f\n", len(outlierFindings), *injectionThreshold)
+			for _, f := range outlierFindings {
+				fmt.Fprintf(os.Stderr, "  [outlier] sentence %d (score=%.2f): %s\n", f.Sentence, f.Score, f.Excerpt)
+			}
 		}
 	}
 
@@ -313,7 +329,6 @@ func main() {
 
 	charsIn := len(text)
 	var result []string
-	var simMatrix [][]float64 // populated if algorithm supports MatrixSummarizer
 	if *explain {
 		if ex, ok := s.(tldt.Explainer); ok {
 			var info *tldt.ExplainInfo
@@ -336,31 +351,12 @@ func main() {
 				os.Exit(1)
 			}
 		}
-	} else if ms, ok := s.(tldt.MatrixSummarizer); ok {
-		var err2 error
-		result, simMatrix, err2 = ms.SummarizeWithMatrix(text, effectiveSentences)
-		if err2 != nil {
-			fmt.Fprintln(os.Stderr, "summarization failed:", err2)
-			os.Exit(1)
-		}
 	} else {
 		var err2 error
 		result, err2 = s.Summarize(text, effectiveSentences)
 		if err2 != nil {
 			fmt.Fprintln(os.Stderr, "summarization failed:", err2)
 			os.Exit(1)
-		}
-	}
-
-	// --detect-injection outlier layer: run after summarization to use LexRank matrix.
-	if *detectInjection && simMatrix != nil {
-		sentences := tldt.TokenizeSentences(text)
-		outliers := tldt.DetectOutliers(sentences, simMatrix, *injectionThreshold)
-		if len(outliers) > 0 {
-			fmt.Fprintf(os.Stderr, "injection-detect: %d outlier sentence(s) above threshold %.2f\n", len(outliers), *injectionThreshold)
-			for _, f := range outliers {
-				fmt.Fprintf(os.Stderr, "  [outlier] sentence %d (score=%.2f): %s\n", f.Sentence, f.Score, f.Excerpt)
-			}
 		}
 	}
 
