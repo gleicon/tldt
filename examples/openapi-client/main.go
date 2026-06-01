@@ -32,13 +32,13 @@ import (
 
 // OpenAPI represents a simplified OpenAPI/Swagger document structure
 type OpenAPI struct {
-	Swagger     string                 `json:"swagger"`
-	OpenAPI     string                 `json:"openapi"`
-	Info        Info                   `json:"info"`
-	Host        string                 `json:"host"`
-	BasePath    string                 `json:"basePath"`
-	Paths       map[string]interface{} `json:"paths"`
-	Definitions map[string]interface{} `json:"definitions"`
+	Swagger     string         `json:"swagger"`
+	OpenAPI     string         `json:"openapi"`
+	Info        Info           `json:"info"`
+	Host        string         `json:"host"`
+	BasePath    string         `json:"basePath"`
+	Paths       map[string]any `json:"paths"`
+	Definitions map[string]any `json:"definitions"`
 }
 
 type Info struct {
@@ -146,15 +146,15 @@ func main() {
 	if *outputJSON {
 		// Output structured JSON
 		output := struct {
-			APITitle      string              `json:"api_title,omitempty"`
-			APIVersion    string              `json:"api_version,omitempty"`
-			OriginalSize  int                 `json:"original_size_bytes"`
-			SummaryTokens int                 `json:"summary_tokens"`
-			Reduction     int                 `json:"reduction_percent"`
-			Warnings      []string            `json:"warnings,omitempty"`
-			PIIFindings   []tldt.PIIFinding   `json:"pii_findings,omitempty"`
-			Redactions    int                 `json:"redactions"`
-			Summary       string              `json:"summary"`
+			APITitle      string            `json:"api_title,omitempty"`
+			APIVersion    string            `json:"api_version,omitempty"`
+			OriginalSize  int               `json:"original_size_bytes"`
+			SummaryTokens int               `json:"summary_tokens"`
+			Reduction     int               `json:"reduction_percent"`
+			Warnings      []string          `json:"warnings,omitempty"`
+			PIIFindings   []tldt.PIIFinding `json:"pii_findings,omitempty"`
+			Redactions    int               `json:"redactions"`
+			Summary       string            `json:"summary"`
 		}{
 			APITitle:      apiDoc.Info.Title,
 			APIVersion:    apiDoc.Info.Version,

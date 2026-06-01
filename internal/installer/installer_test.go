@@ -99,7 +99,7 @@ func TestPatchSettingsJSON_CreatesFile(t *testing.T) {
 		t.Fatalf("reading created settings.json: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
 		t.Fatalf("settings.json is not valid JSON after patch: %v", err)
 	}

@@ -71,7 +71,7 @@ func powerIterateDamped(matrix [][]float64, damping, epsilon float64, maxIter in
 	}
 	base := (1.0 - damping) / float64(n)
 	next := make([]float64, n)
-	for iter := 0; iter < maxIter; iter++ {
+	for iter := range maxIter {
 		for i := range next {
 			sum := 0.0
 			for j := range matrix {

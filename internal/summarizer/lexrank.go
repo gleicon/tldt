@@ -250,7 +250,7 @@ func powerIterate(matrix [][]float64, epsilon float64, maxIter int) ([]float64, 
 	for i := range p {
 		p[i] = 1.0 / float64(n)
 	}
-	for iter := 0; iter < maxIter; iter++ {
+	for iter := range maxIter {
 		next := make([]float64, n)
 		for i := range p {
 			for j := range next {

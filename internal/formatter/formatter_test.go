@@ -61,7 +61,7 @@ func TestFormatJSON_RequiredFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FormatJSON returned error: %v", err)
 	}
-	var out map[string]interface{}
+	var out map[string]any
 	if err := json.Unmarshal([]byte(result), &out); err != nil {
 		t.Fatalf("FormatJSON json.Unmarshal failed: %v", err)
 	}

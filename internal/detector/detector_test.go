@@ -226,10 +226,10 @@ func TestDetectEncoding_NormalTextNoFindings(t *testing.T) {
 func TestDetectEncoding_CtrlCharDensity(t *testing.T) {
 	// Build string with >1% control chars
 	var b strings.Builder
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		b.WriteRune('a')
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		b.WriteRune('\x01') // SOH — not tab/newline/CR
 	}
 	input := b.String()
@@ -287,7 +287,7 @@ func TestDetectOutliers_OffTopicInjection(t *testing.T) {
 	matrix := buildUniformMatrix(4, 0.80)
 	// Override row/col 3 to have near-zero similarity (outlier_score > 0.99 threshold)
 	// With similarity 0.005, meanSim=0.005, outlier_score=0.995 > 0.99
-	for j := 0; j < 4; j++ {
+	for j := range 4 {
 		if j != 3 {
 			matrix[3][j] = 0.005
 			matrix[j][3] = 0.005
@@ -337,7 +337,7 @@ func TestDetectOutliers_CustomThreshold(t *testing.T) {
 	sentences := []string{"A", "B", "C", "marginal"}
 	matrix := buildUniformMatrix(4, 0.80)
 	// Sentence 3 has sim 0.25 → outlier_score = 0.75
-	for j := 0; j < 4; j++ {
+	for j := range 4 {
 		if j != 3 {
 			matrix[3][j] = 0.25
 			matrix[j][3] = 0.25
@@ -358,7 +358,7 @@ func TestDetectOutliers_CustomThreshold(t *testing.T) {
 func TestDetectOutliers_ScoreIsOutlierScore(t *testing.T) {
 	sentences := []string{"A", "B", "outlier"}
 	matrix := buildUniformMatrix(3, 0.80)
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		if j != 2 {
 			matrix[2][j] = 0.01
 			matrix[j][2] = 0.01

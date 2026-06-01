@@ -180,35 +180,35 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 		return fmt.Errorf("reading settings.json: %w", err)
 	}
 
-	var settings map[string]interface{}
+	var settings map[string]any
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &settings); err != nil {
 			return fmt.Errorf("settings.json is not valid JSON: %w", err)
 		}
 	} else {
-		settings = make(map[string]interface{})
+		settings = make(map[string]any)
 	}
 
 	// Navigate/create hooks.UserPromptSubmit array
-	hooks, _ := settings["hooks"].(map[string]interface{})
+	hooks, _ := settings["hooks"].(map[string]any)
 	if hooks == nil {
-		hooks = make(map[string]interface{})
+		hooks = make(map[string]any)
 		settings["hooks"] = hooks
 	}
 
 	// Idempotency: check if hookCmd is already registered
-	existing, _ := hooks["UserPromptSubmit"].([]interface{})
+	existing, _ := hooks["UserPromptSubmit"].([]any)
 	for _, e := range existing {
-		m, ok := e.(map[string]interface{})
+		m, ok := e.(map[string]any)
 		if !ok {
 			continue
 		}
-		hs, ok := m["hooks"].([]interface{})
+		hs, ok := m["hooks"].([]any)
 		if !ok {
 			continue
 		}
 		for _, h := range hs {
-			hm, ok := h.(map[string]interface{})
+			hm, ok := h.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -219,9 +219,9 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 	}
 
 	// Append new hook entry
-	newEntry := map[string]interface{}{
-		"hooks": []interface{}{
-			map[string]interface{}{
+	newEntry := map[string]any{
+		"hooks": []any{
+			map[string]any{
 				"type":    "command",
 				"command": hookCmd,
 				"timeout": 30,

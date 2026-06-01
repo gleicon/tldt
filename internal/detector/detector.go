@@ -330,13 +330,13 @@ func DetectOutliers(sentences []string, simMatrix [][]float64, threshold float64
 	}
 
 	var findings []Finding
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if len(simMatrix[i]) != n {
 			continue
 		}
 		var sum float64
 		count := 0
-		for j := 0; j < n; j++ {
+		for j := range n {
 			if i != j {
 				sum += simMatrix[i][j]
 				count++

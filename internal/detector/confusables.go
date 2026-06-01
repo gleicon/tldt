@@ -25,7 +25,7 @@ var confusableOnce sync.Once
 // (i.e., source is non-basic-Latin but looks like basic Latin or ASCII).
 func loadConfusables() {
 	confusableMap = make(map[rune]string, 1024)
-	for _, line := range strings.Split(confusablesRaw, "\n") {
+	for line := range strings.SplitSeq(confusablesRaw, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
