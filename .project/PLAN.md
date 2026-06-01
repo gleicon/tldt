@@ -8,9 +8,9 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
 
 **Latest follow-ups (after the audit):**
 - `e10f3b9` — final-review pass: 4 behavior-preserving fixes (vocabSize local, 2 test-quality fixes, example enc.Encode).
-- `2b8b3f6` — **S1** redaction coverage: `slack-token` pattern + shared `highEntropyBase64()` fed into `scanPII` (redacted as `[REDACTED:secret]`); AWS/generic skipped (FP risk; entropy gate >4.5 controls FPs); CLI/README/security.md/library.html synced.
-- `93053d7` — **FetchRaw**: hardened JSON/non-HTML fetch primitive (shared `doHardenedRequest`); `Fetch` byte-identical; openapi example switched onto it → gains SSRF protection.
-- `a6e1066` — stripped leaked GSD lingo ("Phase 9") from `docs/security.md` + `docs/index.html`.
+- `fbfbc58` — **S1** redaction coverage: `slack-token` pattern + shared `highEntropyBase64()` fed into `scanPII` (redacted as `[REDACTED:secret]`); AWS/generic skipped (FP risk; entropy gate >4.5 controls FPs); CLI/README/security.md/library.html synced.
+- `8754267` — **FetchRaw**: hardened JSON/non-HTML fetch primitive (shared `doHardenedRequest`); `Fetch` byte-identical; openapi example switched onto it → gains SSRF protection.
+- `8e2a44e` — stripped leaked GSD lingo ("Phase 9") from `docs/security.md` + `docs/index.html`.
 
 **Next** — Create the draft PR (`lucindo:cleanup` → `gleicon/tldt:main`). No roadmap items remain. Remaining recommend-only residuals (G1/G2/G7–G9/Q1/Q4/B1/B2/T3) are minor/optional — see AUDIT.md "Final review pass" table.
 
@@ -76,8 +76,8 @@ Source: `.project/SPEC.md` — Full Code Audit (Behavior-Preserving)
   - [x] Consolidated into AUDIT.md "Final review pass"; 4 behavior-preserving fixes applied (`e10f3b9`), rest recommended.
 
 ### Maintainer-requested follow-ups (post-review)
-- [x] **S1** redaction coverage (commit `2b8b3f6`): `slack-token` pattern + shared `highEntropyBase64()` feeding `scanPII` so `--sanitize-pii` redacts Slack tokens and prefix-less high-entropy secrets as `[REDACTED:secret]`. AWS/generic standalone patterns skipped (FP risk). Docs synced. Golden + API parity held.
-- [x] **FetchRaw** (commit `93053d7`): extracted `doHardenedRequest` shared by `Fetch`/`FetchRaw`; `Fetch` byte-identical; `pkg/tldt.FetchRaw` wrapper; openapi example switched off its unprotected `http.Client`. Tests: raw-body, non-2xx, byte cap, dial-time SSRF. API addition is additive.
-- [x] **GSD doc lingo strip** (commit `a6e1066`): removed "Phase 9" from `docs/security.md` (→ bare Mitigation/Example) and `docs/index.html` (status → "mitigated"). Swept docs/README/code — no other planning lingo remains.
+- [x] **S1** redaction coverage (commit `fbfbc58`): `slack-token` pattern + shared `highEntropyBase64()` feeding `scanPII` so `--sanitize-pii` redacts Slack tokens and prefix-less high-entropy secrets as `[REDACTED:secret]`. AWS/generic standalone patterns skipped (FP risk). Docs synced. Golden + API parity held.
+- [x] **FetchRaw** (commit `8754267`): extracted `doHardenedRequest` shared by `Fetch`/`FetchRaw`; `Fetch` byte-identical; `pkg/tldt.FetchRaw` wrapper; openapi example switched off its unprotected `http.Client`. Tests: raw-body, non-2xx, byte cap, dial-time SSRF. API addition is additive.
+- [x] **GSD doc lingo strip** (commit `8e2a44e`): removed "Phase 9" from `docs/security.md` (→ bare Mitigation/Example) and `docs/index.html` (status → "mitigated"). Swept docs/README/code — no other planning lingo remains.
 - [x] **`.project/` checkpoint**: refreshed PLAN/AUDIT/PROJECT to final state; deleted stale `handoff.md`. `.project/` stays tracked (goes with the PR).
 - [ ] Open draft PR `lucindo:cleanup` → `gleicon/tldt:main`.

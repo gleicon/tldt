@@ -54,7 +54,7 @@ Four behavior-preserving fixes applied (`e10f3b9`), verified build+lint+`test -r
 
 | # | Sev | Location | Recommendation |
 |---|-----|----------|----------------|
-| S1 | ~~High~~ **RESOLVED** (`2b8b3f6`) | `detector.go` `piiPatterns`/`scanPII` | Implemented option 2 + Slack: added `slack-token` pattern (flows to detect+redact) and a shared `highEntropyBase64()` helper whose spans `scanPII` now redacts as `[REDACTED:secret]`. AWS/generic standalone patterns deliberately skipped (high FP); the entropy gate (>4.5) controls FPs. Docs (CLI help, README, security.md, library.html) synced to actual coverage. |
+| S1 | ~~High~~ **RESOLVED** (`fbfbc58`) | `detector.go` `piiPatterns`/`scanPII` | Implemented option 2 + Slack: added `slack-token` pattern (flows to detect+redact) and a shared `highEntropyBase64()` helper whose spans `scanPII` now redacts as `[REDACTED:secret]`. AWS/generic standalone patterns deliberately skipped (high FP); the entropy gate (>4.5) controls FPs. Docs (CLI help, README, security.md, library.html) synced to actual coverage. |
 | G1 | minor | `fetcher.go:145` `Fetch` | No precondition on `maxBytes>0`/`timeout>0`; a *negative* `maxBytes` bypasses the `pkg/tldt` default-fill (triggers only on `==0`) → misleading "no readable text" error. Add a boundary assert. |
 | G7–G9 | minor | `installer.go` | Fail-loudly gaps: `MkdirAll` error swallowed → silent skip on explicit `--target`; type-assertion `ok` discarded → malformed user `hooks`/`UserPromptSubmit` silently clobbered; `hookCmd` not validated absolute despite doc "MUST". |
 | B2 | minor | `fetcher.go:71` `safeDialContext` | Returns `(nil,nil)` if `lookupHost` yields empty+nil (test-seam-only; real resolver never does). Optional defensive guard. |
@@ -63,7 +63,7 @@ Four behavior-preserving fixes applied (`e10f3b9`), verified build+lint+`test -r
 | Q4 | minor | `tldt.go:108–112` | Sentinel re-export style split (2 aliased, 2 redefined+remapped). Functionally correct (`errors.Is` works) — style only. |
 | B1 | note | `detector.go:237` | base64 re-padding drops a token ending in `=`. **Pre-existing, advisory-only, NOT an audit regression** (new formula is math-identical to old loop). Fixing changes stderr for some inputs. |
 | — | note | `fetcher.go` `FinalURL`/SSRF errors | Surface resolved internal IP/host in errors — harmless in single-user CLI; doc note for library consumers embedding `Fetch` in a multi-tenant service. |
-| — | **RESOLVED** (`93053d7`) | `examples/openapi-client` SSRF gap | The example's hand-rolled `http.Client` (from R14) had no SSRF hardening. Added `FetchRaw` — a hardened fetch primitive (shared `doHardenedRequest`: SSRF dial-time validation + redirect/byte/timeout caps, no content-type gate) — and switched the example onto `tldt.FetchRaw`. `Fetch` stays byte-identical; API addition is additive. |
+| — | **RESOLVED** (`8754267`) | `examples/openapi-client` SSRF gap | The example's hand-rolled `http.Client` (from R14) had no SSRF hardening. Added `FetchRaw` — a hardened fetch primitive (shared `doHardenedRequest`: SSRF dial-time validation + redirect/byte/timeout caps, no content-type gate) — and switched the example onto `tldt.FetchRaw`. `Fetch` stays byte-identical; API addition is additive. |
 
 Refuted (not slop / not bugs, don't re-flag): `keepRawMatrix` flag (bivalued, avoids n² alloc) · ensemble one-line wrappers · `_ = flag.Bool("detect-injection")` (intentional CLI-compat) · example unwrapped errors · `DetectPII` vs `SanitizePII` count divergence on nested matches (by design, documented).
 
