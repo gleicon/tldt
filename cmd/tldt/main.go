@@ -41,6 +41,7 @@ func main() {
 	installSkill := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
 	skillDir := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
 	skillTarget := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
+	configDir := flag.String("config-dir", "", "override Claude config dir base (precedence: --config-dir > $CLAUDE_CONFIG_DIR > ~/.claude)")
 	sanitizeFlag := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
 	detectOnly := flag.Bool("detect-only", false, "run requested detection stages then exit before summarizing (no summary, no usage log)")
@@ -63,8 +64,9 @@ func main() {
 	// --install-skill: write skill + hook templates and patch settings.json, then exit
 	if *installSkill {
 		if err := installer.Install(installer.Options{
-			SkillDir: *skillDir,
-			Target:   *skillTarget,
+			SkillDir:  *skillDir,
+			Target:    *skillTarget,
+			ConfigDir: *configDir,
 		}); err != nil {
 			fmt.Fprintln(os.Stderr, "install-skill:", err)
 			os.Exit(1)
@@ -428,6 +430,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --install-skill        Install Claude Code skill and auto-trigger hook")
 	fmt.Fprintln(os.Stderr, "  --skill-dir string     Override skill install directory")
 	fmt.Fprintln(os.Stderr, "  --target string        Install target: claude|cursor|opencode|agents|all")
+	fmt.Fprintln(os.Stderr, "  --config-dir string    Override Claude config dir (else $CLAUDE_CONFIG_DIR, else ~/.claude)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "EMBEDDED AI ASSISTANT SKILLS:")
 	fmt.Fprintln(os.Stderr, "  The binary contains embedded skill templates for AI assistants.")

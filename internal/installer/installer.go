@@ -23,6 +23,10 @@ type Options struct {
 	// Target restricts install to a specific app: "claude", "cursor", "opencode", "agents", "all".
 	// Empty = same as "all" (auto-detect).
 	Target string
+
+	// ConfigDir overrides the Claude config directory base (FR-22).
+	// Precedence: ConfigDir > $CLAUDE_CONFIG_DIR > ~/.claude. Empty = use env or default.
+	ConfigDir string
 }
 
 // installTarget describes one coding assistant's install locations.
@@ -88,11 +92,12 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 	// optional target (e.g. --target opencode) must NOT drag in Claude.
 	var targets []installTarget
 	if opts.Target == "" || opts.Target == "all" || opts.Target == "claude" {
+		base := claudeBaseDir(homeDir, opts)
 		targets = append(targets, installTarget{
 			name:         "claude",
-			skillDest:    filepath.Join(homeDir, ".claude", "skills", "tldt", "SKILL.md"),
-			hookDest:     filepath.Join(homeDir, ".claude", "hooks", "tldt-hook.sh"),
-			settingsPath: filepath.Join(homeDir, ".claude", "settings.json"),
+			skillDest:    filepath.Join(base, "skills", "tldt", "SKILL.md"),
+			hookDest:     filepath.Join(base, "hooks", "tldt-hook.sh"),
+			settingsPath: filepath.Join(base, "settings.json"),
 		})
 	}
 	if opts.Target == "claude" {
@@ -148,6 +153,18 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 	}
 
 	return targets, nil
+}
+
+// claudeBaseDir resolves the Claude config directory base per FR-22:
+// explicit --config-dir > $CLAUDE_CONFIG_DIR > the ~/.claude platform default.
+func claudeBaseDir(homeDir string, opts Options) string {
+	if opts.ConfigDir != "" {
+		return opts.ConfigDir
+	}
+	if v := os.Getenv("CLAUDE_CONFIG_DIR"); v != "" {
+		return v
+	}
+	return filepath.Join(homeDir, ".claude")
 }
 
 // installSkillFile reads the embedded SKILL.md and writes it to destPath.

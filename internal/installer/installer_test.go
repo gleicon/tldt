@@ -253,6 +253,7 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 		t.Fatalf("creating temp dir: %v", err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("CLAUDE_CONFIG_DIR", "") // isolate from ambient env so the default path is exercised
 
 	targets, err := resolveTargets(tmpDir, Options{})
 	if err != nil {
@@ -267,6 +268,44 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 	expectedSkill := filepath.Join(tmpDir, ".claude", "skills", "tldt", "SKILL.md")
 	if targets[0].skillDest != expectedSkill {
 		t.Errorf("claude skillDest = %q, want %q", targets[0].skillDest, expectedSkill)
+	}
+}
+
+func TestResolveTargets_HonorsClaudeConfigDirEnv(t *testing.T) {
+	// AC-17: CLAUDE_CONFIG_DIR set and no --config-dir → artifacts under the env path.
+	tmpDir := t.TempDir()
+	envBase := filepath.Join(tmpDir, "cc-env")
+	t.Setenv("CLAUDE_CONFIG_DIR", envBase)
+
+	targets, err := resolveTargets(tmpDir, Options{Target: "claude"})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	wantSkill := filepath.Join(envBase, "skills", "tldt", "SKILL.md")
+	if targets[0].skillDest != wantSkill {
+		t.Errorf("skillDest = %q, want %q (CLAUDE_CONFIG_DIR honored)", targets[0].skillDest, wantSkill)
+	}
+	if want := filepath.Join(envBase, "hooks", "tldt-hook.sh"); targets[0].hookDest != want {
+		t.Errorf("hookDest = %q, want %q", targets[0].hookDest, want)
+	}
+	if want := filepath.Join(envBase, "settings.json"); targets[0].settingsPath != want {
+		t.Errorf("settingsPath = %q, want %q", targets[0].settingsPath, want)
+	}
+}
+
+func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
+	// AC-18: --config-dir and CLAUDE_CONFIG_DIR both set → the flag wins.
+	tmpDir := t.TempDir()
+	flagBase := filepath.Join(tmpDir, "cc-flag")
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(tmpDir, "cc-env"))
+
+	targets, err := resolveTargets(tmpDir, Options{Target: "claude", ConfigDir: flagBase})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	wantSkill := filepath.Join(flagBase, "skills", "tldt", "SKILL.md")
+	if targets[0].skillDest != wantSkill {
+		t.Errorf("skillDest = %q, want %q (--config-dir must win over env)", targets[0].skillDest, wantSkill)
 	}
 }
 
