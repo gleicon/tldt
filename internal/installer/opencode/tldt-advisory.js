@@ -19,29 +19,36 @@ export const TldtAdvisory = async ({ client }) => {
         .trim()
       if (!text) return
 
-      // Detection-only: no summary, no usage log. Findings go to stderr.
+      // Detection-only: no summary, no usage log. tldt emits a structured
+      // {flagged, findings[]} JSON contract on stdout (outliers excluded).
       const res = spawnSync(
         "tldt",
-        ["--detect-injection", "--detect-pii", "--detect-only"],
+        ["--detect-injection", "--detect-pii", "--detect-only", "--format", "json"],
         { input: text, encoding: "utf8" },
       )
-      // tldt missing or failed to spawn — degrade silently.
-      if (res.error || res.status === null) return
+      // tldt missing, failed to spawn, or errored (no stdout) — degrade silently.
+      if (res.error || res.status !== 0) return
 
-      // Flagged = stderr minus the two clean "no findings" lines, outlier-sentence
-      // reports (a summarization signal that fires on benign diverse prose, not an
-      // injection/PII signal), and blanks.
-      const findings = (res.stderr || "")
-        .split("\n")
-        .filter((l) => l.trim() && !/(pii|injection)-detect: no findings|outlier sentence|\[outlier\]/.test(l))
-        .join("\n")
-        .trim()
-      if (!findings) return
+      let report
+      try {
+        report = JSON.parse(res.stdout || "")
+      } catch {
+        return // malformed output — fail closed, no false advisory
+      }
+      if (!report || !report.flagged) return
+
+      // User-facing toast: a one-line summary per finding (kind + pattern +
+      // location). Excerpts are available here but kept short for the toast.
+      const lines = (report.findings || []).map((f) => {
+        const loc = f.line ? ` (line ${f.line})` : ""
+        const score = typeof f.score === "number" ? ` score ${f.score.toFixed(2)}` : ""
+        return `- ${f.kind}: ${f.pattern}${score}${loc}`
+      })
 
       await client.tui.showToast({
         body: {
           title: "tldt security advisory",
-          message: "Untrusted input flagged:\n" + findings,
+          message: "Untrusted input flagged:\n" + lines.join("\n"),
           variant: "warning",
         },
       })

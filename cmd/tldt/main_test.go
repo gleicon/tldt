@@ -931,6 +931,55 @@ func TestSanitizePIIFlagStdoutOnly(t *testing.T) {
 	}
 }
 
+// TestUsageLog_FirstWriteNoticeOnce verifies the one-time consent notice is
+// printed to stderr only when the usage log is first created, not on subsequent
+// runs, using an isolated HOME.
+func TestUsageLog_FirstWriteNoticeOnce(t *testing.T) {
+	home := t.TempDir()
+	runHome := func() (stderr string) {
+		t.Helper()
+		cmd := exec.Command(binaryPath, "--sentences", "2")
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir, "HOME="+home)
+		cmd.Stdin = strings.NewReader(shortText)
+		var errBuf strings.Builder
+		cmd.Stderr = &errBuf
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("run: %v", err)
+		}
+		return errBuf.String()
+	}
+
+	if first := runHome(); !strings.Contains(first, "usage stats now logged") {
+		t.Errorf("first run: want consent notice on stderr, got %q", first)
+	}
+	if second := runHome(); strings.Contains(second, "usage stats now logged") {
+		t.Errorf("second run: notice must not repeat, got %q", second)
+	}
+}
+
+// TestUsageLog_DisabledNoNotice verifies [stats] enabled=false suppresses both
+// the log write and the consent notice.
+func TestUsageLog_DisabledNoNotice(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, ".tldt.toml"), []byte("[stats]\nenabled = false\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cmd := exec.Command(binaryPath, "--sentences", "2")
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir, "HOME="+home)
+	cmd.Stdin = strings.NewReader(shortText)
+	var errBuf strings.Builder
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if strings.Contains(errBuf.String(), "usage stats now logged") {
+		t.Errorf("stats disabled: notice must not print, got %q", errBuf.String())
+	}
+	if _, err := os.Stat(filepath.Join(home, ".tldt", "usage.jsonl")); !os.IsNotExist(err) {
+		t.Error("stats disabled: usage log must not be created")
+	}
+}
+
 // TestStatsDaily_TableAndJSON verifies `tldt stats --daily` groups the usage log
 // by day in both the text table and JSON, using an isolated HOME so the seeded
 // ~/.tldt/usage.jsonl is the only input.

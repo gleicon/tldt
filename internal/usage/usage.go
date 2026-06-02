@@ -33,8 +33,9 @@ func Path() (string, error) {
 }
 
 // Append writes rec as one newline-terminated JSON line to path, creating the
-// parent directory if needed. The record is emitted in a single O_APPEND write
-// so concurrent appends from parallel processes stay atomic.
+// parent directory if needed. Records are well under PIPE_BUF, so on a local
+// filesystem the single O_APPEND write is atomic against concurrent appends from
+// parallel processes (the guarantee does not hold for larger lines or on NFS).
 func Append(path string, rec Record) error {
 	if path == "" {
 		return errors.New("usage: empty path")

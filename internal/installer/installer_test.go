@@ -72,8 +72,8 @@ func TestInstallHookFile_WritesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading installed hook: %v", err)
 	}
-	if !strings.Contains(string(data), "tldt --detect-injection --detect-pii --detect-only") {
-		t.Error("hook missing advisory invocation 'tldt --detect-injection --detect-pii --detect-only'")
+	if !strings.Contains(string(data), "tldt --hook-output") {
+		t.Error("hook missing advisory invocation 'tldt --hook-output'")
 	}
 }
 
@@ -332,7 +332,7 @@ func TestInstallHookFile_OverwritesOldSummarizingScript(t *testing.T) {
 	if strings.Contains(string(data), "--sanitize --detect-injection --verbose") {
 		t.Error("old summarizing invocation still present after re-install")
 	}
-	if !strings.Contains(string(data), "tldt --detect-injection --detect-pii --detect-only") {
+	if !strings.Contains(string(data), "tldt --hook-output") {
 		t.Error("advisory invocation missing after re-install")
 	}
 }

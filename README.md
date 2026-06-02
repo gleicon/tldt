@@ -128,6 +128,24 @@ tldt -f long-doc.txt --verbose
 
 Stats are suppressed by default so scripts that redirect stderr stay clean.
 
+### Usage log
+
+Each summarization appends a **counts-only** record (timestamp + token counts, never any content) to `~/.tldt/usage.jsonl`, and `tldt stats` reports the totals:
+
+```bash
+tldt stats            # aggregate token savings
+tldt stats --daily    # per-day breakdown
+tldt stats --json     # machine-readable
+tldt stats --reset    # clear the log
+```
+
+Logging is on by default; tldt prints a one-time notice when it first creates the file. The log only ever grows — clear it with `tldt stats --reset`. To opt out entirely, add to `~/.tldt.toml`:
+
+```toml
+[stats]
+enabled = false
+```
+
 ---
 
 ## Algorithms
@@ -221,7 +239,7 @@ After install, use `/tldt <url | file | text>` inside the assistant to summarize
 | `agents` | skill only |
 | `all` | every assistant above (default) |
 
-**Advisory hook**: when installed, a `UserPromptSubmit` hook runs local injection/PII detection on each prompt and adds a security warning to the AI context only when the input is flagged. It never summarizes, replaces, or blocks the prompt. Claude Code and Codex get this hook; OpenCode gets the equivalent advisory plugin.
+**Advisory hook**: when installed, a `UserPromptSubmit` hook runs local injection/PII detection on each prompt and adds a security warning to the AI context only when the input is flagged. The warning carries **metadata only** (finding kind, pattern, location) — never the matched text, so a flagged injection payload is never echoed back into the model's context. It never summarizes, replaces, or blocks the prompt. The Claude/Codex hook is a two-line shell script that delegates to `tldt --hook-output` (no `jq` or `python3` dependency); OpenCode gets the equivalent advisory plugin, which reads tldt's structured `--detect-only --format json` output.
 
 **Alternate Claude locations**:
 
