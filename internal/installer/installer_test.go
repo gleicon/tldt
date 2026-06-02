@@ -72,8 +72,8 @@ func TestInstallHookFile_WritesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading installed hook: %v", err)
 	}
-	if !strings.Contains(string(data), "tldt --sanitize --detect-injection --verbose") {
-		t.Error("hook missing 'tldt --sanitize --detect-injection --verbose'")
+	if !strings.Contains(string(data), "tldt --detect-injection --detect-pii --detect-only") {
+		t.Error("hook missing advisory invocation 'tldt --detect-injection --detect-pii --detect-only'")
 	}
 }
 
