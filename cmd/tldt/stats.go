@@ -85,9 +85,9 @@ func runStatsDaily(path string, jsonOut bool) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "date\tinvocations\tin\tout\tsaved\treduction")
+	_, _ = fmt.Fprintln(w, "date\tinvocations\tin\tout\tsaved\treduction")
 	for _, d := range days {
-		fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%.1f%%\n", d.Date, d.Count, d.In, d.Out, d.Saved, d.Percent)
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%.1f%%\n", d.Date, d.Count, d.In, d.Out, d.Saved, d.Percent)
 	}
 	_ = w.Flush()
 }
