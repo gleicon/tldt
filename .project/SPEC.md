@@ -53,8 +53,8 @@ tldt ships a Claude Code integration today — a `/tldt` skill and a `UserPrompt
 ### Installer — targets & ergonomics
 - **FR-17:** `tldt --install-skill` SHALL install the reader skill to each detected target: Claude Code, Codex, OpenCode, and Cursor.
 - **FR-18:** For Claude Code, the installer SHALL install the skill and register the advisory `UserPromptSubmit` shell hook.
-- **FR-19:** For Codex, the installer SHALL install the skill and register the advisory `UserPromptSubmit` shell hook in Codex's hook config (`~/.codex/hooks.json` or `config.toml`; `.codex/` for project scope).
-- **FR-20:** For OpenCode, the installer SHALL install the skill and a JS/TS plugin that runs the advisory by shelling to `tldt` on the user-message event.
+- **FR-19:** For Codex, the installer SHALL install a Codex **plugin** (a `plugin.json` manifest referencing `./skills/` and `./hooks.json`) carrying both the reader skill and the advisory `UserPromptSubmit` hook, and SHALL register it via a local marketplace (`codex plugin marketplace add <path>` + `codex plugin add <name>@<marketplace>`). Codex 0.133 does NOT load a standalone `~/.codex/hooks.json`; hooks are plugin-scoped. The hook's stdin/stdout contract is Claude-identical (`.prompt` in, `hookSpecificOutput.additionalContext` out), so the advisory hook script is shared with Claude unchanged. *(confirmed against Codex 0.133.0 — OQ-1)*
+- **FR-20:** For OpenCode, the installer SHALL install the skill and a JS/TS plugin (dropped in `~/.config/opencode/plugin/`, or `.opencode/plugin/` for project scope) that exports a `chat.message` hook and runs the advisory by shelling to `tldt`, reading the prompt text from the message `parts`. *(confirmed against OpenCode 1.15.10 / `@opencode-ai/plugin` 1.14.40 — OQ-2)*
 - **FR-21:** For Cursor, the installer SHALL install the skill only (no hook), unchanged from current behavior.
 - **FR-22:** The installer SHALL resolve the target config directory in this precedence: explicit `--config-dir <path>` > `CLAUDE_CONFIG_DIR`/`CODEX_HOME` env var (per target) > the platform default (`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.cursor`).
 - **FR-23:** `tldt --install-skill --project` SHALL write into the current repository (`./.claude/`, `./.codex/`) instead of the user config dir.
@@ -128,8 +128,8 @@ tldt ships a Claude Code integration today — a `/tldt` skill and a `UserPrompt
 - **Testing framework:** `go test -race ./...`; table-driven subtests; `httptest` for fetch; subprocess tests in `cmd/tldt/main_test.go`; no real network/filesystem in unit tests (use temp dirs for usage-log tests).
 
 ## Open Questions
-- **OQ-1 (impl):** Codex's `UserPromptSubmit` stdin JSON field name for the prompt — confirm whether it is `.prompt` (as Claude) or differs; the shared hook script's extractor may need a per-agent branch.
-- **OQ-2 (impl):** OpenCode's exact event for "user submitted a prompt" — likely `message.updated` filtered to the user role; confirm against a live OpenCode build before finalizing the plugin.
+- **OQ-1 (RESOLVED, Codex 0.133.0):** `UserPromptSubmit` stdin field is `.prompt`, identical to Claude (input: `session_id, transcript_path, cwd, hook_event_name, permission_mode, source, turn_id, prompt`; output: `hookSpecificOutput.additionalContext`, exit-2+stderr to block). No per-agent branch needed. Discovered alongside: standalone `~/.codex/hooks.json` is not loaded — hooks ship as a Claude-compatible plugin registered via a local marketplace (see FR-19).
+- **OQ-2 (RESOLVED, OpenCode 1.15.10):** The plugin hook for a user-submitted prompt is `chat.message` (typed callback `(input, output:{message: UserMessage, parts: Part[]})`), not `message.updated`. Prompt text comes from `output.parts`. Native plugins auto-load from `~/.config/opencode/plugin/` (global) or `.opencode/plugin/` (project).
 - **OQ-3:** Should `~/.tldt/usage.jsonl` honor `XDG_STATE_HOME` (e.g. `~/.local/state/tldt/`) instead of a home-dir dotdir? Current decision: `~/.tldt/`; revisit only if it conflicts with packaging expectations.
 - **OQ-4:** Is `tldt stats --daily` in the first cut (FR-15.a) or deferred? Default: deferred unless cheap.
 - **OQ-5:** Does the reader skill cap input size before fetching very large URLs, or rely solely on the fetcher's existing 5MB byte cap? Default: rely on the fetcher cap.

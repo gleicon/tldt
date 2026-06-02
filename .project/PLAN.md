@@ -4,11 +4,11 @@ Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core fi
 
 ## Now
 
-**State** — All spike-independent work done. 6 more commits on `feat/agent-integration`: advisory hook `63eda3e`, reader skill `0974df1`, config-dir resolution `eb3e736`, `--project` `336f73c`, robust upgrade dedup `8eb9b61` (Core CLI commits from prior session unchanged). Agent-artifacts section complete; installer config-dir / `--project` / re-run-idempotency (FR-22/23/24/25/26) complete. `go test -race ./...` + `go vet` clean.
+**State** — All spike-independent work done + both spikes resolved against live builds (Codex 0.133.0, OpenCode 1.15.10). 6 commits on `feat/agent-integration`: advisory hook `63eda3e`, reader skill `0974df1`, config-dir resolution `eb3e736`, `--project` `336f73c`, robust upgrade dedup `8eb9b61` (Core CLI commits from prior session unchanged). Agent-artifacts section complete; installer config-dir / `--project` / re-run-idempotency (FR-22/23/24/25/26) complete. `go test -race ./...` + `go vet` clean.
 
-**Next** — Run the two live-environment spikes (OQ-1, OQ-2); they gate everything left. Until then nothing further can be built from the repo alone. After OQ-1: Codex installer target (skill + advisory shell hook in Codex hooks config, FR-18/19). After OQ-2: OpenCode JS/TS advisory plugin (FR-20). Then default multi-target reaching Codex/OpenCode (FR-17/21).
+**Next** — Spikes done; the Codex/OpenCode targets are unblocked but their mechanisms differ from the original SPEC (see resolved OQs, FR-19/FR-20 revised). Build order: (1) Codex plugin target — bundle skill + advisory hook in a `plugin.json` plugin, register via local marketplace (FR-18/19); (2) OpenCode `chat.message` plugin reading prompt from `parts` (FR-20); (3) default multi-target reaching Codex/OpenCode/Cursor (FR-17/21). Hook script is shared with Claude unchanged (Codex `.prompt` == Claude).
 
-**Open questions** — OQ-1: Codex `UserPromptSubmit` stdin prompt-field name (does it match Claude's `.prompt`?) — confirm against a live Codex build; hook extractor branches if it differs. OQ-2: OpenCode user-message event name for the advisory plugin — confirm against a live OpenCode build. Both need a running build to probe stdin/event contracts. OQ-4: `tldt stats --daily` deferred (not in first cut). `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
+**Open questions** — OQ-1 RESOLVED: Codex `UserPromptSubmit` uses `.prompt`, Claude-identical I/O; but hooks are plugin-scoped (standalone `~/.codex/hooks.json` not loaded) → FR-19 revised to plugin+marketplace. OQ-2 RESOLVED: OpenCode hook is `chat.message` (not `message.updated`), text from `parts` → FR-20 revised. OQ-4: `tldt stats --daily` deferred (not in first cut). `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
 
 ## Roadmap
 
@@ -24,13 +24,13 @@ Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core fi
 - [x] Reader skill accepts url / file / text → `tldt --url` / `-f` / pipe, returns summary + savings line; description steers "long prose for context, not verbatim/code/edit" (FR-6, FR-7, FR-8) — `0974df1`
 
 ### Spikes (gate the agent-specific installer targets)
-- [ ] Codex `UserPromptSubmit` stdin prompt-field name confirmed against a live build; hook extractor branches if it differs from Claude's `.prompt` (OQ-1)
-- [ ] OpenCode user-message event for the advisory plugin confirmed against a live build (OQ-2)
+- [x] Codex `UserPromptSubmit` field confirmed `.prompt` (Claude-identical I/O) against 0.133.0; hooks are plugin-scoped, not standalone `hooks.json` (OQ-1)
+- [x] OpenCode advisory hook confirmed `chat.message` (text from `parts`) against 1.15.10 / `@opencode-ai/plugin` 1.14.40 (OQ-2)
 
 ### Installer
 - [x] Config-dir resolves with precedence `--config-dir` > `CLAUDE_CONFIG_DIR` > platform default — Claude target only; `CODEX_HOME` lands with Codex target (FR-22) — `eb3e736`
 - [x] `--project` writes repo-local artifacts; hook registered in `.claude/settings.local.json` via `$CLAUDE_PROJECT_DIR`; no machine-specific path written to a committed file (FR-23, FR-24) — `336f73c`
 - [x] Re-running the installer overwrites skill + hook files, replaces an old summarizing hook with the advisory one, and leaves exactly one tldt hook registration (FR-25, FR-26) — `8eb9b61`
 - [ ] Default install reaches Claude / Codex / OpenCode / Cursor skill dirs; Cursor stays skill-only (FR-17, FR-21)
-- [ ] Codex target installs skill + advisory shell hook in Codex hooks config — after OQ-1 (FR-18, FR-19)
-- [ ] OpenCode target installs skill + JS/TS advisory plugin — after OQ-2 (FR-20)
+- [ ] Codex target installs a `plugin.json` plugin (skill + advisory hook) registered via local marketplace; hook script shared with Claude (FR-18, FR-19)
+- [ ] OpenCode target installs skill + JS/TS `chat.message` advisory plugin in `~/.config/opencode/plugin/` (FR-20)
