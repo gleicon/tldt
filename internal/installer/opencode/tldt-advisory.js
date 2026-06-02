@@ -28,10 +28,12 @@ export const TldtAdvisory = async ({ client }) => {
       // tldt missing or failed to spawn — degrade silently.
       if (res.error || res.status === null) return
 
-      // Flagged = stderr minus the two clean "no findings" lines and blanks.
+      // Flagged = stderr minus the two clean "no findings" lines, outlier-sentence
+      // reports (a summarization signal that fires on benign diverse prose, not an
+      // injection/PII signal), and blanks.
       const findings = (res.stderr || "")
         .split("\n")
-        .filter((l) => l.trim() && !/(pii|injection)-detect: no findings/.test(l))
+        .filter((l) => l.trim() && !/(pii|injection)-detect: no findings|outlier sentence|\[outlier\]/.test(l))
         .join("\n")
         .trim()
       if (!findings) return

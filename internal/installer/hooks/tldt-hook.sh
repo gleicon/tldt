@@ -21,8 +21,10 @@ STDERR_FILE=$(mktemp)
 printf '%s' "$PROMPT" | tldt --detect-injection --detect-pii --detect-only \
   >/dev/null 2>"$STDERR_FILE" || true
 
-# Flagged = stderr minus the two clean "no findings" lines and blanks.
-FINDINGS=$(grep -vE '(pii|injection)-detect: no findings' "$STDERR_FILE" \
+# Flagged = stderr minus the two clean "no findings" lines, outlier-sentence
+# reports (a summarization signal that fires on benign diverse prose, not an
+# injection/PII signal), and blanks.
+FINDINGS=$(grep -vE '(pii|injection)-detect: no findings|outlier sentence|\[outlier\]' "$STDERR_FILE" \
   | grep -v '^[[:space:]]*$' || true)
 rm -f "$STDERR_FILE"
 
