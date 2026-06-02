@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Options controls Install() behavior.
@@ -27,6 +28,10 @@ type Options struct {
 	// ConfigDir overrides the Claude config directory base (FR-22).
 	// Precedence: ConfigDir > $CLAUDE_CONFIG_DIR > ~/.claude. Empty = use env or default.
 	ConfigDir string
+
+	// Project installs repo-locally under ./.claude/ and registers the hook in the
+	// gitignored .claude/settings.local.json via $CLAUDE_PROJECT_DIR (FR-23, FR-24).
+	Project bool
 }
 
 // installTarget describes one coding assistant's install locations.
@@ -34,6 +39,7 @@ type installTarget struct {
 	name         string
 	skillDest    string // path to write SKILL.md
 	hookDest     string // path to write hook script; empty = no hook for this app
+	hookCmd      string // command path registered in settings.json (may differ from hookDest for --project)
 	settingsPath string // path to settings.json; empty = no hook registration
 }
 
@@ -63,7 +69,7 @@ func Install(opts Options) error {
 			if err := installHookFile(t.hookDest); err != nil {
 				return fmt.Errorf("installing hook to %s: %w", t.name, err)
 			}
-			if err := PatchSettingsJSON(t.settingsPath, t.hookDest); err != nil {
+			if err := PatchSettingsJSON(t.settingsPath, t.hookCmd); err != nil {
 				return fmt.Errorf("patching settings.json for %s: %w", t.name, err)
 			}
 		}
@@ -87,16 +93,30 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 		}}, nil
 	}
 
+	// --project: repo-local Claude install only. Hook is registered in the gitignored
+	// settings.local.json via $CLAUDE_PROJECT_DIR so no machine path is committed (FR-23, FR-24).
+	if opts.Project {
+		return []installTarget{{
+			name:         "claude",
+			skillDest:    filepath.Join(".claude", "skills", "tldt", "SKILL.md"),
+			hookDest:     filepath.Join(".claude", "hooks", "tldt-hook.sh"),
+			hookCmd:      "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh",
+			settingsPath: filepath.Join(".claude", "settings.local.json"),
+		}}, nil
+	}
+
 	// Claude Code is included on the default/all run or when explicitly targeted.
 	// It is the only target that registers the UserPromptSubmit hook. A specific
 	// optional target (e.g. --target opencode) must NOT drag in Claude.
 	var targets []installTarget
 	if opts.Target == "" || opts.Target == "all" || opts.Target == "claude" {
 		base := claudeBaseDir(homeDir, opts)
+		hookDest := filepath.Join(base, "hooks", "tldt-hook.sh")
 		targets = append(targets, installTarget{
 			name:         "claude",
 			skillDest:    filepath.Join(base, "skills", "tldt", "SKILL.md"),
-			hookDest:     filepath.Join(base, "hooks", "tldt-hook.sh"),
+			hookDest:     hookDest,
+			hookCmd:      hookDest,
 			settingsPath: filepath.Join(base, "settings.json"),
 		})
 	}
@@ -197,10 +217,11 @@ func installHookFile(destPath string) error {
 // with an empty object if missing), merges the tldt UserPromptSubmit hook entry,
 // and writes back using a temp-file-then-rename strategy for atomicity.
 // Idempotent: if hookCmd is already registered, returns nil without modifying the file.
-// hookCmd MUST be an absolute expanded path (not $HOME/...).
+// hookCmd MUST be an absolute expanded path, or a portable $CLAUDE_PROJECT_DIR/-rooted
+// path for --project installs (FR-24). Truly relative paths are rejected.
 func PatchSettingsJSON(settingsPath string, hookCmd string) error {
-	if !filepath.IsAbs(hookCmd) {
-		return fmt.Errorf("hookCmd must be an absolute path, got %q", hookCmd)
+	if !filepath.IsAbs(hookCmd) && !strings.HasPrefix(hookCmd, "$CLAUDE_PROJECT_DIR/") {
+		return fmt.Errorf("hookCmd must be an absolute or $CLAUDE_PROJECT_DIR-rooted path, got %q", hookCmd)
 	}
 
 	data, err := os.ReadFile(settingsPath)

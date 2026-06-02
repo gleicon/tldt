@@ -42,6 +42,7 @@ func main() {
 	skillDir := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
 	skillTarget := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
 	configDir := flag.String("config-dir", "", "override Claude config dir base (precedence: --config-dir > $CLAUDE_CONFIG_DIR > ~/.claude)")
+	projectInstall := flag.Bool("project", false, "install repo-locally under ./.claude/ and register the hook in .claude/settings.local.json")
 	sanitizeFlag := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
 	detectOnly := flag.Bool("detect-only", false, "run requested detection stages then exit before summarizing (no summary, no usage log)")
@@ -67,6 +68,7 @@ func main() {
 			SkillDir:  *skillDir,
 			Target:    *skillTarget,
 			ConfigDir: *configDir,
+			Project:   *projectInstall,
 		}); err != nil {
 			fmt.Fprintln(os.Stderr, "install-skill:", err)
 			os.Exit(1)
@@ -431,6 +433,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --skill-dir string     Override skill install directory")
 	fmt.Fprintln(os.Stderr, "  --target string        Install target: claude|cursor|opencode|agents|all")
 	fmt.Fprintln(os.Stderr, "  --config-dir string    Override Claude config dir (else $CLAUDE_CONFIG_DIR, else ~/.claude)")
+	fmt.Fprintln(os.Stderr, "  --project              Install repo-locally under ./.claude/ (hook in settings.local.json)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "EMBEDDED AI ASSISTANT SKILLS:")
 	fmt.Fprintln(os.Stderr, "  The binary contains embedded skill templates for AI assistants.")

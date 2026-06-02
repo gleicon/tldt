@@ -309,6 +309,51 @@ func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
 	}
 }
 
+func TestResolveTargets_ProjectScopeIsRepoLocal(t *testing.T) {
+	// FR-23/FR-24: --project → single repo-local Claude target, settings.local.json,
+	// and a $CLAUDE_PROJECT_DIR-rooted hook command (not a machine path).
+	targets, err := resolveTargets(t.TempDir(), Options{Project: true})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	if len(targets) != 1 || targets[0].name != "claude" {
+		t.Fatalf("--project: got %+v, want exactly [claude]", targets)
+	}
+	tg := targets[0]
+	if want := filepath.Join(".claude", "skills", "tldt", "SKILL.md"); tg.skillDest != want {
+		t.Errorf("skillDest = %q, want %q", tg.skillDest, want)
+	}
+	if want := filepath.Join(".claude", "hooks", "tldt-hook.sh"); tg.hookDest != want {
+		t.Errorf("hookDest = %q, want %q", tg.hookDest, want)
+	}
+	if want := filepath.Join(".claude", "settings.local.json"); tg.settingsPath != want {
+		t.Errorf("settingsPath = %q, want %q", tg.settingsPath, want)
+	}
+	if tg.hookCmd != "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh" {
+		t.Errorf("hookCmd = %q, want $CLAUDE_PROJECT_DIR-rooted path", tg.hookCmd)
+	}
+	if filepath.IsAbs(tg.hookCmd) {
+		t.Errorf("hookCmd must not be an absolute machine path, got %q", tg.hookCmd)
+	}
+}
+
+func TestPatchSettingsJSON_AcceptsProjectDirVar(t *testing.T) {
+	// AC-19: the $CLAUDE_PROJECT_DIR hook command is registered in settings.local.json
+	// and no absolute machine path is written.
+	settingsPath := filepath.Join(t.TempDir(), "settings.local.json")
+	hookCmd := "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh"
+	if err := PatchSettingsJSON(settingsPath, hookCmd); err != nil {
+		t.Fatalf("PatchSettingsJSON: unexpected error for project hookCmd: %v", err)
+	}
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("reading settings.local.json: %v", err)
+	}
+	if !strings.Contains(string(data), hookCmd) {
+		t.Errorf("settings.local.json missing %q", hookCmd)
+	}
+}
+
 func TestResolveTargets_SpecificOptionalExcludesClaude(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "tldt-target-opencode-*")
 	if err != nil {
