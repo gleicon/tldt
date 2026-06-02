@@ -79,7 +79,7 @@ tldt -f article.txt --format markdown
 | `--from-html` | off | Convert HTML input to Markdown before summarizing |
 | `--install-skill` | off | Install tldt skill and UserPromptSubmit hook |
 | `--skill-dir <dir>` | — | Override skill install directory |
-| `--target <app>` | — | Install target: `claude`, `cursor`, `opencode`, `agents`, or `all` |
+| `--target <app>` | — | Install target: `claude`, `codex`, `cursor`, `opencode`, `agents`, or `all` |
 
 > `--sanitize-pii` favors over-redaction: its high-entropy gate can also redact dense base64 that is not secret (content hashes, signatures, key fingerprints) as `[REDACTED:secret]`. Use `--detect-pii` to report matches without modifying text.
 
@@ -200,19 +200,37 @@ tldt -f article.txt --level aggressive   # 3 sentences
 
 ---
 
-## Claude Code skill integration
+## AI assistant skill integration
 
-Install tldt as a Claude Code skill so you can invoke it directly inside a session:
+Install tldt as a skill across AI coding assistants. The default run auto-detects every assistant with an existing config directory and installs to all of them:
 
 ```bash
-tldt --install-skill                    # auto-detect Claude Code install dirs
-tldt --install-skill --target claude    # specific app only
-tldt --install-skill --skill-dir /path  # explicit directory
+tldt --install-skill                    # auto-detect and install everywhere
+tldt --install-skill --target claude    # one assistant (auto-creates its dir)
+tldt --install-skill --skill-dir /path  # write the skill to an explicit dir
 ```
 
-After install, use `/tldt <text>` inside Claude Code to summarize inline.
+After install, use `/tldt <url | file | text>` inside the assistant to summarize inline.
 
-**Auto-trigger hook**: when installed, the hook fires automatically on long paste or file input. The summarized version enters the AI context instead of the raw text, with token savings reported to stderr.
+| `--target` | Installs |
+| --- | --- |
+| `claude` | skill + advisory hook + `settings.json` |
+| `codex` | plugin (skill + advisory hook) via a local marketplace |
+| `opencode` | skill + advisory plugin |
+| `cursor` | skill only |
+| `agents` | skill only |
+| `all` | every assistant above (default) |
+
+**Advisory hook**: when installed, a `UserPromptSubmit` hook runs local injection/PII detection on each prompt and adds a security warning to the AI context only when the input is flagged. It never summarizes, replaces, or blocks the prompt. Claude Code and Codex get this hook; OpenCode gets the equivalent advisory plugin.
+
+**Alternate Claude locations**:
+
+```bash
+tldt --install-skill --config-dir ~/alt/.claude   # override the Claude config base
+tldt --install-skill --project                     # repo-local ./.claude/ install
+```
+
+`--config-dir` takes precedence over `$CLAUDE_CONFIG_DIR`, then the `~/.claude` default. `--project` installs into the current repo and registers the hook in `.claude/settings.local.json` via `$CLAUDE_PROJECT_DIR`, so no machine-specific path is committed.
 
 ---
 
