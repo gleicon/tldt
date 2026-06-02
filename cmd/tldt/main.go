@@ -17,6 +17,7 @@ import (
 	"github.com/gleicon/tldt/internal/config"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
+	usagelog "github.com/gleicon/tldt/internal/usage"
 )
 
 func main() {
@@ -139,6 +140,17 @@ func main() {
 	}
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
+
+	// Append a counts-only usage record. A log-write failure must never alter
+	// stdout, the exit code, or the summarization (FR-11) — so errors are dropped.
+	if logPath, err := usagelog.Path(); err == nil {
+		_ = usagelog.Append(logPath, usagelog.Record{
+			TS:    time.Now().Format(time.RFC3339),
+			In:    tokIn,
+			Out:   tokOut,
+			Saved: tokIn - tokOut,
+		})
+	}
 }
 
 // resolveSettings merges the effective algorithm, sentence count, and output
