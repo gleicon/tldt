@@ -522,3 +522,51 @@ func TestResolveTargets_DetectsOptionalApps(t *testing.T) {
 		t.Error("cursor target not found even though ~/.cursor dir exists")
 	}
 }
+
+// TestInstall_DefaultRunReachesAllFour pins FR-17/21: a default run (no --target)
+// installs to every detected app in one pass — Claude (skill+hook+settings), Codex
+// (plugin tree), OpenCode (skill+advisory plugin), and Cursor (skill only). The
+// optional dirs are pre-created so detection includes them; ~/.agents is left absent
+// to confirm the detection gate still excludes an uninstalled app. PATH is pointed at
+// an empty dir so the Codex registration takes its best-effort (no-shell-out) branch,
+// keeping the test deterministic regardless of whether codex is on the dev machine.
+func TestInstall_DefaultRunReachesAllFour(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")            // exercise the ~/.claude default
+	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	t.Setenv("PATH", t.TempDir())                // no codex binary => best-effort branch
+
+	for _, dir := range []string{
+		filepath.Join(home, ".cursor"),
+		filepath.Join(home, ".config", "opencode"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("pre-creating %q: %v", dir, err)
+		}
+	}
+
+	if err := Install(Options{}); err != nil {
+		t.Fatalf("Install(default): %v", err)
+	}
+
+	want := []string{
+		filepath.Join(home, ".claude", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".claude", "hooks", "tldt-hook.sh"),
+		filepath.Join(home, ".claude", "settings.json"),
+		filepath.Join(home, ".codex", "tldt-marketplace", "plugins", "tldt", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".config", "opencode", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".config", "opencode", "plugins", "tldt-advisory.js"),
+		filepath.Join(home, ".cursor", "skills", "tldt", "SKILL.md"),
+	}
+	for _, p := range want {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("default run did not land %q: %v", p, err)
+		}
+	}
+
+	// The detection gate must still exclude an app whose dir is absent.
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "tldt", "SKILL.md")); err == nil {
+		t.Error("default run installed to ~/.agents even though its dir was absent")
+	}
+}
