@@ -53,6 +53,17 @@ func Install(opts Options) error {
 		return fmt.Errorf("resolving home dir: %w", err)
 	}
 
+	// Codex uses a plugin+marketplace mechanism, handled apart from the
+	// file-write targets below. A --target codex run installs only Codex.
+	if codexTargeted(opts) {
+		if err := installCodexPlugin(codexBaseDir(homeDir, opts)); err != nil {
+			return fmt.Errorf("installing codex plugin: %w", err)
+		}
+		if opts.Target == "codex" {
+			return nil
+		}
+	}
+
 	targets, err := resolveTargets(homeDir, opts)
 	if err != nil {
 		return err
