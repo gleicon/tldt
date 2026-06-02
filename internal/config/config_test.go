@@ -190,6 +190,36 @@ func TestLevelPresets_Unknown(t *testing.T) {
 	}
 }
 
+func TestStatsConfig(t *testing.T) {
+	if !DefaultConfig().Stats.Enabled {
+		t.Error("DefaultConfig().Stats.Enabled = false, want true")
+	}
+
+	// Absent [stats] section keeps the default (enabled).
+	f, err := os.CreateTemp("", "tldt-stats-absent-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("sentences = 3\n")
+	_ = f.Close()
+	if !Load(f.Name()).Stats.Enabled {
+		t.Error("Load(no [stats]): Stats.Enabled = false, want true (default)")
+	}
+
+	// Explicit opt-out flips it off.
+	f2, err := os.CreateTemp("", "tldt-stats-off-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f2.Name()) })
+	_, _ = f2.WriteString("[stats]\nenabled = false\n")
+	_ = f2.Close()
+	if Load(f2.Name()).Stats.Enabled {
+		t.Error("Load([stats] enabled=false): Stats.Enabled = true, want false")
+	}
+}
+
 func TestConfigPath(t *testing.T) {
 	path, err := ConfigPath()
 	if err != nil {
@@ -197,55 +227,5 @@ func TestConfigPath(t *testing.T) {
 	}
 	if !strings.HasSuffix(path, ".tldt.toml") {
 		t.Errorf("ConfigPath() = %q, want path ending in \".tldt.toml\"", path)
-	}
-}
-
-func TestHookConfig(t *testing.T) {
-	// Default threshold
-	d := DefaultConfig()
-	if d.Hook.Threshold != 2000 {
-		t.Errorf("DefaultConfig().Hook.Threshold = %d, want 2000", d.Hook.Threshold)
-	}
-
-	// TOML [hook] section loads correctly
-	f, err := os.CreateTemp("", "tldt-hook-test-*.toml")
-	if err != nil {
-		t.Fatalf("creating temp file: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Remove(f.Name()) })
-	_, _ = f.WriteString("[hook]\nthreshold = 1500\n")
-	_ = f.Close()
-
-	cfg := Load(f.Name())
-	if cfg.Hook.Threshold != 1500 {
-		t.Errorf("Load([hook] threshold=1500): Hook.Threshold = %d, want 1500", cfg.Hook.Threshold)
-	}
-
-	// Zero threshold guard
-	f2, err := os.CreateTemp("", "tldt-hook-zero-*.toml")
-	if err != nil {
-		t.Fatalf("creating temp file: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Remove(f2.Name()) })
-	_, _ = f2.WriteString("[hook]\nthreshold = 0\n")
-	_ = f2.Close()
-
-	cfg2 := Load(f2.Name())
-	if cfg2.Hook.Threshold != 2000 {
-		t.Errorf("Load([hook] threshold=0): Hook.Threshold = %d, want 2000 (guard)", cfg2.Hook.Threshold)
-	}
-
-	// Negative threshold guard
-	f3, err := os.CreateTemp("", "tldt-hook-neg-*.toml")
-	if err != nil {
-		t.Fatalf("creating temp file: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Remove(f3.Name()) })
-	_, _ = f3.WriteString("[hook]\nthreshold = -5\n")
-	_ = f3.Close()
-
-	cfg3 := Load(f3.Name())
-	if cfg3.Hook.Threshold != 2000 {
-		t.Errorf("Load([hook] threshold=-5): Hook.Threshold = %d, want 2000 (guard)", cfg3.Hook.Threshold)
 	}
 }

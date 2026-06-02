@@ -72,11 +72,8 @@ func TestInstallHookFile_WritesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading installed hook: %v", err)
 	}
-	if !strings.Contains(string(data), "tldt --print-threshold") {
-		t.Error("hook missing 'tldt --print-threshold'")
-	}
-	if !strings.Contains(string(data), "tldt --sanitize --detect-injection --verbose") {
-		t.Error("hook missing 'tldt --sanitize --detect-injection --verbose'")
+	if !strings.Contains(string(data), "tldt --hook-output") {
+		t.Error("hook missing advisory invocation 'tldt --hook-output'")
 	}
 }
 
@@ -256,6 +253,7 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 		t.Fatalf("creating temp dir: %v", err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	t.Setenv("CLAUDE_CONFIG_DIR", "") // isolate from ambient env so the default path is exercised
 
 	targets, err := resolveTargets(tmpDir, Options{})
 	if err != nil {
@@ -270,6 +268,153 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 	expectedSkill := filepath.Join(tmpDir, ".claude", "skills", "tldt", "SKILL.md")
 	if targets[0].skillDest != expectedSkill {
 		t.Errorf("claude skillDest = %q, want %q", targets[0].skillDest, expectedSkill)
+	}
+}
+
+func TestResolveTargets_HonorsClaudeConfigDirEnv(t *testing.T) {
+	// CLAUDE_CONFIG_DIR set and no --config-dir → artifacts under the env path.
+	tmpDir := t.TempDir()
+	envBase := filepath.Join(tmpDir, "cc-env")
+	t.Setenv("CLAUDE_CONFIG_DIR", envBase)
+
+	targets, err := resolveTargets(tmpDir, Options{Target: "claude"})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	wantSkill := filepath.Join(envBase, "skills", "tldt", "SKILL.md")
+	if targets[0].skillDest != wantSkill {
+		t.Errorf("skillDest = %q, want %q (CLAUDE_CONFIG_DIR honored)", targets[0].skillDest, wantSkill)
+	}
+	if want := filepath.Join(envBase, "hooks", "tldt-hook.sh"); targets[0].hookDest != want {
+		t.Errorf("hookDest = %q, want %q", targets[0].hookDest, want)
+	}
+	if want := filepath.Join(envBase, "settings.json"); targets[0].settingsPath != want {
+		t.Errorf("settingsPath = %q, want %q", targets[0].settingsPath, want)
+	}
+}
+
+func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
+	// --config-dir and CLAUDE_CONFIG_DIR both set → the flag wins.
+	tmpDir := t.TempDir()
+	flagBase := filepath.Join(tmpDir, "cc-flag")
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(tmpDir, "cc-env"))
+
+	targets, err := resolveTargets(tmpDir, Options{Target: "claude", ConfigDir: flagBase})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	wantSkill := filepath.Join(flagBase, "skills", "tldt", "SKILL.md")
+	if targets[0].skillDest != wantSkill {
+		t.Errorf("skillDest = %q, want %q (--config-dir must win over env)", targets[0].skillDest, wantSkill)
+	}
+}
+
+func TestInstallHookFile_OverwritesOldSummarizingScript(t *testing.T) {
+	// re-running over a prior summarizing hook replaces its content
+	// with the advisory script.
+	destPath := filepath.Join(t.TempDir(), "hooks", "tldt-hook.sh")
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	old := "#!/usr/bin/env bash\ntldt --sanitize --detect-injection --verbose\n"
+	if err := os.WriteFile(destPath, []byte(old), 0755); err != nil {
+		t.Fatalf("seeding old hook: %v", err)
+	}
+
+	if err := installHookFile(destPath); err != nil {
+		t.Fatalf("installHookFile: %v", err)
+	}
+
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("reading hook: %v", err)
+	}
+	if strings.Contains(string(data), "--sanitize --detect-injection --verbose") {
+		t.Error("old summarizing invocation still present after re-install")
+	}
+	if !strings.Contains(string(data), "tldt --hook-output") {
+		t.Error("advisory invocation missing after re-install")
+	}
+}
+
+func TestPatchSettingsJSON_ReplacesStaleTldtHook(t *testing.T) {
+	// a prior tldt registration with a DIFFERENT command path is
+	// dropped, leaving exactly one registration pointing at the new command.
+	settingsPath := filepath.Join(t.TempDir(), "settings.json")
+	stale := `{"hooks":{"UserPromptSubmit":[` +
+		`{"hooks":[{"type":"command","command":"/old/path/tldt-hook.sh","timeout":30}]},` +
+		`{"hooks":[{"type":"command","command":"/other/hook.sh"}]}` +
+		`]}}`
+	if err := os.WriteFile(settingsPath, []byte(stale), 0644); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	newCmd := "/new/base/hooks/tldt-hook.sh"
+	if err := PatchSettingsJSON(settingsPath, newCmd); err != nil {
+		t.Fatalf("PatchSettingsJSON: %v", err)
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("reading settings: %v", err)
+	}
+	s := string(data)
+	if c := strings.Count(s, "tldt-hook.sh"); c != 1 {
+		t.Errorf("tldt-hook.sh appears %d times, want exactly 1: %s", c, s)
+	}
+	if strings.Contains(s, "/old/path/tldt-hook.sh") {
+		t.Error("stale tldt registration not removed")
+	}
+	if !strings.Contains(s, newCmd) {
+		t.Errorf("new command %q not registered", newCmd)
+	}
+	if !strings.Contains(s, "/other/hook.sh") {
+		t.Error("co-located non-tldt hook was clobbered")
+	}
+}
+
+func TestResolveTargets_ProjectScopeIsRepoLocal(t *testing.T) {
+	// --project → single repo-local Claude target, settings.local.json,
+	// and a $CLAUDE_PROJECT_DIR-rooted hook command (not a machine path).
+	targets, err := resolveTargets(t.TempDir(), Options{Project: true})
+	if err != nil {
+		t.Fatalf("resolveTargets: %v", err)
+	}
+	if len(targets) != 1 || targets[0].name != "claude" {
+		t.Fatalf("--project: got %+v, want exactly [claude]", targets)
+	}
+	tg := targets[0]
+	if want := filepath.Join(".claude", "skills", "tldt", "SKILL.md"); tg.skillDest != want {
+		t.Errorf("skillDest = %q, want %q", tg.skillDest, want)
+	}
+	if want := filepath.Join(".claude", "hooks", "tldt-hook.sh"); tg.hookDest != want {
+		t.Errorf("hookDest = %q, want %q", tg.hookDest, want)
+	}
+	if want := filepath.Join(".claude", "settings.local.json"); tg.settingsPath != want {
+		t.Errorf("settingsPath = %q, want %q", tg.settingsPath, want)
+	}
+	if tg.hookCmd != "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh" {
+		t.Errorf("hookCmd = %q, want $CLAUDE_PROJECT_DIR-rooted path", tg.hookCmd)
+	}
+	if filepath.IsAbs(tg.hookCmd) {
+		t.Errorf("hookCmd must not be an absolute machine path, got %q", tg.hookCmd)
+	}
+}
+
+func TestPatchSettingsJSON_AcceptsProjectDirVar(t *testing.T) {
+	// the $CLAUDE_PROJECT_DIR hook command is registered in settings.local.json
+	// and no absolute machine path is written.
+	settingsPath := filepath.Join(t.TempDir(), "settings.local.json")
+	hookCmd := "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh"
+	if err := PatchSettingsJSON(settingsPath, hookCmd); err != nil {
+		t.Fatalf("PatchSettingsJSON: unexpected error for project hookCmd: %v", err)
+	}
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("reading settings.local.json: %v", err)
+	}
+	if !strings.Contains(string(data), hookCmd) {
+		t.Errorf("settings.local.json missing %q", hookCmd)
 	}
 }
 
@@ -375,5 +520,53 @@ func TestResolveTargets_DetectsOptionalApps(t *testing.T) {
 	}
 	if !found {
 		t.Error("cursor target not found even though ~/.cursor dir exists")
+	}
+}
+
+// TestInstall_DefaultRunReachesAllFour pins that a default run (no --target)
+// installs to every detected app in one pass — Claude (skill+hook+settings), Codex
+// (plugin tree), OpenCode (skill+advisory plugin), and Cursor (skill only). The
+// optional dirs are pre-created so detection includes them; ~/.agents is left absent
+// to confirm the detection gate still excludes an uninstalled app. PATH is pointed at
+// an empty dir so the Codex registration takes its best-effort (no-shell-out) branch,
+// keeping the test deterministic regardless of whether codex is on the dev machine.
+func TestInstall_DefaultRunReachesAllFour(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")            // exercise the ~/.claude default
+	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	t.Setenv("PATH", t.TempDir())                // no codex binary => best-effort branch
+
+	for _, dir := range []string{
+		filepath.Join(home, ".cursor"),
+		filepath.Join(home, ".config", "opencode"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("pre-creating %q: %v", dir, err)
+		}
+	}
+
+	if err := Install(Options{}); err != nil {
+		t.Fatalf("Install(default): %v", err)
+	}
+
+	want := []string{
+		filepath.Join(home, ".claude", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".claude", "hooks", "tldt-hook.sh"),
+		filepath.Join(home, ".claude", "settings.json"),
+		filepath.Join(home, ".codex", "tldt-marketplace", "plugins", "tldt", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".config", "opencode", "skills", "tldt", "SKILL.md"),
+		filepath.Join(home, ".config", "opencode", "plugins", "tldt-advisory.js"),
+		filepath.Join(home, ".cursor", "skills", "tldt", "SKILL.md"),
+	}
+	for _, p := range want {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("default run did not land %q: %v", p, err)
+		}
+	}
+
+	// The detection gate must still exclude an app whose dir is absent.
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "tldt", "SKILL.md")); err == nil {
+		t.Error("default run installed to ~/.agents even though its dir was absent")
 	}
 }

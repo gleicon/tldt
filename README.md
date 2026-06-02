@@ -77,10 +77,9 @@ tldt -f article.txt --format markdown
 | `--detect-pii` | off | Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr |
 | `--sanitize-pii` | off | Redact PII/secrets (detected patterns plus high-entropy key material) with `[REDACTED:<type>]` before summarizing |
 | `--from-html` | off | Convert HTML input to Markdown before summarizing |
-| `--print-threshold` | off | Print configured hook token threshold to stdout and exit |
 | `--install-skill` | off | Install tldt skill and UserPromptSubmit hook |
 | `--skill-dir <dir>` | — | Override skill install directory |
-| `--target <app>` | — | Install target: `claude`, `cursor`, `opencode`, `agents`, or `all` |
+| `--target <app>` | — | Install target: `claude`, `codex`, `cursor`, `opencode`, `agents`, or `all` |
 
 > `--sanitize-pii` favors over-redaction: its high-entropy gate can also redact dense base64 that is not secret (content hashes, signatures, key fingerprints) as `[REDACTED:secret]`. Use `--detect-pii` to report matches without modifying text.
 
@@ -128,6 +127,24 @@ tldt -f long-doc.txt --verbose
 ```
 
 Stats are suppressed by default so scripts that redirect stderr stay clean.
+
+### Usage log
+
+Each summarization appends a **counts-only** record (timestamp + token counts, never any content) to `~/.tldt/usage.jsonl`, and `tldt stats` reports the totals:
+
+```bash
+tldt stats            # aggregate token savings
+tldt stats --daily    # per-day breakdown
+tldt stats --json     # machine-readable
+tldt stats --reset    # clear the log
+```
+
+Logging is on by default; tldt prints a one-time notice when it first creates the file. The log only ever grows — clear it with `tldt stats --reset`. To opt out entirely, add to `~/.tldt.toml`:
+
+```toml
+[stats]
+enabled = false
+```
 
 ---
 
@@ -183,9 +200,6 @@ algorithm = "ensemble"
 sentences = 7
 format    = "text"
 level     = "standard"
-
-[hook]
-threshold = 2000   # tokens; auto-trigger hook fires above this
 ```
 
 CLI flags always override the config file. Missing or malformed TOML silently falls back to built-in defaults — never an error.
@@ -204,23 +218,37 @@ tldt -f article.txt --level aggressive   # 3 sentences
 
 ---
 
-## Claude Code skill integration
+## AI assistant skill integration
 
-Install tldt as a Claude Code skill so you can invoke it directly inside a session:
-
-```bash
-tldt --install-skill                    # auto-detect Claude Code install dirs
-tldt --install-skill --target claude    # specific app only
-tldt --install-skill --skill-dir /path  # explicit directory
-```
-
-After install, use `/tldt <text>` inside Claude Code to summarize inline.
-
-**Auto-trigger hook**: when installed, the hook fires automatically when your paste or file input exceeds a token threshold (default: 2000). The summarized version enters the AI context instead of the raw text, with token savings reported to stderr.
+Install tldt as a skill across AI coding assistants. The default run auto-detects every assistant with an existing config directory and installs to all of them:
 
 ```bash
-tldt --print-threshold   # print current threshold (from config) and exit
+tldt --install-skill                    # auto-detect and install everywhere
+tldt --install-skill --target claude    # one assistant (auto-creates its dir)
+tldt --install-skill --skill-dir /path  # write the skill to an explicit dir
 ```
+
+After install, use `/tldt <url | file | text>` inside the assistant to summarize inline.
+
+| `--target` | Installs |
+| --- | --- |
+| `claude` | skill + advisory hook + `settings.json` |
+| `codex` | plugin (skill + advisory hook) via a local marketplace |
+| `opencode` | skill + advisory plugin |
+| `cursor` | skill only |
+| `agents` | skill only |
+| `all` | every assistant above (default) |
+
+**Advisory hook**: when installed, a `UserPromptSubmit` hook runs local injection/PII detection on each prompt and adds a security warning to the AI context only when the input is flagged. The warning carries **metadata only** (finding kind, pattern, location) — never the matched text, so a flagged injection payload is never echoed back into the model's context. It never summarizes, replaces, or blocks the prompt. The Claude/Codex hook is a two-line shell script that delegates to `tldt --hook-output` (no `jq` or `python3` dependency); OpenCode gets the equivalent advisory plugin, which reads tldt's structured `--detect-only --format json` output.
+
+**Alternate Claude locations**:
+
+```bash
+tldt --install-skill --config-dir ~/alt/.claude   # override the Claude config base
+tldt --install-skill --project                     # repo-local ./.claude/ install
+```
+
+`--config-dir` takes precedence over `$CLAUDE_CONFIG_DIR`, then the `~/.claude` default. `--project` installs into the current repo and registers the hook in `.claude/settings.local.json` via `$CLAUDE_PROJECT_DIR`, so no machine-specific path is committed.
 
 ---
 

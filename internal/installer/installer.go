@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Options controls Install() behavior.
@@ -23,6 +24,14 @@ type Options struct {
 	// Target restricts install to a specific app: "claude", "cursor", "opencode", "agents", "all".
 	// Empty = same as "all" (auto-detect).
 	Target string
+
+	// ConfigDir overrides the Claude config directory base.
+	// Precedence: ConfigDir > $CLAUDE_CONFIG_DIR > ~/.claude. Empty = use env or default.
+	ConfigDir string
+
+	// Project installs repo-locally under ./.claude/ and registers the hook in the
+	// gitignored .claude/settings.local.json via $CLAUDE_PROJECT_DIR.
+	Project bool
 }
 
 // installTarget describes one coding assistant's install locations.
@@ -30,7 +39,9 @@ type installTarget struct {
 	name         string
 	skillDest    string // path to write SKILL.md
 	hookDest     string // path to write hook script; empty = no hook for this app
+	hookCmd      string // command path registered in settings.json (may differ from hookDest for --project)
 	settingsPath string // path to settings.json; empty = no hook registration
+	pluginDest   string // path to write the OpenCode advisory plugin; empty = no plugin for this app
 }
 
 // Install writes skill files and registers the Claude Code hook.
@@ -41,6 +52,17 @@ func Install(opts Options) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("resolving home dir: %w", err)
+	}
+
+	// Codex uses a plugin+marketplace mechanism, handled apart from the
+	// file-write targets below. A --target codex run installs only Codex.
+	if codexTargeted(opts) {
+		if err := installCodexPlugin(codexBaseDir(homeDir, opts)); err != nil {
+			return fmt.Errorf("installing codex plugin: %w", err)
+		}
+		if opts.Target == "codex" {
+			return nil
+		}
 	}
 
 	targets, err := resolveTargets(homeDir, opts)
@@ -59,8 +81,13 @@ func Install(opts Options) error {
 			if err := installHookFile(t.hookDest); err != nil {
 				return fmt.Errorf("installing hook to %s: %w", t.name, err)
 			}
-			if err := PatchSettingsJSON(t.settingsPath, t.hookDest); err != nil {
+			if err := PatchSettingsJSON(t.settingsPath, t.hookCmd); err != nil {
 				return fmt.Errorf("patching settings.json for %s: %w", t.name, err)
+			}
+		}
+		if t.pluginDest != "" {
+			if err := installOpenCodePlugin(t.pluginDest); err != nil {
+				return fmt.Errorf("installing plugin to %s: %w", t.name, err)
 			}
 		}
 		fmt.Printf("installed to %s: %s\n", t.name, t.skillDest)
@@ -83,42 +110,63 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 		}}, nil
 	}
 
+	// --project: repo-local Claude install only. Hook is registered in the gitignored
+	// settings.local.json via $CLAUDE_PROJECT_DIR so no machine path is committed.
+	if opts.Project {
+		return []installTarget{{
+			name:         "claude",
+			skillDest:    filepath.Join(".claude", "skills", "tldt", "SKILL.md"),
+			hookDest:     filepath.Join(".claude", "hooks", "tldt-hook.sh"),
+			hookCmd:      "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh",
+			settingsPath: filepath.Join(".claude", "settings.local.json"),
+		}}, nil
+	}
+
 	// Claude Code is included on the default/all run or when explicitly targeted.
 	// It is the only target that registers the UserPromptSubmit hook. A specific
 	// optional target (e.g. --target opencode) must NOT drag in Claude.
 	var targets []installTarget
 	if opts.Target == "" || opts.Target == "all" || opts.Target == "claude" {
+		base := claudeBaseDir(homeDir, opts)
+		hookDest := filepath.Join(base, "hooks", "tldt-hook.sh")
 		targets = append(targets, installTarget{
 			name:         "claude",
-			skillDest:    filepath.Join(homeDir, ".claude", "skills", "tldt", "SKILL.md"),
-			hookDest:     filepath.Join(homeDir, ".claude", "hooks", "tldt-hook.sh"),
-			settingsPath: filepath.Join(homeDir, ".claude", "settings.json"),
+			skillDest:    filepath.Join(base, "skills", "tldt", "SKILL.md"),
+			hookDest:     hookDest,
+			hookCmd:      hookDest,
+			settingsPath: filepath.Join(base, "settings.json"),
 		})
 	}
 	if opts.Target == "claude" {
 		return targets, nil
 	}
 
-	// Optional apps: detect by base directory existence
+	// Optional apps: detect by base directory existence. OpenCode also gets the
+	// advisory plugin; per OpenCode docs plugins live in plugins/ alongside
+	// skills/. Cursor stays skill-only.
 	optional := []struct {
-		name      string
-		detectDir string
-		skillDest string
+		name       string
+		detectDir  string
+		skillDest  string
+		pluginDest string
 	}{
 		{
 			"cursor",
 			filepath.Join(homeDir, ".cursor"),
 			filepath.Join(homeDir, ".cursor", "skills", "tldt", "SKILL.md"),
+			"",
 		},
 		{
 			"opencode",
 			filepath.Join(homeDir, ".config", "opencode"),
 			filepath.Join(homeDir, ".config", "opencode", "skills", "tldt", "SKILL.md"),
+			filepath.Join(homeDir, ".config", "opencode", "plugins", "tldt-advisory.js"),
 		},
 		{
 			"agents",
 			filepath.Join(homeDir, ".agents"),
 			filepath.Join(homeDir, ".agents", "skills", "tldt", "SKILL.md"),
+			"",
 		},
 	}
 
@@ -140,14 +188,28 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 		}
 		if dirExists {
 			targets = append(targets, installTarget{
-				name:      o.name,
-				skillDest: o.skillDest,
-				// No hookDest or settingsPath — only Claude Code supports UserPromptSubmit hooks
+				name:       o.name,
+				skillDest:  o.skillDest,
+				pluginDest: o.pluginDest,
+				// No hookDest or settingsPath — these apps don't use the Claude/Codex
+				// UserPromptSubmit shell hook; OpenCode gets the advisory plugin instead.
 			})
 		}
 	}
 
 	return targets, nil
+}
+
+// claudeBaseDir resolves the Claude config directory base:
+// explicit --config-dir > $CLAUDE_CONFIG_DIR > the ~/.claude platform default.
+func claudeBaseDir(homeDir string, opts Options) string {
+	if opts.ConfigDir != "" {
+		return opts.ConfigDir
+	}
+	if v := os.Getenv("CLAUDE_CONFIG_DIR"); v != "" {
+		return v
+	}
+	return filepath.Join(homeDir, ".claude")
 }
 
 // installSkillFile reads the embedded SKILL.md and writes it to destPath.
@@ -156,6 +218,19 @@ func installSkillFile(destPath string) error {
 	data, err := EmbeddedFiles.ReadFile("skills/tldt/SKILL.md")
 	if err != nil {
 		return fmt.Errorf("embedded SKILL.md not found: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return fmt.Errorf("creating directory for %q: %w", destPath, err)
+	}
+	return os.WriteFile(destPath, data, 0644)
+}
+
+// installOpenCodePlugin reads the embedded OpenCode advisory plugin and writes it
+// to destPath. Creates all intermediate directories. Overwrites any existing file.
+func installOpenCodePlugin(destPath string) error {
+	data, err := EmbeddedFiles.ReadFile("opencode/tldt-advisory.js")
+	if err != nil {
+		return fmt.Errorf("embedded tldt-advisory.js not found: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return fmt.Errorf("creating directory for %q: %w", destPath, err)
@@ -179,11 +254,13 @@ func installHookFile(destPath string) error {
 // PatchSettingsJSON reads the existing settings.json at settingsPath (or starts
 // with an empty object if missing), merges the tldt UserPromptSubmit hook entry,
 // and writes back using a temp-file-then-rename strategy for atomicity.
-// Idempotent: if hookCmd is already registered, returns nil without modifying the file.
-// hookCmd MUST be an absolute expanded path (not $HOME/...).
+// Idempotent: any prior tldt registration is dropped and replaced, so the file
+// always ends with exactly one tldt hook registration.
+// hookCmd MUST be an absolute expanded path, or a portable $CLAUDE_PROJECT_DIR/-rooted
+// path for --project installs. Truly relative paths are rejected.
 func PatchSettingsJSON(settingsPath string, hookCmd string) error {
-	if !filepath.IsAbs(hookCmd) {
-		return fmt.Errorf("hookCmd must be an absolute path, got %q", hookCmd)
+	if !filepath.IsAbs(hookCmd) && !strings.HasPrefix(hookCmd, "$CLAUDE_PROJECT_DIR/") {
+		return fmt.Errorf("hookCmd must be an absolute or $CLAUDE_PROJECT_DIR-rooted path, got %q", hookCmd)
 	}
 
 	data, err := os.ReadFile(settingsPath)
@@ -224,27 +301,42 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 		}
 		existing = ups
 	}
+	// Drop any prior tldt registration (any command referencing tldt-hook.sh),
+	// regardless of its exact path/format, so re-running upgrades in place and
+	// leaves exactly one tldt registration. Co-located non-tldt
+	// hooks in the same entry are preserved — we never clobber user config.
+	var kept []any
 	for _, e := range existing {
 		m, ok := e.(map[string]any)
 		if !ok {
+			kept = append(kept, e)
 			continue
 		}
 		hs, ok := m["hooks"].([]any)
 		if !ok {
+			kept = append(kept, e)
 			continue
 		}
+		var keptHooks []any
 		for _, h := range hs {
 			hm, ok := h.(map[string]any)
 			if !ok {
+				keptHooks = append(keptHooks, h)
 				continue
 			}
-			if hm["command"] == hookCmd {
-				return nil // already installed — no-op
+			if cmd, _ := hm["command"].(string); strings.Contains(cmd, "tldt-hook.sh") {
+				continue // stale tldt hook — drop it
 			}
+			keptHooks = append(keptHooks, h)
 		}
+		if len(keptHooks) == 0 {
+			continue // entry held only tldt hooks — drop the whole entry
+		}
+		m["hooks"] = keptHooks
+		kept = append(kept, m)
 	}
 
-	// Append new hook entry
+	// Append exactly one current registration.
 	newEntry := map[string]any{
 		"hooks": []any{
 			map[string]any{
@@ -254,7 +346,7 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 			},
 		},
 	}
-	hooks["UserPromptSubmit"] = append(existing, newEntry)
+	hooks["UserPromptSubmit"] = append(kept, newEntry)
 
 	// Marshal with indentation (preserve human-readable format)
 	out, err := json.MarshalIndent(settings, "", "  ")

@@ -17,9 +17,16 @@ import (
 	"github.com/gleicon/tldt/internal/config"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
+	usagelog "github.com/gleicon/tldt/internal/usage"
 )
 
 func main() {
+	// Subcommand dispatch (tldt is otherwise flag-only).
+	if len(os.Args) > 1 && os.Args[1] == "stats" {
+		runStats(os.Args[2:])
+		return
+	}
+
 	filePath := flag.String("f", "", "input file path")
 	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
@@ -31,12 +38,15 @@ func main() {
 	format := flag.String("format", "text", "output format: text|json|markdown")
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
-	printThreshold := flag.Bool("print-threshold", false, "print configured hook token threshold to stdout and exit")
 	installSkill := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
 	skillDir := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
-	skillTarget := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
+	skillTarget := flag.String("target", "", "install target app: claude|codex|cursor|opencode|agents|all (default: all detected)")
+	configDir := flag.String("config-dir", "", "override Claude config dir base (precedence: --config-dir > $CLAUDE_CONFIG_DIR > ~/.claude)")
+	projectInstall := flag.Bool("project", false, "install repo-locally under ./.claude/ and register the hook in .claude/settings.local.json")
 	sanitizeFlag := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
+	detectOnly := flag.Bool("detect-only", false, "run requested detection stages then exit before summarizing (no summary, no usage log)")
+	hookOutput := flag.Bool("hook-output", false, "UserPromptSubmit hook mode: read the {prompt} stdin envelope, detect injection+PII, emit a metadata-only advisory envelope when flagged (else nothing)")
 	injectionThreshold := flag.Float64("injection-threshold", tldt.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
 	detectPII := flag.Bool("detect-pii", false, "report PII and secret patterns (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr (advisory)")
 	sanitizePII := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
@@ -53,23 +63,26 @@ func main() {
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
 
-	// --print-threshold: print configured hook token threshold to stdout and exit
-	// Prints bare integer only — no label — so hook script can capture it directly.
-	if *printThreshold {
-		fmt.Println(cfg.Hook.Threshold)
-		os.Exit(0)
-	}
-
 	// --install-skill: write skill + hook templates and patch settings.json, then exit
 	if *installSkill {
 		if err := installer.Install(installer.Options{
-			SkillDir: *skillDir,
-			Target:   *skillTarget,
+			SkillDir:  *skillDir,
+			Target:    *skillTarget,
+			ConfigDir: *configDir,
+			Project:   *projectInstall,
 		}); err != nil {
 			fmt.Fprintln(os.Stderr, "install-skill:", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
+	}
+
+	// --hook-output: UserPromptSubmit hook mode. Reads the {prompt} envelope from
+	// stdin (not the normal input path), runs detection, and emits a metadata-only
+	// advisory envelope when flagged. Always exits 0 — the hook is defense-in-depth.
+	if *hookOutput {
+		runHookOutput(*injectionThreshold)
+		return
 	}
 
 	// Resolve effective parameters: config -> level preset -> explicit flags.
@@ -90,14 +103,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	text = runSecurityStages(text, securityOpts{
+	secOpts := securityOpts{
 		fromHTML:           *fromHTML,
 		sanitize:           *sanitizeFlag,
 		sanitizePII:        *sanitizePII,
 		detectPII:          *detectPII,
 		detectInjection:    *detectInjection,
 		injectionThreshold: *injectionThreshold,
-	})
+	}
+	text = applyMutatingStages(text, secOpts)
+
+	// --detect-only --format json: emit the structured detection contract to
+	// stdout and exit. Machine consumers (the OpenCode plugin) read this instead
+	// of parsing stderr prose.
+	if *detectOnly && effectiveFormat == "json" {
+		emitDetectJSON(text, secOpts)
+	}
+	// Human advisory: report PII/injection findings to stderr (no-op when neither
+	// detect flag is set). Runs on both the detect-only and summarize paths.
+	runDetectionStderr(text, secOpts)
+
+	// --detect-only: advisory path. Exit before summarizing so no summary is
+	// emitted and no usage line is written.
+	if *detectOnly {
+		os.Exit(0)
+	}
 
 	const defaultSentenceCap = 2000
 	if !*noCap {
@@ -147,6 +177,27 @@ func main() {
 	}
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
+
+	// Append a counts-only usage record unless disabled via [stats] enabled=false.
+	// A log-write failure must never alter stdout, the exit code, or the
+	// summarization — so errors are dropped.
+	if cfg.Stats.Enabled {
+		if logPath, err := usagelog.Path(); err == nil {
+			_, statErr := os.Stat(logPath)
+			firstWrite := os.IsNotExist(statErr)
+			if appendErr := usagelog.Append(logPath, usagelog.Record{
+				TS:    time.Now().Format(time.RFC3339),
+				In:    tokIn,
+				Out:   tokOut,
+				Saved: tokIn - tokOut,
+			}); appendErr == nil && firstWrite {
+				// One-time consent notice on first log creation. Counts only; the
+				// user can opt out without ever having content recorded.
+				fmt.Fprintf(os.Stderr, "tldt: usage stats now logged to %s (counts only — no content). "+
+					"Disable with [stats] enabled = false in ~/.tldt.toml; clear with tldt stats --reset\n", logPath)
+			}
+		}
+	}
 }
 
 // resolveSettings merges the effective algorithm, sentence count, and output
@@ -206,11 +257,11 @@ type securityOpts struct {
 	injectionThreshold float64
 }
 
-// runSecurityStages applies the requested HTML-conversion, sanitization, and
-// PII/injection stages to text in order, reporting to stderr, and returns the
-// possibly-modified text. detect-pii and detect-injection are advisory and leave
-// the text unchanged. Exits the process on HTML conversion or detection failure.
-func runSecurityStages(text string, o securityOpts) string {
+// applyMutatingStages applies the requested text-modifying stages —
+// HTML-to-Markdown conversion, Unicode sanitization, and PII redaction — in
+// order, reporting each to stderr, and returns the possibly-modified text.
+// Exits the process on HTML conversion failure.
+func applyMutatingStages(text string, o securityOpts) string {
 	// --from-html: convert HTML to Markdown before processing.
 	if o.fromHTML {
 		converted, err := tldt.ConvertHTML(text, tldt.HTMLConvertOptions{
@@ -249,7 +300,13 @@ func runSecurityStages(text string, o securityOpts) string {
 		fmt.Fprintf(os.Stderr, "pii-detect: %d redaction(s) applied\n", len(findings))
 		text = redacted
 	}
+	return text
+}
 
+// runDetectionStderr runs the advisory PII and injection detectors on text and
+// reports findings to stderr. It never modifies text. A no-op when neither
+// detect flag is set. Exits the process on a detector failure.
+func runDetectionStderr(text string, o securityOpts) {
 	// --detect-pii: advisory PII scan; never modifies text. When --sanitize-pii is
 	// also set this runs on already-redacted text, so findings will be empty.
 	if o.detectPII {
@@ -268,7 +325,6 @@ func runSecurityStages(text string, o securityOpts) string {
 	if o.detectInjection {
 		reportInjection(text, o.injectionThreshold)
 	}
-	return text
 }
 
 // reportInjection runs invisible-character and Detect analysis on text and writes
@@ -391,6 +447,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --injection-threshold float  Outlier detection threshold (default: 0.99)")
 	fmt.Fprintln(os.Stderr, "  --detect-pii           Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, cards)")
 	fmt.Fprintln(os.Stderr, "  --sanitize-pii         Redact PII/secrets (detected patterns plus high-entropy key material)")
+	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit before summarizing (no summary, no usage log)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "FORMAT OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  --format string        Output format: text (default), json, markdown")
@@ -403,10 +460,11 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "                        (uses readability extraction + html-to-markdown)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIGURATION:")
-	fmt.Fprintln(os.Stderr, "  --print-threshold      Print hook token threshold from config and exit")
 	fmt.Fprintln(os.Stderr, "  --install-skill        Install Claude Code skill and auto-trigger hook")
 	fmt.Fprintln(os.Stderr, "  --skill-dir string     Override skill install directory")
-	fmt.Fprintln(os.Stderr, "  --target string        Install target: claude|cursor|opencode|agents|all")
+	fmt.Fprintln(os.Stderr, "  --target string        Install target: claude|codex|cursor|opencode|agents|all")
+	fmt.Fprintln(os.Stderr, "  --config-dir string    Override Claude config dir (else $CLAUDE_CONFIG_DIR, else ~/.claude)")
+	fmt.Fprintln(os.Stderr, "  --project              Install repo-locally under ./.claude/ (hook in settings.local.json)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "EMBEDDED AI ASSISTANT SKILLS:")
 	fmt.Fprintln(os.Stderr, "  The binary contains embedded skill templates for AI assistants.")
@@ -420,12 +478,10 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "    - Usage: Type /tldt <long text> inside the assistant")
 	fmt.Fprintln(os.Stderr, "    - Returns: Token savings + extractive summary")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "  tldt-hook.sh - Auto-trigger hook (Claude Code only)")
-	fmt.Fprintln(os.Stderr, "    - Location: ~/.claude/hooks/tldt-hook.sh")
-	fmt.Fprintln(os.Stderr, "    - Auto-summarizes prompts exceeding threshold (default: 2000 tokens)")
-	fmt.Fprintln(os.Stderr, "    - Runs security preprocessing: --sanitize --detect-injection --detect-pii")
-	fmt.Fprintln(os.Stderr, "    - Output guard: re-runs detection on summary before context injection")
-	fmt.Fprintln(os.Stderr, "    - Configurable via ~/.tldt.toml [hook] threshold = N")
+	fmt.Fprintln(os.Stderr, "  tldt-hook.sh - Advisory security hook (Claude Code & Codex)")
+	fmt.Fprintln(os.Stderr, "    - Location: ~/.claude/hooks/tldt-hook.sh (Claude); bundled in the Codex plugin")
+	fmt.Fprintln(os.Stderr, "    - Delegates to: tldt --hook-output (reads the prompt envelope, no jq/python needed)")
+	fmt.Fprintln(os.Stderr, "    - Adds a metadata-only warning to context when input is flagged; never summarizes or blocks")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "INSTALLATION:")
 	fmt.Fprintln(os.Stderr, "")
@@ -434,14 +490,15 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "  Target specific assistant (auto-creates directory if needed):")
 	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target claude    # SKILL.md + hook + settings.json")
-	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target opencode  # SKILL.md only (auto-creates dir)")
+	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target codex     # plugin (skill + advisory hook) via local marketplace")
+	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target opencode  # SKILL.md + advisory plugin (auto-creates dir)")
 	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target cursor    # SKILL.md only (auto-creates dir)")
 	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target agents    # SKILL.md only (auto-creates dir)")
 	fmt.Fprintln(os.Stderr, "    tldt --install-skill --target all       # All assistants")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "  Notes:")
-	fmt.Fprintln(os.Stderr, "    - Only Claude Code supports auto-trigger hooks (UserPromptSubmit)")
-	fmt.Fprintln(os.Stderr, "    - Other assistants get SKILL.md only (manual /tldt command)")
+	fmt.Fprintln(os.Stderr, "    - Claude Code & Codex get the advisory hook (UserPromptSubmit); OpenCode gets an advisory plugin")
+	fmt.Fprintln(os.Stderr, "    - Cursor and Agents get SKILL.md only (manual /tldt command)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "EXAMPLES:")
 	fmt.Fprintln(os.Stderr, "  cat article.txt | tldt")
@@ -452,7 +509,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIG FILE:")
 	fmt.Fprintln(os.Stderr, "  ~/.tldt.toml - Default settings (algorithm, sentences, format, level)")
-	fmt.Fprintln(os.Stderr, "               - Hook threshold: [hook] section with threshold = N")
+	fmt.Fprintln(os.Stderr, "               - Usage logging: [stats] section with enabled = false to opt out")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "For more information: https://github.com/gleicon/tldt")
 	os.Exit(0)

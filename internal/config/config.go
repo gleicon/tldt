@@ -10,18 +10,18 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// HookConfig holds settings for the UserPromptSubmit auto-trigger hook.
-type HookConfig struct {
-	Threshold int `toml:"threshold"`
+// StatsConfig holds settings for usage logging (~/.tldt/usage.jsonl).
+type StatsConfig struct {
+	Enabled bool `toml:"enabled"`
 }
 
 // Config holds per-user default flags loaded from ~/.tldt.toml.
 type Config struct {
-	Algorithm string     `toml:"algorithm"`
-	Sentences int        `toml:"sentences"`
-	Format    string     `toml:"format"`
-	Level     string     `toml:"level"`
-	Hook      HookConfig `toml:"hook"`
+	Algorithm string      `toml:"algorithm"`
+	Sentences int         `toml:"sentences"`
+	Format    string      `toml:"format"`
+	Level     string      `toml:"level"`
+	Stats     StatsConfig `toml:"stats"`
 }
 
 // DefaultConfig returns the built-in default configuration.
@@ -31,8 +31,8 @@ func DefaultConfig() Config {
 		Sentences: 5,
 		Format:    "text",
 		Level:     "",
-		Hook: HookConfig{
-			Threshold: 2000,
+		Stats: StatsConfig{
+			Enabled: true,
 		},
 	}
 }
@@ -58,10 +58,6 @@ func Load(cfgPath string) Config {
 	// Guard: zero/negative sentences in config file falls back to default
 	if cfg.Sentences <= 0 {
 		cfg.Sentences = DefaultConfig().Sentences
-	}
-	// Guard: zero/negative threshold falls back to default.
-	if cfg.Hook.Threshold <= 0 {
-		cfg.Hook.Threshold = DefaultConfig().Hook.Threshold
 	}
 	return cfg
 }

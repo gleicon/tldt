@@ -1,0 +1,22 @@
+{
+  "name": "tldt",
+  "version": "0.1.0",
+  "description": "Local extractive summarizer with prompt-injection and PII advisory. No LLM cost.",
+  "author": {
+    "name": "gleicon",
+    "url": "https://github.com/gleicon/tldt"
+  },
+  "homepage": "https://github.com/gleicon/tldt",
+  "repository": "https://github.com/gleicon/tldt",
+  "license": "MIT",
+  "keywords": ["summarize", "security", "pii", "injection"],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "tldt",
+    "shortDescription": "Summarize long prose; advise on untrusted input.",
+    "developerName": "gleicon",
+    "category": "Productivity",
+    "capabilities": []
+  }
+}

@@ -930,3 +930,98 @@ func TestSanitizePIIFlagStdoutOnly(t *testing.T) {
 		t.Errorf("--sanitize-pii: pii-detect output on stdout: %q", stdout)
 	}
 }
+
+// TestUsageLog_FirstWriteNoticeOnce verifies the one-time consent notice is
+// printed to stderr only when the usage log is first created, not on subsequent
+// runs, using an isolated HOME.
+func TestUsageLog_FirstWriteNoticeOnce(t *testing.T) {
+	home := t.TempDir()
+	runHome := func() (stderr string) {
+		t.Helper()
+		cmd := exec.Command(binaryPath, "--sentences", "2")
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir, "HOME="+home)
+		cmd.Stdin = strings.NewReader(shortText)
+		var errBuf strings.Builder
+		cmd.Stderr = &errBuf
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("run: %v", err)
+		}
+		return errBuf.String()
+	}
+
+	if first := runHome(); !strings.Contains(first, "usage stats now logged") {
+		t.Errorf("first run: want consent notice on stderr, got %q", first)
+	}
+	if second := runHome(); strings.Contains(second, "usage stats now logged") {
+		t.Errorf("second run: notice must not repeat, got %q", second)
+	}
+}
+
+// TestUsageLog_DisabledNoNotice verifies [stats] enabled=false suppresses both
+// the log write and the consent notice.
+func TestUsageLog_DisabledNoNotice(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, ".tldt.toml"), []byte("[stats]\nenabled = false\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cmd := exec.Command(binaryPath, "--sentences", "2")
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir, "HOME="+home)
+	cmd.Stdin = strings.NewReader(shortText)
+	var errBuf strings.Builder
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if strings.Contains(errBuf.String(), "usage stats now logged") {
+		t.Errorf("stats disabled: notice must not print, got %q", errBuf.String())
+	}
+	if _, err := os.Stat(filepath.Join(home, ".tldt", "usage.jsonl")); !os.IsNotExist(err) {
+		t.Error("stats disabled: usage log must not be created")
+	}
+}
+
+// TestStatsDaily_TableAndJSON verifies `tldt stats --daily` groups the usage log
+// by day in both the text table and JSON, using an isolated HOME so the seeded
+// ~/.tldt/usage.jsonl is the only input.
+func TestStatsDaily_TableAndJSON(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".tldt"), 0o755); err != nil {
+		t.Fatalf("mkdir .tldt: %v", err)
+	}
+	log := "{\"ts\":\"2026-06-01T09:00:00Z\",\"in\":400,\"out\":100,\"saved\":300}\n" +
+		"{\"ts\":\"2026-06-02T10:00:00Z\",\"in\":1000,\"out\":250,\"saved\":750}\n" +
+		"{\"ts\":\"2026-06-02T11:00:00Z\",\"in\":1000,\"out\":500,\"saved\":500}\n"
+	if err := os.WriteFile(filepath.Join(home, ".tldt", "usage.jsonl"), []byte(log), 0o644); err != nil {
+		t.Fatalf("seed usage log: %v", err)
+	}
+
+	runHome := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command(binaryPath, args...)
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir, "HOME="+home)
+		var out strings.Builder
+		cmd.Stdout = &out
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("stats %v: %v", args, err)
+		}
+		return out.String()
+	}
+
+	table := runHome("stats", "--daily")
+	for _, want := range []string{"2026-06-01", "2026-06-02", "62.5%", "75.0%"} {
+		if !strings.Contains(table, want) {
+			t.Errorf("stats --daily table missing %q:\n%s", want, table)
+		}
+	}
+	// Two days, newest with two invocations aggregated into one row.
+	if got := strings.Count(table, "2026-06-02"); got != 1 {
+		t.Errorf("stats --daily: 2026-06-02 should appear once (aggregated), got %d", got)
+	}
+
+	js := runHome("stats", "--daily", "--json")
+	for _, want := range []string{`"date": "2026-06-01"`, `"date": "2026-06-02"`, `"count": 2`, `"saved": 1250`} {
+		if !strings.Contains(js, want) {
+			t.Errorf("stats --daily --json missing %q:\n%s", want, js)
+		}
+	}
+}

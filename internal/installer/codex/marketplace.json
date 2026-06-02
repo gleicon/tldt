@@ -1,0 +1,19 @@
+{
+  "name": "tldt-local",
+  "interface": {
+    "displayName": "tldt (local)"
+  },
+  "plugins": [
+    {
+      "name": "tldt",
+      "source": {
+        "source": "local",
+        "path": "./plugins/tldt"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
