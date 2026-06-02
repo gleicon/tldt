@@ -216,7 +216,8 @@ func installHookFile(destPath string) error {
 // PatchSettingsJSON reads the existing settings.json at settingsPath (or starts
 // with an empty object if missing), merges the tldt UserPromptSubmit hook entry,
 // and writes back using a temp-file-then-rename strategy for atomicity.
-// Idempotent: if hookCmd is already registered, returns nil without modifying the file.
+// Idempotent: any prior tldt registration is dropped and replaced, so the file
+// always ends with exactly one tldt hook registration.
 // hookCmd MUST be an absolute expanded path, or a portable $CLAUDE_PROJECT_DIR/-rooted
 // path for --project installs (FR-24). Truly relative paths are rejected.
 func PatchSettingsJSON(settingsPath string, hookCmd string) error {
@@ -262,27 +263,42 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 		}
 		existing = ups
 	}
+	// Drop any prior tldt registration (any command referencing tldt-hook.sh),
+	// regardless of its exact path/format, so re-running upgrades in place and
+	// leaves exactly one tldt registration (FR-25, FR-26). Co-located non-tldt
+	// hooks in the same entry are preserved — we never clobber user config.
+	var kept []any
 	for _, e := range existing {
 		m, ok := e.(map[string]any)
 		if !ok {
+			kept = append(kept, e)
 			continue
 		}
 		hs, ok := m["hooks"].([]any)
 		if !ok {
+			kept = append(kept, e)
 			continue
 		}
+		var keptHooks []any
 		for _, h := range hs {
 			hm, ok := h.(map[string]any)
 			if !ok {
+				keptHooks = append(keptHooks, h)
 				continue
 			}
-			if hm["command"] == hookCmd {
-				return nil // already installed — no-op
+			if cmd, _ := hm["command"].(string); strings.Contains(cmd, "tldt-hook.sh") {
+				continue // stale tldt hook — drop it
 			}
+			keptHooks = append(keptHooks, h)
 		}
+		if len(keptHooks) == 0 {
+			continue // entry held only tldt hooks — drop the whole entry
+		}
+		m["hooks"] = keptHooks
+		kept = append(kept, m)
 	}
 
-	// Append new hook entry
+	// Append exactly one current registration.
 	newEntry := map[string]any{
 		"hooks": []any{
 			map[string]any{
@@ -292,7 +308,7 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 			},
 		},
 	}
-	hooks["UserPromptSubmit"] = append(existing, newEntry)
+	hooks["UserPromptSubmit"] = append(kept, newEntry)
 
 	// Marshal with indentation (preserve human-readable format)
 	out, err := json.MarshalIndent(settings, "", "  ")

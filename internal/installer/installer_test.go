@@ -309,6 +309,70 @@ func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
 	}
 }
 
+func TestInstallHookFile_OverwritesOldSummarizingScript(t *testing.T) {
+	// FR-26/AC-20: re-running over a prior summarizing hook replaces its content
+	// with the advisory script.
+	destPath := filepath.Join(t.TempDir(), "hooks", "tldt-hook.sh")
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	old := "#!/usr/bin/env bash\ntldt --sanitize --detect-injection --verbose\n"
+	if err := os.WriteFile(destPath, []byte(old), 0755); err != nil {
+		t.Fatalf("seeding old hook: %v", err)
+	}
+
+	if err := installHookFile(destPath); err != nil {
+		t.Fatalf("installHookFile: %v", err)
+	}
+
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("reading hook: %v", err)
+	}
+	if strings.Contains(string(data), "--sanitize --detect-injection --verbose") {
+		t.Error("old summarizing invocation still present after re-install")
+	}
+	if !strings.Contains(string(data), "tldt --detect-injection --detect-pii --detect-only") {
+		t.Error("advisory invocation missing after re-install")
+	}
+}
+
+func TestPatchSettingsJSON_ReplacesStaleTldtHook(t *testing.T) {
+	// FR-25/AC-20: a prior tldt registration with a DIFFERENT command path is
+	// dropped, leaving exactly one registration pointing at the new command.
+	settingsPath := filepath.Join(t.TempDir(), "settings.json")
+	stale := `{"hooks":{"UserPromptSubmit":[` +
+		`{"hooks":[{"type":"command","command":"/old/path/tldt-hook.sh","timeout":30}]},` +
+		`{"hooks":[{"type":"command","command":"/other/hook.sh"}]}` +
+		`]}}`
+	if err := os.WriteFile(settingsPath, []byte(stale), 0644); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	newCmd := "/new/base/hooks/tldt-hook.sh"
+	if err := PatchSettingsJSON(settingsPath, newCmd); err != nil {
+		t.Fatalf("PatchSettingsJSON: %v", err)
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("reading settings: %v", err)
+	}
+	s := string(data)
+	if c := strings.Count(s, "tldt-hook.sh"); c != 1 {
+		t.Errorf("tldt-hook.sh appears %d times, want exactly 1: %s", c, s)
+	}
+	if strings.Contains(s, "/old/path/tldt-hook.sh") {
+		t.Error("stale tldt registration not removed")
+	}
+	if !strings.Contains(s, newCmd) {
+		t.Errorf("new command %q not registered", newCmd)
+	}
+	if !strings.Contains(s, "/other/hook.sh") {
+		t.Error("co-located non-tldt hook was clobbered")
+	}
+}
+
 func TestResolveTargets_ProjectScopeIsRepoLocal(t *testing.T) {
 	// FR-23/FR-24: --project → single repo-local Claude target, settings.local.json,
 	// and a $CLAUDE_PROJECT_DIR-rooted hook command (not a machine path).
