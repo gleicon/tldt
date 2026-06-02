@@ -2,6 +2,14 @@
 
 Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core first (fully testable), then agent artifacts, then installer. Spikes gate the two agent-specific installer targets.
 
+## Now
+
+**State** — Design fully resolved (`/ds-explore` → `/ds-grill-me` → `/ds-spec`). Spec at `.project/SPEC.md`, roadmap below. Branch `feat/agent-integration` (2 doc commits: spec + roadmap). No implementation started — all roadmap tasks `[ ]`.
+
+**Next** — First Core task: remove `--print-threshold` flag and `[hook] threshold` config (FR-5), confirming nothing references them.
+
+**Open questions** — OQ-1 (Codex `UserPromptSubmit` prompt field) and OQ-2 (OpenCode user event) are live-environment spikes gating the Codex/OpenCode installer targets — defer until those tasks. OQ-4: decide whether `tldt stats --daily` is in the first cut. `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
+
 ## Roadmap
 
 ### Core CLI (Go, no agent config required)
