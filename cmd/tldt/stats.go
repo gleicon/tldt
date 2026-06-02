@@ -10,6 +10,21 @@ import (
 	usagelog "github.com/gleicon/tldt/internal/usage"
 )
 
+// fail prints a stats error to stderr and exits non-zero.
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, "stats:", err)
+	os.Exit(1)
+}
+
+// emitJSON writes v to stdout as indented JSON, exiting non-zero on error.
+func emitJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		fail(err)
+	}
+}
+
 // runStats handles the `tldt stats` subcommand: print aggregate token-savings
 // totals from ~/.tldt/usage.jsonl, emit them as JSON, or clear the log.
 func runStats(args []string) {
@@ -21,14 +36,12 @@ func runStats(args []string) {
 
 	path, err := usagelog.Path()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "stats:", err)
-		os.Exit(1)
+		fail(err)
 	}
 
 	if *reset {
 		if err := usagelog.Reset(path); err != nil {
-			fmt.Fprintln(os.Stderr, "stats:", err)
-			os.Exit(1)
+			fail(err)
 		}
 		fmt.Fprintln(os.Stderr, "usage log cleared")
 		return
@@ -41,17 +54,11 @@ func runStats(args []string) {
 
 	agg, err := usagelog.Read(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "stats:", err)
-		os.Exit(1)
+		fail(err)
 	}
 
 	if *jsonOut {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(agg); err != nil {
-			fmt.Fprintln(os.Stderr, "stats:", err)
-			os.Exit(1)
-		}
+		emitJSON(agg)
 		return
 	}
 
@@ -67,20 +74,14 @@ func runStats(args []string) {
 func runStatsDaily(path string, jsonOut bool) {
 	days, err := usagelog.ReadDaily(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "stats:", err)
-		os.Exit(1)
+		fail(err)
 	}
 
 	if jsonOut {
 		if days == nil {
 			days = []usagelog.DailyAggregate{}
 		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(days); err != nil {
-			fmt.Fprintln(os.Stderr, "stats:", err)
-			os.Exit(1)
-		}
+		emitJSON(days)
 		return
 	}
 
