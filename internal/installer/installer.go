@@ -41,6 +41,7 @@ type installTarget struct {
 	hookDest     string // path to write hook script; empty = no hook for this app
 	hookCmd      string // command path registered in settings.json (may differ from hookDest for --project)
 	settingsPath string // path to settings.json; empty = no hook registration
+	pluginDest   string // path to write the OpenCode advisory plugin; empty = no plugin for this app
 }
 
 // Install writes skill files and registers the Claude Code hook.
@@ -82,6 +83,11 @@ func Install(opts Options) error {
 			}
 			if err := PatchSettingsJSON(t.settingsPath, t.hookCmd); err != nil {
 				return fmt.Errorf("patching settings.json for %s: %w", t.name, err)
+			}
+		}
+		if t.pluginDest != "" {
+			if err := installOpenCodePlugin(t.pluginDest); err != nil {
+				return fmt.Errorf("installing plugin to %s: %w", t.name, err)
 			}
 		}
 		fmt.Printf("installed to %s: %s\n", t.name, t.skillDest)
@@ -135,26 +141,32 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 		return targets, nil
 	}
 
-	// Optional apps: detect by base directory existence
+	// Optional apps: detect by base directory existence. OpenCode also gets the
+	// advisory plugin (FR-20); per OpenCode docs plugins live in plugins/ alongside
+	// skills/. Cursor stays skill-only (FR-21).
 	optional := []struct {
-		name      string
-		detectDir string
-		skillDest string
+		name       string
+		detectDir  string
+		skillDest  string
+		pluginDest string
 	}{
 		{
 			"cursor",
 			filepath.Join(homeDir, ".cursor"),
 			filepath.Join(homeDir, ".cursor", "skills", "tldt", "SKILL.md"),
+			"",
 		},
 		{
 			"opencode",
 			filepath.Join(homeDir, ".config", "opencode"),
 			filepath.Join(homeDir, ".config", "opencode", "skills", "tldt", "SKILL.md"),
+			filepath.Join(homeDir, ".config", "opencode", "plugins", "tldt-advisory.js"),
 		},
 		{
 			"agents",
 			filepath.Join(homeDir, ".agents"),
 			filepath.Join(homeDir, ".agents", "skills", "tldt", "SKILL.md"),
+			"",
 		},
 	}
 
@@ -176,9 +188,11 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 		}
 		if dirExists {
 			targets = append(targets, installTarget{
-				name:      o.name,
-				skillDest: o.skillDest,
-				// No hookDest or settingsPath — only Claude Code supports UserPromptSubmit hooks
+				name:       o.name,
+				skillDest:  o.skillDest,
+				pluginDest: o.pluginDest,
+				// No hookDest or settingsPath — these apps don't use the Claude/Codex
+				// UserPromptSubmit shell hook; OpenCode gets the advisory plugin instead.
 			})
 		}
 	}
@@ -204,6 +218,19 @@ func installSkillFile(destPath string) error {
 	data, err := EmbeddedFiles.ReadFile("skills/tldt/SKILL.md")
 	if err != nil {
 		return fmt.Errorf("embedded SKILL.md not found: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return fmt.Errorf("creating directory for %q: %w", destPath, err)
+	}
+	return os.WriteFile(destPath, data, 0644)
+}
+
+// installOpenCodePlugin reads the embedded OpenCode advisory plugin and writes it
+// to destPath. Creates all intermediate directories. Overwrites any existing file.
+func installOpenCodePlugin(destPath string) error {
+	data, err := EmbeddedFiles.ReadFile("opencode/tldt-advisory.js")
+	if err != nil {
+		return fmt.Errorf("embedded tldt-advisory.js not found: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return fmt.Errorf("creating directory for %q: %w", destPath, err)
