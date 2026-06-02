@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // Record is one usage-log line. Field order matches the on-disk JSON schema
@@ -107,6 +108,70 @@ func Read(path string) (Aggregate, error) {
 		agg.Percent = float64(agg.Saved) / float64(agg.In) * 100
 	}
 	return agg, nil
+}
+
+// DailyAggregate is a per-day rollup. Date is the YYYY-MM-DD bucket (the date
+// portion of the record's RFC3339 ts); the embedded Aggregate holds that day's totals.
+type DailyAggregate struct {
+	Date string `json:"date"`
+	Aggregate
+}
+
+// ReadDaily parses path and returns per-day totals sorted ascending by date.
+// A missing log yields a nil slice with no error (FR-16). Malformed lines and
+// records whose ts is too short to hold a YYYY-MM-DD date are skipped, not fatal.
+func ReadDaily(path string) ([]DailyAggregate, error) {
+	if path == "" {
+		return nil, errors.New("usage: empty path")
+	}
+	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("usage: open: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	byDay := make(map[string]*DailyAggregate)
+	s := bufio.NewScanner(f)
+	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for s.Scan() {
+		line := bytes.TrimSpace(s.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var r Record
+		if err := json.Unmarshal(line, &r); err != nil {
+			continue
+		}
+		if len(r.TS) < 10 {
+			continue
+		}
+		day := r.TS[:10]
+		d := byDay[day]
+		if d == nil {
+			d = &DailyAggregate{Date: day}
+			byDay[day] = d
+		}
+		d.Count++
+		d.In += r.In
+		d.Out += r.Out
+		d.Saved += r.Saved
+	}
+	if err := s.Err(); err != nil {
+		return nil, fmt.Errorf("usage: read: %w", err)
+	}
+
+	days := make([]DailyAggregate, 0, len(byDay))
+	for _, d := range byDay {
+		if d.In > 0 {
+			d.Percent = float64(d.Saved) / float64(d.In) * 100
+		}
+		days = append(days, *d)
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i].Date < days[j].Date })
+	return days, nil
 }
 
 // Reset clears the usage log by removing it. A missing log is not an error.

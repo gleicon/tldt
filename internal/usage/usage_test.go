@@ -153,6 +153,66 @@ func TestRead_SkipsMalformedLines(t *testing.T) {
 	}
 }
 
+func TestReadDaily_GroupsSortsAndComputesPercent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	// Out of order across two days; ReadDaily must group and sort ascending.
+	recs := []Record{
+		{TS: "2026-06-02T10:00:00Z", In: 1000, Out: 250, Saved: 750},
+		{TS: "2026-06-01T09:00:00Z", In: 400, Out: 100, Saved: 300},
+		{TS: "2026-06-02T11:00:00Z", In: 1000, Out: 500, Saved: 500},
+	}
+	for _, r := range recs {
+		if err := Append(path, r); err != nil {
+			t.Fatalf("Append: %v", err)
+		}
+	}
+	days, err := ReadDaily(path)
+	if err != nil {
+		t.Fatalf("ReadDaily: %v", err)
+	}
+	want := []DailyAggregate{
+		{Date: "2026-06-01", Aggregate: Aggregate{Count: 1, In: 400, Out: 100, Saved: 300, Percent: 75}},
+		{Date: "2026-06-02", Aggregate: Aggregate{Count: 2, In: 2000, Out: 750, Saved: 1250, Percent: 62.5}},
+	}
+	if len(days) != len(want) {
+		t.Fatalf("ReadDaily returned %d days, want %d: %+v", len(days), len(want), days)
+	}
+	for i := range want {
+		if days[i] != want[i] {
+			t.Errorf("day[%d] = %+v, want %+v", i, days[i], want[i])
+		}
+	}
+}
+
+func TestReadDaily_MissingLogIsEmpty(t *testing.T) {
+	days, err := ReadDaily(filepath.Join(t.TempDir(), "absent.jsonl"))
+	if err != nil {
+		t.Fatalf("ReadDaily(missing): %v", err)
+	}
+	if len(days) != 0 {
+		t.Errorf("ReadDaily(missing) = %+v, want empty", days)
+	}
+}
+
+func TestReadDaily_SkipsMalformedAndShortTS(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	// A short ts (no date), a garbage line, and a valid record.
+	content := `{"ts":"t1","in":100,"out":40,"saved":60}
+{"ts":"2026-06-02T10:00:00Z","in":200,"o
+{"ts":"2026-06-02T11:00:00Z","in":200,"out":50,"saved":150}
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("writing log: %v", err)
+	}
+	days, err := ReadDaily(path)
+	if err != nil {
+		t.Fatalf("ReadDaily: %v", err)
+	}
+	if len(days) != 1 || days[0].Date != "2026-06-02" || days[0].Count != 1 || days[0].Saved != 150 {
+		t.Errorf("ReadDaily skipping malformed/short-ts: got %+v, want one 2026-06-02 day Count=1 Saved=150", days)
+	}
+}
+
 func TestReset(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "usage.jsonl")
 	if err := Append(path, Record{TS: "t", In: 10, Out: 4, Saved: 6}); err != nil {
