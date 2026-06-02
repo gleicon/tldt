@@ -190,6 +190,37 @@ func TestLevelPresets_Unknown(t *testing.T) {
 	}
 }
 
+func TestStatsConfig(t *testing.T) {
+	// Default: usage logging enabled.
+	if !DefaultConfig().Stats.Enabled {
+		t.Error("DefaultConfig().Stats.Enabled = false, want true")
+	}
+
+	// Absent [stats] section keeps the default (enabled).
+	f, err := os.CreateTemp("", "tldt-stats-absent-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("sentences = 3\n")
+	_ = f.Close()
+	if !Load(f.Name()).Stats.Enabled {
+		t.Error("Load(no [stats]): Stats.Enabled = false, want true (default)")
+	}
+
+	// Explicit opt-out flips it off.
+	f2, err := os.CreateTemp("", "tldt-stats-off-*.toml")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f2.Name()) })
+	_, _ = f2.WriteString("[stats]\nenabled = false\n")
+	_ = f2.Close()
+	if Load(f2.Name()).Stats.Enabled {
+		t.Error("Load([stats] enabled=false): Stats.Enabled = true, want false")
+	}
+}
+
 func TestConfigPath(t *testing.T) {
 	path, err := ConfigPath()
 	if err != nil {

@@ -10,12 +10,18 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// StatsConfig holds settings for usage logging (~/.tldt/usage.jsonl).
+type StatsConfig struct {
+	Enabled bool `toml:"enabled"`
+}
+
 // Config holds per-user default flags loaded from ~/.tldt.toml.
 type Config struct {
-	Algorithm string `toml:"algorithm"`
-	Sentences int    `toml:"sentences"`
-	Format    string `toml:"format"`
-	Level     string `toml:"level"`
+	Algorithm string      `toml:"algorithm"`
+	Sentences int         `toml:"sentences"`
+	Format    string      `toml:"format"`
+	Level     string      `toml:"level"`
+	Stats     StatsConfig `toml:"stats"`
 }
 
 // DefaultConfig returns the built-in default configuration.
@@ -25,6 +31,9 @@ func DefaultConfig() Config {
 		Sentences: 5,
 		Format:    "text",
 		Level:     "",
+		Stats: StatsConfig{
+			Enabled: true,
+		},
 	}
 }
 

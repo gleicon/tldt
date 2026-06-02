@@ -37,6 +37,7 @@ func main() {
 	skillTarget := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
 	sanitizeFlag := flag.Bool("sanitize", false, "strip invisible Unicode and apply NFKC normalization before summarization")
 	detectInjection := flag.Bool("detect-injection", false, "report injection patterns and encoding anomalies to stderr (advisory)")
+	detectOnly := flag.Bool("detect-only", false, "run requested detection stages then exit before summarizing (no summary, no usage log)")
 	injectionThreshold := flag.Float64("injection-threshold", tldt.DefaultOutlierThreshold, "outlier score [0,1] above which sentences are flagged")
 	detectPII := flag.Bool("detect-pii", false, "report PII and secret patterns (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr (advisory)")
 	sanitizePII := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
@@ -92,6 +93,13 @@ func main() {
 		injectionThreshold: *injectionThreshold,
 	})
 
+	// --detect-only: advisory path. Detection already reported to stderr above;
+	// exit before summarizing so no summary is emitted and no usage line is
+	// written (FR-12).
+	if *detectOnly {
+		os.Exit(0)
+	}
+
 	const defaultSentenceCap = 2000
 	if !*noCap {
 		text = applySentenceCap(text, defaultSentenceCap)
@@ -141,15 +149,18 @@ func main() {
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
 
-	// Append a counts-only usage record. A log-write failure must never alter
-	// stdout, the exit code, or the summarization (FR-11) — so errors are dropped.
-	if logPath, err := usagelog.Path(); err == nil {
-		_ = usagelog.Append(logPath, usagelog.Record{
-			TS:    time.Now().Format(time.RFC3339),
-			In:    tokIn,
-			Out:   tokOut,
-			Saved: tokIn - tokOut,
-		})
+	// Append a counts-only usage record unless disabled via [stats] enabled=false
+	// (FR-10). A log-write failure must never alter stdout, the exit code, or the
+	// summarization (FR-11) — so errors are dropped.
+	if cfg.Stats.Enabled {
+		if logPath, err := usagelog.Path(); err == nil {
+			_ = usagelog.Append(logPath, usagelog.Record{
+				TS:    time.Now().Format(time.RFC3339),
+				In:    tokIn,
+				Out:   tokOut,
+				Saved: tokIn - tokOut,
+			})
+		}
 	}
 }
 
@@ -395,6 +406,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --injection-threshold float  Outlier detection threshold (default: 0.99)")
 	fmt.Fprintln(os.Stderr, "  --detect-pii           Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, cards)")
 	fmt.Fprintln(os.Stderr, "  --sanitize-pii         Redact PII/secrets (detected patterns plus high-entropy key material)")
+	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit before summarizing (no summary, no usage log)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "FORMAT OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  --format string        Output format: text (default), json, markdown")
@@ -454,6 +466,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIG FILE:")
 	fmt.Fprintln(os.Stderr, "  ~/.tldt.toml - Default settings (algorithm, sentences, format, level)")
+	fmt.Fprintln(os.Stderr, "               - Usage logging: [stats] section with enabled = false to opt out")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "For more information: https://github.com/gleicon/tldt")
 	os.Exit(0)

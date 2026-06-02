@@ -77,7 +77,7 @@ tldt ships a Claude Code integration today — a `/tldt` skill and a `UserPrompt
 - **Removed:** `tldt --print-threshold`.
 
 **Files / data formats at boundaries**
-- `~/.tldt/usage.jsonl` — append-only JSON Lines, one object per summary: `{"ts": <unix-seconds int>, "in": <int>, "out": <int>, "saved": <int>}`.
+- `~/.tldt/usage.jsonl` — append-only JSON Lines, one object per summary: `{"ts": <RFC3339 string>, "in": <int>, "out": <int>, "saved": <int>}`.
 - `~/.tldt.toml` — gains `[stats] enabled = <bool>`; loses `[hook] threshold`.
 - Claude/Codex `settings.json`/`hooks.json` — advisory hook registration (command type, JSON-on-stdin contract).
 - OpenCode plugin module (JS/TS) under the OpenCode plugins dir.
