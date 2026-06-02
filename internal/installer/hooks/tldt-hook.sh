@@ -32,9 +32,8 @@ fi
 CHAR_COUNT=$(printf '%s' "$PROMPT" | wc -c | tr -d ' ')
 TOKEN_ESTIMATE=$(( CHAR_COUNT / 4 ))
 
-# Get threshold from tldt config — reads ~/.tldt.toml [hook] threshold (D-10)
-# Falls back to 2000 if tldt --print-threshold fails (D-11)
-THRESHOLD=$(tldt --print-threshold 2>/dev/null || echo "2000")
+# Token threshold above which the prompt is summarized (D-10)
+THRESHOLD=2000
 
 # Below threshold — pass through silently (no output = Claude proceeds normally)
 if [ "$TOKEN_ESTIMATE" -lt "$THRESHOLD" ]; then

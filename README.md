@@ -77,7 +77,6 @@ tldt -f article.txt --format markdown
 | `--detect-pii` | off | Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr |
 | `--sanitize-pii` | off | Redact PII/secrets (detected patterns plus high-entropy key material) with `[REDACTED:<type>]` before summarizing |
 | `--from-html` | off | Convert HTML input to Markdown before summarizing |
-| `--print-threshold` | off | Print configured hook token threshold to stdout and exit |
 | `--install-skill` | off | Install tldt skill and UserPromptSubmit hook |
 | `--skill-dir <dir>` | — | Override skill install directory |
 | `--target <app>` | — | Install target: `claude`, `cursor`, `opencode`, `agents`, or `all` |
@@ -183,9 +182,6 @@ algorithm = "ensemble"
 sentences = 7
 format    = "text"
 level     = "standard"
-
-[hook]
-threshold = 2000   # tokens; auto-trigger hook fires above this
 ```
 
 CLI flags always override the config file. Missing or malformed TOML silently falls back to built-in defaults — never an error.
@@ -216,11 +212,7 @@ tldt --install-skill --skill-dir /path  # explicit directory
 
 After install, use `/tldt <text>` inside Claude Code to summarize inline.
 
-**Auto-trigger hook**: when installed, the hook fires automatically when your paste or file input exceeds a token threshold (default: 2000). The summarized version enters the AI context instead of the raw text, with token savings reported to stderr.
-
-```bash
-tldt --print-threshold   # print current threshold (from config) and exit
-```
+**Auto-trigger hook**: when installed, the hook fires automatically on long paste or file input. The summarized version enters the AI context instead of the raw text, with token savings reported to stderr.
 
 ---
 

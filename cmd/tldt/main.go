@@ -31,7 +31,6 @@ func main() {
 	format := flag.String("format", "text", "output format: text|json|markdown")
 	verbose := flag.Bool("verbose", false, "print token stats to stderr (suppressed by default; use when stderr is not redirected)")
 	rouge := flag.String("rouge", "", "path to reference summary file; prints ROUGE-1/2/L scores to stderr")
-	printThreshold := flag.Bool("print-threshold", false, "print configured hook token threshold to stdout and exit")
 	installSkill := flag.Bool("install-skill", false, "install tldt Claude Code skill and UserPromptSubmit hook")
 	skillDir := flag.String("skill-dir", "", "override skill install directory (default: all detected app dirs)")
 	skillTarget := flag.String("target", "", "install target app: claude|cursor|opencode|agents|all (default: all detected)")
@@ -52,13 +51,6 @@ func main() {
 	// flag.Visit (NOT flag.VisitAll) visits only explicitly-set flags.
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
-
-	// --print-threshold: print configured hook token threshold to stdout and exit
-	// Prints bare integer only — no label — so hook script can capture it directly.
-	if *printThreshold {
-		fmt.Println(cfg.Hook.Threshold)
-		os.Exit(0)
-	}
 
 	// --install-skill: write skill + hook templates and patch settings.json, then exit
 	if *installSkill {
@@ -403,7 +395,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "                        (uses readability extraction + html-to-markdown)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIGURATION:")
-	fmt.Fprintln(os.Stderr, "  --print-threshold      Print hook token threshold from config and exit")
 	fmt.Fprintln(os.Stderr, "  --install-skill        Install Claude Code skill and auto-trigger hook")
 	fmt.Fprintln(os.Stderr, "  --skill-dir string     Override skill install directory")
 	fmt.Fprintln(os.Stderr, "  --target string        Install target: claude|cursor|opencode|agents|all")
@@ -422,10 +413,9 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "  tldt-hook.sh - Auto-trigger hook (Claude Code only)")
 	fmt.Fprintln(os.Stderr, "    - Location: ~/.claude/hooks/tldt-hook.sh")
-	fmt.Fprintln(os.Stderr, "    - Auto-summarizes prompts exceeding threshold (default: 2000 tokens)")
+	fmt.Fprintln(os.Stderr, "    - Auto-summarizes long prompts")
 	fmt.Fprintln(os.Stderr, "    - Runs security preprocessing: --sanitize --detect-injection --detect-pii")
 	fmt.Fprintln(os.Stderr, "    - Output guard: re-runs detection on summary before context injection")
-	fmt.Fprintln(os.Stderr, "    - Configurable via ~/.tldt.toml [hook] threshold = N")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "INSTALLATION:")
 	fmt.Fprintln(os.Stderr, "")
@@ -452,7 +442,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIG FILE:")
 	fmt.Fprintln(os.Stderr, "  ~/.tldt.toml - Default settings (algorithm, sentences, format, level)")
-	fmt.Fprintln(os.Stderr, "               - Hook threshold: [hook] section with threshold = N")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "For more information: https://github.com/gleicon/tldt")
 	os.Exit(0)
