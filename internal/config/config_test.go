@@ -191,7 +191,6 @@ func TestLevelPresets_Unknown(t *testing.T) {
 }
 
 func TestStatsConfig(t *testing.T) {
-	// Default: usage logging enabled.
 	if !DefaultConfig().Stats.Enabled {
 		t.Error("DefaultConfig().Stats.Enabled = false, want true")
 	}

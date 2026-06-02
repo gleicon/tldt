@@ -33,7 +33,7 @@ func TestAppend_CreatesDirAndWritesLine(t *testing.T) {
 	if got != rec {
 		t.Errorf("round-trip mismatch: got %+v, want %+v", got, rec)
 	}
-	// Schema field names must match the spec exactly.
+	// On-disk JSON field names are a compatibility contract; assert them literally.
 	if !strings.Contains(string(data), `"ts"`) ||
 		!strings.Contains(string(data), `"in"`) ||
 		!strings.Contains(string(data), `"out"`) ||
