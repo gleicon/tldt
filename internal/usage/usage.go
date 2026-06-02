@@ -68,23 +68,37 @@ type Aggregate struct {
 	Percent float64 `json:"percent"`
 }
 
-// Read parses path and returns aggregate totals. A missing log is treated as
-// empty and yields a zero Aggregate with no error. Malformed lines —
-// e.g. a record half-written by a crashed process — are skipped, not fatal.
-func Read(path string) (Aggregate, error) {
+// add folds one record's counts into the aggregate.
+func (a *Aggregate) add(r Record) {
+	a.Count++
+	a.In += r.In
+	a.Out += r.Out
+	a.Saved += r.Saved
+}
+
+// finalize computes Percent from the accumulated totals (0 when In is 0).
+func (a *Aggregate) finalize() {
+	if a.In > 0 {
+		a.Percent = float64(a.Saved) / float64(a.In) * 100
+	}
+}
+
+// scanRecords calls fn for each valid record in path. A missing log yields no
+// calls and no error. Malformed lines — e.g. a record half-written by a crashed
+// process — are skipped, not fatal.
+func scanRecords(path string, fn func(Record)) error {
 	if path == "" {
-		return Aggregate{}, errors.New("usage: empty path")
+		return errors.New("usage: empty path")
 	}
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return Aggregate{}, nil
+		return nil
 	}
 	if err != nil {
-		return Aggregate{}, fmt.Errorf("usage: open: %w", err)
+		return fmt.Errorf("usage: open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	var agg Aggregate
 	s := bufio.NewScanner(f)
 	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for s.Scan() {
@@ -96,17 +110,23 @@ func Read(path string) (Aggregate, error) {
 		if err := json.Unmarshal(line, &r); err != nil {
 			continue
 		}
-		agg.Count++
-		agg.In += r.In
-		agg.Out += r.Out
-		agg.Saved += r.Saved
+		fn(r)
 	}
 	if err := s.Err(); err != nil {
-		return Aggregate{}, fmt.Errorf("usage: read: %w", err)
+		return fmt.Errorf("usage: read: %w", err)
 	}
-	if agg.In > 0 {
-		agg.Percent = float64(agg.Saved) / float64(agg.In) * 100
+	return nil
+}
+
+// Read parses path and returns aggregate totals. A missing log is treated as
+// empty and yields a zero Aggregate with no error. Malformed lines —
+// e.g. a record half-written by a crashed process — are skipped, not fatal.
+func Read(path string) (Aggregate, error) {
+	var agg Aggregate
+	if err := scanRecords(path, agg.add); err != nil {
+		return Aggregate{}, err
 	}
+	agg.finalize()
 	return agg, nil
 }
 
@@ -121,32 +141,10 @@ type DailyAggregate struct {
 // A missing log yields a nil slice with no error. Malformed lines and
 // records whose ts is too short to hold a YYYY-MM-DD date are skipped, not fatal.
 func ReadDaily(path string) ([]DailyAggregate, error) {
-	if path == "" {
-		return nil, errors.New("usage: empty path")
-	}
-	f, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("usage: open: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
 	byDay := make(map[string]*DailyAggregate)
-	s := bufio.NewScanner(f)
-	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for s.Scan() {
-		line := bytes.TrimSpace(s.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var r Record
-		if err := json.Unmarshal(line, &r); err != nil {
-			continue
-		}
+	err := scanRecords(path, func(r Record) {
 		if len(r.TS) < 10 {
-			continue
+			return
 		}
 		day := r.TS[:10]
 		d := byDay[day]
@@ -154,20 +152,15 @@ func ReadDaily(path string) ([]DailyAggregate, error) {
 			d = &DailyAggregate{Date: day}
 			byDay[day] = d
 		}
-		d.Count++
-		d.In += r.In
-		d.Out += r.Out
-		d.Saved += r.Saved
-	}
-	if err := s.Err(); err != nil {
-		return nil, fmt.Errorf("usage: read: %w", err)
+		d.add(r)
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	days := make([]DailyAggregate, 0, len(byDay))
 	for _, d := range byDay {
-		if d.In > 0 {
-			d.Percent = float64(d.Saved) / float64(d.In) * 100
-		}
+		d.finalize()
 		days = append(days, *d)
 	}
 	sort.Slice(days, func(i, j int) bool { return days[i].Date < days[j].Date })
