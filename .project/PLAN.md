@@ -4,11 +4,11 @@ Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core fi
 
 ## Now
 
-**State** — Core CLI section complete (4 commits on `feat/agent-integration`: FR-5 removal `229fbc3`, usage logging `e3483c5`, `[stats]` opt-out + `--detect-only` `558b517`, `tldt stats` subcommand `3fb4f55`). New `internal/usage` package (`Append`/`Read`/`Reset`); `ts` is RFC3339 (spec updated to match). All tests pass `go test -race ./...`.
+**State** — All spike-independent work done. 6 more commits on `feat/agent-integration`: advisory hook `63eda3e`, reader skill `0974df1`, config-dir resolution `eb3e736`, `--project` `336f73c`, robust upgrade dedup `8eb9b61` (Core CLI commits from prior session unchanged). Agent-artifacts section complete; installer config-dir / `--project` / re-run-idempotency (FR-22/23/24/25/26) complete. `go test -race ./...` + `go vet` clean.
 
-**Next** — First Agent-artifacts task: rewrite `internal/installer/hooks/tldt-hook.sh` into the advisory hook — `tldt --detect-injection --detect-pii --detect-only`, emit `additionalContext` only when flagged, never summarize/block, exit 0 silently when tldt absent (FR-1/2/3/4, NFR-5). Crux: confirm tldt's stderr signal for clean vs flagged (`reportInjection`/`reportPII` in `main.go`) so the hook can distinguish them. Also update `installer_test.go` (still pins the old `--sanitize --detect-injection --verbose` invocation).
+**Next** — Run the two live-environment spikes (OQ-1, OQ-2); they gate everything left. Until then nothing further can be built from the repo alone. After OQ-1: Codex installer target (skill + advisory shell hook in Codex hooks config, FR-18/19). After OQ-2: OpenCode JS/TS advisory plugin (FR-20). Then default multi-target reaching Codex/OpenCode (FR-17/21).
 
-**Open questions** — OQ-1 (Codex `UserPromptSubmit` prompt field) and OQ-2 (OpenCode user event) are live-environment spikes gating the Codex/OpenCode installer targets — defer until those tasks. OQ-4: `tldt stats --daily` deferred (not in first cut, per decision). `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
+**Open questions** — OQ-1: Codex `UserPromptSubmit` stdin prompt-field name (does it match Claude's `.prompt`?) — confirm against a live Codex build; hook extractor branches if it differs. OQ-2: OpenCode user-message event name for the advisory plugin — confirm against a live OpenCode build. Both need a running build to probe stdin/event contracts. OQ-4: `tldt stats --daily` deferred (not in first cut). `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
 
 ## Roadmap
 
@@ -20,17 +20,17 @@ Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core fi
 - [ ] `tldt stats --daily` per-day breakdown — optional, confirm inclusion (FR-15.a, OQ-4)
 
 ### Agent artifacts (content)
-- [ ] Advisory hook runs `tldt --detect-injection --detect-pii` on every prompt, emits `additionalContext` only when flagged, never summarizes or blocks, and exits 0 silently when tldt is absent (FR-1, FR-2, FR-3, FR-4, NFR-5)
-- [ ] Reader skill accepts url / file / text → `tldt --url` / `-f` / pipe, returns summary + savings line; description steers "long prose for context, not verbatim/code/edit" (FR-6, FR-7, FR-8)
+- [x] Advisory hook runs `tldt --detect-injection --detect-pii --detect-only` on every prompt, emits `additionalContext` only when flagged, never summarizes or blocks, and exits 0 silently when tldt is absent (FR-1, FR-2, FR-3, FR-4, NFR-5) — `63eda3e`
+- [x] Reader skill accepts url / file / text → `tldt --url` / `-f` / pipe, returns summary + savings line; description steers "long prose for context, not verbatim/code/edit" (FR-6, FR-7, FR-8) — `0974df1`
 
 ### Spikes (gate the agent-specific installer targets)
 - [ ] Codex `UserPromptSubmit` stdin prompt-field name confirmed against a live build; hook extractor branches if it differs from Claude's `.prompt` (OQ-1)
 - [ ] OpenCode user-message event for the advisory plugin confirmed against a live build (OQ-2)
 
 ### Installer
-- [ ] Config-dir resolves with precedence `--config-dir` > `CLAUDE_CONFIG_DIR`/`CODEX_HOME` > platform default (FR-22)
-- [ ] `--project` writes repo-local artifacts; hook registered in `.claude/settings.local.json` via `$CLAUDE_PROJECT_DIR`; no machine-specific path written to a committed file (FR-23, FR-24)
-- [ ] Re-running the installer overwrites skill + hook files, replaces an old summarizing hook with the advisory one, and leaves exactly one tldt hook registration (FR-25, FR-26)
+- [x] Config-dir resolves with precedence `--config-dir` > `CLAUDE_CONFIG_DIR` > platform default — Claude target only; `CODEX_HOME` lands with Codex target (FR-22) — `eb3e736`
+- [x] `--project` writes repo-local artifacts; hook registered in `.claude/settings.local.json` via `$CLAUDE_PROJECT_DIR`; no machine-specific path written to a committed file (FR-23, FR-24) — `336f73c`
+- [x] Re-running the installer overwrites skill + hook files, replaces an old summarizing hook with the advisory one, and leaves exactly one tldt hook registration (FR-25, FR-26) — `8eb9b61`
 - [ ] Default install reaches Claude / Codex / OpenCode / Cursor skill dirs; Cursor stays skill-only (FR-17, FR-21)
 - [ ] Codex target installs skill + advisory shell hook in Codex hooks config — after OQ-1 (FR-18, FR-19)
 - [ ] OpenCode target installs skill + JS/TS advisory plugin — after OQ-2 (FR-20)
