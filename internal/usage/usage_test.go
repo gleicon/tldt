@@ -87,3 +87,85 @@ func TestAppend_EmptyPath(t *testing.T) {
 		t.Error("Append(\"\"): want error, got nil")
 	}
 }
+
+func TestRead_MissingLogReportsZeros(t *testing.T) {
+	// FR-16: a missing log is not an error.
+	agg, err := Read(filepath.Join(t.TempDir(), "does-not-exist.jsonl"))
+	if err != nil {
+		t.Fatalf("Read(missing): unexpected error: %v", err)
+	}
+	if (agg != Aggregate{}) {
+		t.Errorf("Read(missing) = %+v, want zero Aggregate", agg)
+	}
+}
+
+func TestRead_EmptyLogReportsZeros(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatalf("writing empty log: %v", err)
+	}
+	agg, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read(empty): %v", err)
+	}
+	if (agg != Aggregate{}) {
+		t.Errorf("Read(empty) = %+v, want zero Aggregate", agg)
+	}
+}
+
+func TestRead_AggregatesAndPercent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	recs := []Record{
+		{TS: "2026-06-02T10:00:00Z", In: 1000, Out: 250, Saved: 750},
+		{TS: "2026-06-02T10:01:00Z", In: 3000, Out: 1000, Saved: 2000},
+	}
+	for _, r := range recs {
+		if err := Append(path, r); err != nil {
+			t.Fatalf("Append: %v", err)
+		}
+	}
+	agg, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	want := Aggregate{Count: 2, In: 4000, Out: 1250, Saved: 2750, Percent: 2750.0 / 4000.0 * 100}
+	if agg != want {
+		t.Errorf("Read aggregate = %+v, want %+v", agg, want)
+	}
+}
+
+func TestRead_SkipsMalformedLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	// A valid record, a garbage line (e.g. half-written by a crash), another valid.
+	content := `{"ts":"t1","in":100,"out":40,"saved":60}
+{"ts":"t2","in":200,"o
+{"ts":"t3","in":200,"out":50,"saved":150}
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("writing log: %v", err)
+	}
+	agg, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if agg.Count != 2 || agg.In != 300 || agg.Saved != 210 {
+		t.Errorf("Read skipping malformed: got %+v, want Count=2 In=300 Saved=210", agg)
+	}
+}
+
+func TestReset(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "usage.jsonl")
+	if err := Append(path, Record{TS: "t", In: 10, Out: 4, Saved: 6}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	if err := Reset(path); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("Reset: log still exists (stat err=%v)", err)
+	}
+	// Reset on an already-absent log is a no-op, not an error.
+	if err := Reset(path); err != nil {
+		t.Errorf("Reset(missing): unexpected error: %v", err)
+	}
+}

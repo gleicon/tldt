@@ -21,6 +21,12 @@ import (
 )
 
 func main() {
+	// Subcommand dispatch (tldt is otherwise flag-only).
+	if len(os.Args) > 1 && os.Args[1] == "stats" {
+		runStats(os.Args[2:])
+		return
+	}
+
 	filePath := flag.String("f", "", "input file path")
 	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
