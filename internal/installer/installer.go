@@ -25,12 +25,12 @@ type Options struct {
 	// Empty = same as "all" (auto-detect).
 	Target string
 
-	// ConfigDir overrides the Claude config directory base (FR-22).
+	// ConfigDir overrides the Claude config directory base.
 	// Precedence: ConfigDir > $CLAUDE_CONFIG_DIR > ~/.claude. Empty = use env or default.
 	ConfigDir string
 
 	// Project installs repo-locally under ./.claude/ and registers the hook in the
-	// gitignored .claude/settings.local.json via $CLAUDE_PROJECT_DIR (FR-23, FR-24).
+	// gitignored .claude/settings.local.json via $CLAUDE_PROJECT_DIR.
 	Project bool
 }
 
@@ -111,7 +111,7 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 	}
 
 	// --project: repo-local Claude install only. Hook is registered in the gitignored
-	// settings.local.json via $CLAUDE_PROJECT_DIR so no machine path is committed (FR-23, FR-24).
+	// settings.local.json via $CLAUDE_PROJECT_DIR so no machine path is committed.
 	if opts.Project {
 		return []installTarget{{
 			name:         "claude",
@@ -142,8 +142,8 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 	}
 
 	// Optional apps: detect by base directory existence. OpenCode also gets the
-	// advisory plugin (FR-20); per OpenCode docs plugins live in plugins/ alongside
-	// skills/. Cursor stays skill-only (FR-21).
+	// advisory plugin; per OpenCode docs plugins live in plugins/ alongside
+	// skills/. Cursor stays skill-only.
 	optional := []struct {
 		name       string
 		detectDir  string
@@ -200,7 +200,7 @@ func resolveTargets(homeDir string, opts Options) ([]installTarget, error) {
 	return targets, nil
 }
 
-// claudeBaseDir resolves the Claude config directory base per FR-22:
+// claudeBaseDir resolves the Claude config directory base:
 // explicit --config-dir > $CLAUDE_CONFIG_DIR > the ~/.claude platform default.
 func claudeBaseDir(homeDir string, opts Options) string {
 	if opts.ConfigDir != "" {
@@ -257,7 +257,7 @@ func installHookFile(destPath string) error {
 // Idempotent: any prior tldt registration is dropped and replaced, so the file
 // always ends with exactly one tldt hook registration.
 // hookCmd MUST be an absolute expanded path, or a portable $CLAUDE_PROJECT_DIR/-rooted
-// path for --project installs (FR-24). Truly relative paths are rejected.
+// path for --project installs. Truly relative paths are rejected.
 func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 	if !filepath.IsAbs(hookCmd) && !strings.HasPrefix(hookCmd, "$CLAUDE_PROJECT_DIR/") {
 		return fmt.Errorf("hookCmd must be an absolute or $CLAUDE_PROJECT_DIR-rooted path, got %q", hookCmd)
@@ -303,7 +303,7 @@ func PatchSettingsJSON(settingsPath string, hookCmd string) error {
 	}
 	// Drop any prior tldt registration (any command referencing tldt-hook.sh),
 	// regardless of its exact path/format, so re-running upgrades in place and
-	// leaves exactly one tldt registration (FR-25, FR-26). Co-located non-tldt
+	// leaves exactly one tldt registration. Co-located non-tldt
 	// hooks in the same entry are preserved — we never clobber user config.
 	var kept []any
 	for _, e := range existing {

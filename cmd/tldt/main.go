@@ -105,7 +105,7 @@ func main() {
 
 	// --detect-only: advisory path. Detection already reported to stderr above;
 	// exit before summarizing so no summary is emitted and no usage line is
-	// written (FR-12).
+	// written.
 	if *detectOnly {
 		os.Exit(0)
 	}
@@ -159,9 +159,9 @@ func main() {
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
 
-	// Append a counts-only usage record unless disabled via [stats] enabled=false
-	// (FR-10). A log-write failure must never alter stdout, the exit code, or the
-	// summarization (FR-11) — so errors are dropped.
+	// Append a counts-only usage record unless disabled via [stats] enabled=false.
+	// A log-write failure must never alter stdout, the exit code, or the
+	// summarization — so errors are dropped.
 	if cfg.Stats.Enabled {
 		if logPath, err := usagelog.Path(); err == nil {
 			_ = usagelog.Append(logPath, usagelog.Record{

@@ -29,8 +29,8 @@ func TestInstallOpenCodePlugin_WritesAdvisoryPlugin(t *testing.T) {
 	}
 }
 
-// OpenCode gets the advisory plugin (FR-20) alongside its skill; per OpenCode docs
-// the plugin lives in <config>/plugins/. Cursor stays skill-only (FR-21).
+// OpenCode gets the advisory plugin alongside its skill; per OpenCode docs
+// the plugin lives in <config>/plugins/. Cursor stays skill-only.
 func TestResolveTargets_OpenCodeGetsPlugin(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmpDir, ".config", "opencode"), 0755); err != nil {

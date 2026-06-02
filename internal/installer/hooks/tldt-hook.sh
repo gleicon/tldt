@@ -2,7 +2,7 @@
 # tldt-hook.sh — UserPromptSubmit advisory hook (Claude Code / Codex)
 # Runs tldt injection+PII detection on the prompt; emits additionalContext
 # ONLY when something is flagged. Never summarizes, replaces, or blocks.
-# Exits 0 silently if tldt is absent (FR-4).
+# Exits 0 silently if tldt is absent.
 set -euo pipefail
 
 command -v tldt >/dev/null 2>&1 || exit 0
@@ -26,7 +26,7 @@ FINDINGS=$(grep -vE '(pii|injection)-detect: no findings' "$STDERR_FILE" \
   | grep -v '^[[:space:]]*$' || true)
 rm -f "$STDERR_FILE"
 
-# Clean prompt — silent pass-through (FR-2).
+# Clean prompt — silent pass-through.
 [ -z "$FINDINGS" ] && exit 0
 
 CONTENT="[tldt security advisory — untrusted input flagged]

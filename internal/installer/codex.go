@@ -21,7 +21,7 @@ const (
 	codexMarketplaceDir  = "tldt-marketplace"
 )
 
-// codexBaseDir resolves the Codex config directory base per FR-22:
+// codexBaseDir resolves the Codex config directory base:
 // explicit --config-dir > $CODEX_HOME > the ~/.codex platform default.
 func codexBaseDir(homeDir string, opts Options) string {
 	if opts.ConfigDir != "" {

@@ -34,7 +34,7 @@ func Path() (string, error) {
 
 // Append writes rec as one newline-terminated JSON line to path, creating the
 // parent directory if needed. The record is emitted in a single O_APPEND write
-// so concurrent appends from parallel processes stay atomic (NFR-2).
+// so concurrent appends from parallel processes stay atomic.
 func Append(path string, rec Record) error {
 	if path == "" {
 		return errors.New("usage: empty path")
@@ -69,7 +69,7 @@ type Aggregate struct {
 }
 
 // Read parses path and returns aggregate totals. A missing log is treated as
-// empty and yields a zero Aggregate with no error (FR-16). Malformed lines —
+// empty and yields a zero Aggregate with no error. Malformed lines —
 // e.g. a record half-written by a crashed process — are skipped, not fatal.
 func Read(path string) (Aggregate, error) {
 	if path == "" {
@@ -118,7 +118,7 @@ type DailyAggregate struct {
 }
 
 // ReadDaily parses path and returns per-day totals sorted ascending by date.
-// A missing log yields a nil slice with no error (FR-16). Malformed lines and
+// A missing log yields a nil slice with no error. Malformed lines and
 // records whose ts is too short to hold a YYYY-MM-DD date are skipped, not fatal.
 func ReadDaily(path string) ([]DailyAggregate, error) {
 	if path == "" {

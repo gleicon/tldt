@@ -272,7 +272,7 @@ func TestResolveTargets_AlwaysIncludesClaude(t *testing.T) {
 }
 
 func TestResolveTargets_HonorsClaudeConfigDirEnv(t *testing.T) {
-	// AC-17: CLAUDE_CONFIG_DIR set and no --config-dir → artifacts under the env path.
+	// CLAUDE_CONFIG_DIR set and no --config-dir → artifacts under the env path.
 	tmpDir := t.TempDir()
 	envBase := filepath.Join(tmpDir, "cc-env")
 	t.Setenv("CLAUDE_CONFIG_DIR", envBase)
@@ -294,7 +294,7 @@ func TestResolveTargets_HonorsClaudeConfigDirEnv(t *testing.T) {
 }
 
 func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
-	// AC-18: --config-dir and CLAUDE_CONFIG_DIR both set → the flag wins.
+	// --config-dir and CLAUDE_CONFIG_DIR both set → the flag wins.
 	tmpDir := t.TempDir()
 	flagBase := filepath.Join(tmpDir, "cc-flag")
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(tmpDir, "cc-env"))
@@ -310,7 +310,7 @@ func TestResolveTargets_ConfigDirFlagBeatsEnv(t *testing.T) {
 }
 
 func TestInstallHookFile_OverwritesOldSummarizingScript(t *testing.T) {
-	// FR-26/AC-20: re-running over a prior summarizing hook replaces its content
+	// re-running over a prior summarizing hook replaces its content
 	// with the advisory script.
 	destPath := filepath.Join(t.TempDir(), "hooks", "tldt-hook.sh")
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -338,7 +338,7 @@ func TestInstallHookFile_OverwritesOldSummarizingScript(t *testing.T) {
 }
 
 func TestPatchSettingsJSON_ReplacesStaleTldtHook(t *testing.T) {
-	// FR-25/AC-20: a prior tldt registration with a DIFFERENT command path is
+	// a prior tldt registration with a DIFFERENT command path is
 	// dropped, leaving exactly one registration pointing at the new command.
 	settingsPath := filepath.Join(t.TempDir(), "settings.json")
 	stale := `{"hooks":{"UserPromptSubmit":[` +
@@ -374,7 +374,7 @@ func TestPatchSettingsJSON_ReplacesStaleTldtHook(t *testing.T) {
 }
 
 func TestResolveTargets_ProjectScopeIsRepoLocal(t *testing.T) {
-	// FR-23/FR-24: --project → single repo-local Claude target, settings.local.json,
+	// --project → single repo-local Claude target, settings.local.json,
 	// and a $CLAUDE_PROJECT_DIR-rooted hook command (not a machine path).
 	targets, err := resolveTargets(t.TempDir(), Options{Project: true})
 	if err != nil {
@@ -402,7 +402,7 @@ func TestResolveTargets_ProjectScopeIsRepoLocal(t *testing.T) {
 }
 
 func TestPatchSettingsJSON_AcceptsProjectDirVar(t *testing.T) {
-	// AC-19: the $CLAUDE_PROJECT_DIR hook command is registered in settings.local.json
+	// the $CLAUDE_PROJECT_DIR hook command is registered in settings.local.json
 	// and no absolute machine path is written.
 	settingsPath := filepath.Join(t.TempDir(), "settings.local.json")
 	hookCmd := "$CLAUDE_PROJECT_DIR/.claude/hooks/tldt-hook.sh"
@@ -523,7 +523,7 @@ func TestResolveTargets_DetectsOptionalApps(t *testing.T) {
 	}
 }
 
-// TestInstall_DefaultRunReachesAllFour pins FR-17/21: a default run (no --target)
+// TestInstall_DefaultRunReachesAllFour pins that a default run (no --target)
 // installs to every detected app in one pass — Claude (skill+hook+settings), Codex
 // (plugin tree), OpenCode (skill+advisory plugin), and Cursor (skill only). The
 // optional dirs are pre-created so detection includes them; ~/.agents is left absent

@@ -933,7 +933,7 @@ func TestSanitizePIIFlagStdoutOnly(t *testing.T) {
 
 // TestStatsDaily_TableAndJSON verifies `tldt stats --daily` groups the usage log
 // by day in both the text table and JSON, using an isolated HOME so the seeded
-// ~/.tldt/usage.jsonl is the only input. (FR-15.a)
+// ~/.tldt/usage.jsonl is the only input.
 func TestStatsDaily_TableAndJSON(t *testing.T) {
 	home := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(home, ".tldt"), 0o755); err != nil {

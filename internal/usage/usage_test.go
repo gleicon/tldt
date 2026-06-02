@@ -89,7 +89,7 @@ func TestAppend_EmptyPath(t *testing.T) {
 }
 
 func TestRead_MissingLogReportsZeros(t *testing.T) {
-	// FR-16: a missing log is not an error.
+	// a missing log is not an error.
 	agg, err := Read(filepath.Join(t.TempDir(), "does-not-exist.jsonl"))
 	if err != nil {
 		t.Fatalf("Read(missing): unexpected error: %v", err)
