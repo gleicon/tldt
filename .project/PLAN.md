@@ -4,19 +4,19 @@ Source: `.project/SPEC.md`. Ordered for independent shipping — pure-Go core fi
 
 ## Now
 
-**State** — Design fully resolved (`/ds-explore` → `/ds-grill-me` → `/ds-spec`). Spec at `.project/SPEC.md`, roadmap below. Branch `feat/agent-integration` (2 doc commits: spec + roadmap). No implementation started — all roadmap tasks `[ ]`.
+**State** — Core CLI section complete (4 commits on `feat/agent-integration`: FR-5 removal `229fbc3`, usage logging `e3483c5`, `[stats]` opt-out + `--detect-only` `558b517`, `tldt stats` subcommand `3fb4f55`). New `internal/usage` package (`Append`/`Read`/`Reset`); `ts` is RFC3339 (spec updated to match). All tests pass `go test -race ./...`.
 
-**Next** — First Core task: remove `--print-threshold` flag and `[hook] threshold` config (FR-5), confirming nothing references them.
+**Next** — First Agent-artifacts task: rewrite `internal/installer/hooks/tldt-hook.sh` into the advisory hook — `tldt --detect-injection --detect-pii --detect-only`, emit `additionalContext` only when flagged, never summarize/block, exit 0 silently when tldt absent (FR-1/2/3/4, NFR-5). Crux: confirm tldt's stderr signal for clean vs flagged (`reportInjection`/`reportPII` in `main.go`) so the hook can distinguish them. Also update `installer_test.go` (still pins the old `--sanitize --detect-injection --verbose` invocation).
 
-**Open questions** — OQ-1 (Codex `UserPromptSubmit` prompt field) and OQ-2 (OpenCode user event) are live-environment spikes gating the Codex/OpenCode installer targets — defer until those tasks. OQ-4: decide whether `tldt stats --daily` is in the first cut. `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
+**Open questions** — OQ-1 (Codex `UserPromptSubmit` prompt field) and OQ-2 (OpenCode user event) are live-environment spikes gating the Codex/OpenCode installer targets — defer until those tasks. OQ-4: `tldt stats --daily` deferred (not in first cut, per decision). `.project/EXPLORE.md` is untracked scratch — keep or delete at will.
 
 ## Roadmap
 
 ### Core CLI (Go, no agent config required)
-- [ ] `--print-threshold` flag and `[hook] threshold` config removed; nothing references them (FR-5)
-- [ ] Each summary-producing run appends a counts-only `{ts,in,out,saved}` line to `~/.tldt/usage.jsonl`; a log-write failure never alters stdout, exit code, or the summarization (FR-9, FR-11, NFR-2, NFR-4)
-- [ ] Usage logging honors `[stats] enabled=false` opt-out; the detection-only path writes no log line (FR-10, FR-12)
-- [ ] `tldt stats` reports count / total in / total out / saved / percent; `--json` emits the same machine-readably; `--reset` clears the log; missing-or-empty log reports zeros and exits 0 (FR-13, FR-14, FR-15, FR-16)
+- [x] `--print-threshold` flag and `[hook] threshold` config removed; nothing references them (FR-5)
+- [x] Each summary-producing run appends a counts-only `{ts,in,out,saved}` line to `~/.tldt/usage.jsonl`; a log-write failure never alters stdout, exit code, or the summarization (FR-9, FR-11, NFR-2, NFR-4)
+- [x] Usage logging honors `[stats] enabled=false` opt-out; the detection-only path writes no log line (FR-10, FR-12)
+- [x] `tldt stats` reports count / total in / total out / saved / percent; `--json` emits the same machine-readably; `--reset` clears the log; missing-or-empty log reports zeros and exits 0 (FR-13, FR-14, FR-15, FR-16)
 - [ ] `tldt stats --daily` per-day breakdown — optional, confirm inclusion (FR-15.a, OQ-4)
 
 ### Agent artifacts (content)
