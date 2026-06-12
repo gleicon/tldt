@@ -1,4 +1,4 @@
-.PHONY: build test test-uat install install-skill clean deps lint run help wasm demo demo-build wasm-clean
+.PHONY: build test test-uat test-injection install install-skill clean deps lint run help wasm demo demo-build wasm-clean
 
 BINARY := tldt
 CMD     := ./cmd/tldt
@@ -6,12 +6,15 @@ WASM_DIR := ./wasm
 DOCS_DIR := ./docs
 GOROOT   := $(shell go env GOROOT)
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+
 ## build: compile binary to ./tldt
 build:
-	go build -o $(BINARY) $(CMD)
+	go build $(LDFLAGS) -o $(BINARY) $(CMD)
 
-## test: run all tests
-test:
+## test: run all tests including injection surface detection
+test: test-injection
 	go test ./...
 
 ## test-verbose: run tests with output
@@ -71,6 +74,13 @@ lint:
 ## run: build and run with stdin (usage example)
 run: build
 	@echo "Built. Pipe text: echo 'your text' | ./$(BINARY)"
+
+## test-injection: run document surface injection detection tests (PDF, DOCX, XLSX, HTML)
+test-injection:
+	@echo "=== Injection surface detection tests ==="
+	go test -v -count=1 -run 'TestDetectInjection|TestExtractDOCX|TestExtractXLSX|TestExtractPDF|TestExtractHTMLSurfaces' ./...
+	@echo ""
+	@echo "=== PASS ==="
 
 ## test-uat: run automated UAT tests for phase 4 URL input feature
 test-uat:

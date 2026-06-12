@@ -321,8 +321,9 @@ For full OWASP LLM Top 10 2025 coverage including LLM01 (prompt injection defens
 ## Build & test
 
 ```bash
-make build            # compile to ./tldt
-make test             # run all tests
+make build            # compile to ./tldt (version stamped via git tag)
+make test             # run all tests (includes injection surface tests)
+make test-injection   # run only injection/surface detection tests (PDF, DOCX, XLSX, HTML)
 make test-verbose     # tests with output
 make test-cover       # unit + subprocess coverage report
 make test-race        # run with race detector
@@ -332,3 +333,5 @@ make deps             # tidy + verify modules
 make lint             # go vet
 make clean            # remove binary
 ```
+
+`make test-injection` covers `TestDetectInjection_*` (end-to-end binary), `TestExtractPDF/DOCX/XLSX_*` (unit extractor), and `TestExtractHTMLSurfaces_*` (unit fetcher).

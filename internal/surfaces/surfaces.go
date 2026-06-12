@@ -20,11 +20,8 @@ const (
 	SourceHTMLTextarea     = "html:textarea"       // <textarea>pre-filled</textarea>
 
 	// PDF surfaces
-	SourcePDFMetadata   = "pdf:metadata"    // XMP / Info dict fields
-	SourcePDFAnnotation = "pdf:annotation"  // /Annot objects with /Contents
-	SourcePDFJavaScript = "pdf:javascript"  // /JS action streams
-	SourcePDFBookmark   = "pdf:bookmark"    // outline /Title entries
-	SourcePDFFormField  = "pdf:form-field"  // /Widget tooltip (/TU) and value (/V)
+	SourcePDFMetadata   = "pdf:metadata"   // XMP / Info dict fields
+	SourcePDFJavaScript = "pdf:javascript" // /JS action streams
 
 	// DOCX surfaces
 	SourceDOCXProperty  = "docx:property"   // docProps/core.xml and app.xml

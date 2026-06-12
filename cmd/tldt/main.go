@@ -22,6 +22,8 @@ import (
 	usagelog "github.com/gleicon/tldt/internal/usage"
 )
 
+var version = "dev" // set at build time via -ldflags "-X main.version=vX.Y.Z"
+
 func main() {
 	// Subcommand dispatch (tldt is otherwise flag-only).
 	if len(os.Args) > 1 && os.Args[1] == "stats" {
@@ -29,6 +31,7 @@ func main() {
 		return
 	}
 
+	versionFlag := flag.Bool("version", false, "print version and exit")
 	filePath := flag.String("f", "", "input file path")
 	urlFlag := flag.String("url", "", "URL of a webpage to fetch and summarize")
 	algorithm := flag.String("algorithm", "lexrank", "algorithm: lexrank|textrank|graph|ensemble")
@@ -56,12 +59,16 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	if *versionFlag {
+		fmt.Println("tldt " + version)
+		return
+	}
+
 	// Load config file — silent fallback to defaults on any error.
 	cfgPath, _ := config.ConfigPath()
 	cfg := config.Load(cfgPath)
 
 	// Detect which flags the user explicitly provided.
-	// flag.Visit (NOT flag.VisitAll) visits only explicitly-set flags.
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
 
