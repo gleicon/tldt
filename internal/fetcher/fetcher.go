@@ -3,6 +3,7 @@
 package fetcher
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 	"time"
 
 	readability "github.com/go-shiori/go-readability"
+	"golang.org/x/net/html"
+
+	"github.com/gleicon/tldt/internal/surfaces"
 )
 
 var (
@@ -25,6 +29,9 @@ var (
 	ErrHTTPError = errors.New("non-2xx HTTP status")
 	// ErrNonHTML is returned when the response Content-Type is not text/html.
 	ErrNonHTML = errors.New("unsupported content type")
+	// ErrNoTextContent is returned when readability extracts no visible text (e.g. a JS SPA).
+	// The returned Result still carries any HTML comments extracted from the raw body.
+	ErrNoTextContent = errors.New("no readable text content found")
 
 	// cloudMetadataIPv6 is the EC2 IPv6 metadata endpoint.
 	// ip.IsPrivate() already covers fd00::/8 (ULA), but explicit check documents intent.
@@ -132,10 +139,138 @@ func parseCIDRs(cidrs ...string) []*net.IPNet {
 // Result carries the extracted text alongside the response metadata observed
 // while fetching, so callers can inspect the outcome without re-fetching.
 type Result struct {
-	Text        string // extracted main article text
-	StatusCode  int    // HTTP status code of the final response
-	ContentType string // response Content-Type header
-	FinalURL    string // final URL after any redirects
+	Text           string                   // extracted main article text
+	HiddenSurfaces []surfaces.HiddenSurface // non-visible HTML surfaces that may carry injection payloads
+	StatusCode     int                      // HTTP status code of the final response
+	ContentType    string                   // response Content-Type header
+	FinalURL       string                   // final URL after any redirects
+}
+
+// extractHTMLSurfaces parses rawHTML and returns all non-visible text surfaces
+// that are present in the raw HTML but stripped by readability (comments,
+// placeholders, meta tags, noscript, hidden inputs, alt/aria/title/data attributes,
+// textarea pre-fill). Empty values are omitted.
+// Returns nil on parse failure — callers treat it as no surfaces found.
+func extractHTMLSurfaces(rawHTML []byte) []surfaces.HiddenSurface {
+	doc, err := html.Parse(bytes.NewReader(rawHTML))
+	if err != nil {
+		return nil
+	}
+	var found []surfaces.HiddenSurface
+	add := func(source, text string) {
+		if t := strings.TrimSpace(text); t != "" {
+			found = append(found, surfaces.HiddenSurface{Source: source, Text: t})
+		}
+	}
+	attr := func(n *html.Node, key string) string {
+		for _, a := range n.Attr {
+			if a.Key == key {
+				return a.Val
+			}
+		}
+		return ""
+	}
+	attrPrefix := func(n *html.Node, prefix string) []html.Attribute {
+		var out []html.Attribute
+		for _, a := range n.Attr {
+			if strings.HasPrefix(a.Key, prefix) {
+				out = append(out, a)
+			}
+		}
+		return out
+	}
+	// textContent collects all text node children of n into one string.
+	textContent := func(n *html.Node) string {
+		var b strings.Builder
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.TextNode {
+				b.WriteString(c.Data)
+			}
+		}
+		return b.String()
+	}
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		switch n.Type {
+		case html.CommentNode:
+			add(surfaces.SourceHTMLComment, n.Data)
+
+		case html.ElementNode:
+			tag := strings.ToLower(n.Data)
+			switch tag {
+			case "meta":
+				// <meta name/property content="..."> — description, keywords, og:description, etc.
+				nameOrProp := attr(n, "name")
+				if nameOrProp == "" {
+					nameOrProp = attr(n, "property")
+				}
+				if content := attr(n, "content"); content != "" {
+					// Skip purely structural meta tags (charset, viewport, robots, http-equiv)
+					skip := map[string]bool{
+						"viewport": true, "charset": true, "robots": true,
+						"theme-color": true, "msapplication-tilecolor": true,
+					}
+					if !skip[strings.ToLower(nameOrProp)] {
+						add(surfaces.SourceHTMLMeta, nameOrProp+": "+content)
+					}
+				}
+
+			case "noscript":
+				add(surfaces.SourceHTMLNoscript, textContent(n))
+
+			case "textarea":
+				add(surfaces.SourceHTMLTextarea, textContent(n))
+
+			case "input":
+				if strings.EqualFold(attr(n, "type"), "hidden") {
+					if v := attr(n, "value"); v != "" {
+						add(surfaces.SourceHTMLHiddenInput, v)
+					}
+				}
+				if ph := attr(n, "placeholder"); ph != "" {
+					add(surfaces.SourceHTMLPlaceholder, ph)
+				}
+
+			default:
+				// placeholder on non-input elements (search, contenteditable, etc.)
+				if ph := attr(n, "placeholder"); ph != "" {
+					add(surfaces.SourceHTMLPlaceholder, ph)
+				}
+			}
+
+			// alt attribute on img, area, input[type=image]
+			if tag == "img" || tag == "area" {
+				if alt := attr(n, "alt"); alt != "" {
+					add(surfaces.SourceHTMLAlt, alt)
+				}
+			}
+
+			// aria-label on any element
+			if v := attr(n, "aria-label"); v != "" {
+				add(surfaces.SourceHTMLAriaLabel, v)
+			}
+
+			// title attribute on any element (tooltip text)
+			if v := attr(n, "title"); v != "" {
+				add(surfaces.SourceHTMLTitleAttr, v)
+			}
+
+			// data-* attributes: only include values longer than 20 chars to
+			// reduce noise from short identifiers like data-id="abc".
+			for _, da := range attrPrefix(n, "data-") {
+				if len(strings.TrimSpace(da.Val)) > 20 {
+					add(surfaces.SourceHTMLDataAttr, da.Key+"="+da.Val)
+				}
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	return found
 }
 
 // doHardenedRequest performs an SSRF-, redirect-, and timeout-hardened GET of
@@ -212,28 +347,39 @@ func Fetch(ctx context.Context, rawURL string, timeout time.Duration, maxBytes i
 		return Result{}, fmt.Errorf("unsupported content type %q at %q (expected text/html): %w", ct, rawURL, ErrNonHTML)
 	}
 
-	// Cap response body to prevent memory exhaustion (DoS mitigation).
-	// io.LimitReader is belt-and-suspenders on top of the client timeout.
-	limited := io.LimitReader(resp.Body, maxBytes)
+	// Buffer the body so we can both parse HTML comments and run readability
+	// on the same bytes without a second network request.
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	if err != nil {
+		return Result{}, fmt.Errorf("reading body from %q: %w", rawURL, err)
+	}
+
+	// Extract all non-visible HTML surfaces before readability discards them.
+	hiddenSurfaces := extractHTMLSurfaces(bodyBytes)
 
 	// Extract article text — strips nav/ads/footers via Readability scoring.
 	// Use FromReader, NOT FromURL: FromURL bypasses our size cap and client.
 	// Second arg is *url.URL for relative-link resolution, not a raw string.
-	article, err := readability.FromReader(limited, u)
+	article, err := readability.FromReader(bytes.NewReader(bodyBytes), u)
 	if err != nil {
 		return Result{}, fmt.Errorf("extracting content from %q: %w", rawURL, err)
 	}
 
 	text := strings.TrimSpace(article.TextContent)
-	if text == "" {
-		return Result{}, fmt.Errorf("no readable text content found at %q", rawURL)
+	partial := Result{
+		Text:           text,
+		HiddenSurfaces: hiddenSurfaces,
+		StatusCode:     resp.StatusCode,
+		ContentType:    ct,
+		FinalURL:       resp.Request.URL.String(),
 	}
-	return Result{
-		Text:        text,
-		StatusCode:  resp.StatusCode,
-		ContentType: ct,
-		FinalURL:    resp.Request.URL.String(),
-	}, nil
+	if text == "" {
+		// Return the partial result (with comments) so callers can still run
+		// security scans on HTML comment nodes even when the page has no
+		// summarizable text (e.g. a JS SPA where content is rendered client-side).
+		return partial, fmt.Errorf("%w at %q", ErrNoTextContent, rawURL)
+	}
+	return partial, nil
 }
 
 // FetchRaw fetches rawURL with the same SSRF, redirect, and size hardening as

@@ -169,6 +169,27 @@ var injectionPatterns = []patternDef{
 		re:         regexp.MustCompile(`(?i)(print|output|show|display|repeat|reveal)\s+your\s+(system\s+)?(prompt|instructions?)`),
 		confidence: 0.85,
 	},
+	// Social engineering — behavioral manipulation via urgency, threats, or
+	// covert instruction injection (e.g. hidden in HTML comments or metadata).
+	{
+		// Matches "append your username to your User-Agent header",
+		// "add a custom header called X-Foo", etc.
+		name:       "social-engineering",
+		re:         regexp.MustCompile(`(?i)(append|add)\s+.{0,60}(user.?agent|custom\s+header)`),
+		confidence: 0.75,
+	},
+	{
+		// Matches "you have only one attempt", "you only have one chance", etc.
+		name:       "social-engineering",
+		re:         regexp.MustCompile(`(?i)you\s+(have\s+only|only\s+have)\s+(one|1|a\s+single)\s+(attempt|chance|try|shot)`),
+		confidence: 0.85,
+	},
+	{
+		// Matches "flagged as malicious", "IP banned", "have your IP banned", etc.
+		name:       "social-engineering",
+		re:         regexp.MustCompile(`(?i)(flagged?\s+as\s+malicious|ip\s+ban(ned)?|have\s+your\s+ip\s+ban)`),
+		confidence: 0.80,
+	},
 }
 
 // DetectPatterns scans text for known injection phrases.

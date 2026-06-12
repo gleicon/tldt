@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	tldt "github.com/gleicon/tldt/pkg/tldt"
 
 	"github.com/gleicon/tldt/internal/config"
+	"github.com/gleicon/tldt/internal/extractor"
 	"github.com/gleicon/tldt/internal/formatter"
 	"github.com/gleicon/tldt/internal/installer"
 	usagelog "github.com/gleicon/tldt/internal/usage"
@@ -89,18 +91,10 @@ func main() {
 	effectiveAlgorithm, effectiveSentences, effectiveFormat := resolveSettings(
 		cfg, flagsSet, *level, *algorithm, *format, *sentences)
 
-	rawBytes, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
+	rawBytes, hiddenSurfaces, err := resolveInputBytes(flag.Args(), *filePath, *urlFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
-	}
-	text, isEmpty, err := validateInput(rawBytes)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if isEmpty {
-		os.Exit(0)
 	}
 
 	secOpts := securityOpts{
@@ -111,6 +105,23 @@ func main() {
 		detectInjection:    *detectInjection,
 		injectionThreshold: *injectionThreshold,
 	}
+
+	// HTML comment injection check runs before the empty-text guard so that
+	// JS SPAs (no readable body text, but comments carrying injection payloads)
+	// still get scanned when --detect-injection is set.
+	if secOpts.detectInjection && len(hiddenSurfaces) > 0 {
+		reportHiddenSurfaces(hiddenSurfaces, secOpts.injectionThreshold)
+	}
+
+	text, isEmpty, err := validateInput(rawBytes)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if isEmpty {
+		os.Exit(0)
+	}
+
 	text = applyMutatingStages(text, secOpts)
 
 	// --detect-only --format json: emit the structured detection contract to
@@ -371,6 +382,59 @@ func reportInjection(text string, threshold float64) {
 	}
 }
 
+// reportHiddenSurfaces runs injection detection on all hidden surfaces extracted
+// from a fetched URL or document file. Surfaces are invisible to content extractors
+// (readability, document converters) but present in raw HTML/PDF/DOCX/XLSX and
+// readable by LLMs — this is the dedicated scan for that blind spot.
+// Each surface is scanned individually; findings are labeled with source and index.
+func reportHiddenSurfaces(surfs []tldt.HiddenSurface, threshold float64) {
+	var totalFindings int
+	for i, s := range surfs {
+		dresult, err := tldt.Detect(s.Text, tldt.DetectOptions{OutlierThreshold: threshold})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "injection-detect[%s:%d]: detection error: %v\n", s.Source, i, err)
+			continue
+		}
+		report := dresult.Report
+		var patternFindings []tldt.Finding
+		for _, f := range report.Findings {
+			if f.Category != "outlier" {
+				patternFindings = append(patternFindings, f)
+			}
+		}
+		if len(patternFindings) > 0 {
+			totalFindings += len(patternFindings)
+			fmt.Fprintf(os.Stderr, "injection-detect[%s:%d]: %d finding(s), max confidence %.2f\n",
+				s.Source, i, len(patternFindings), report.MaxScore)
+			for _, f := range patternFindings {
+				fmt.Fprintf(os.Stderr, "  [%s] %s (score=%.2f): %s\n", f.Category, f.Pattern, f.Score, f.Excerpt)
+			}
+			if report.Suspicious {
+				fmt.Fprintf(os.Stderr, "injection-detect[%s:%d]: WARNING — surface flagged as suspicious\n", s.Source, i)
+			}
+		}
+	}
+	if totalFindings == 0 {
+		fmt.Fprintln(os.Stderr, "injection-detect[hidden-surfaces]: no findings")
+	}
+}
+
+// extractDocumentSurfaces detects the document type by file extension and
+// extracts hidden injection surfaces from DOCX, XLSX, and PDF files.
+// Returns nil for unknown types — callers skip surface scanning gracefully.
+func extractDocumentSurfaces(filePath string, data []byte) []tldt.HiddenSurface {
+	lower := strings.ToLower(filePath)
+	switch {
+	case strings.HasSuffix(lower, ".docx"):
+		return extractor.ExtractDOCX(data)
+	case strings.HasSuffix(lower, ".xlsx"), strings.HasSuffix(lower, ".xls"):
+		return extractor.ExtractXLSX(data)
+	case strings.HasSuffix(lower, ".pdf"):
+		return extractor.ExtractPDF(data)
+	}
+	return nil
+}
+
 // summarize builds the summarizer for algo and returns the summary. With explain
 // set it prints algorithm diagnostics to stderr when the algorithm supports them,
 // otherwise notes the fallback. Exits the process on failure.
@@ -563,7 +627,9 @@ func groupIntoParagraphs(sentences []string, n int) string {
 }
 
 // resolveInputBytes reads raw input bytes from --url, stdin pipe, -f file, or positional args.
-func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, error) {
+// For --url fetches it also returns hidden HTML surfaces extracted from the raw HTML — these are
+// invisible to readability but can carry prompt injection payloads. Non-URL paths return nil surfaces.
+func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, []tldt.HiddenSurface, error) {
 	// --url branch: highest priority — most explicit input source
 	if urlStr != "" {
 		fresult, err := tldt.Fetch(context.Background(), urlStr, tldt.FetchOptions{
@@ -571,29 +637,38 @@ func resolveInputBytes(args []string, filePath string, urlStr string) ([]byte, e
 			MaxBytes: 5 << 20, // 5MB cap
 		})
 		if err != nil {
-			return nil, fmt.Errorf("fetching URL: %w", err)
+			// ErrNoTextContent means a JS SPA or empty page — no summarizable text,
+			// but hidden surfaces may still carry injection payloads. Return nil text
+			// with surfaces so the caller can still run security scanning.
+			if errors.Is(err, tldt.ErrNoTextContent) {
+				return nil, fresult.HiddenSurfaces, nil
+			}
+			return nil, nil, fmt.Errorf("fetching URL: %w", err)
 		}
-		return []byte(fresult.Text), nil
+		return []byte(fresult.Text), fresult.HiddenSurfaces, nil
 	}
 	stat, err := os.Stdin.Stat()
 	if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			return nil, fmt.Errorf("reading stdin: %w", err)
+			return nil, nil, fmt.Errorf("reading stdin: %w", err)
 		}
-		return data, nil
+		return data, nil, nil
 	}
 	if filePath != "" {
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			return nil, fmt.Errorf("reading file %q: %w", filePath, err)
+			return nil, nil, fmt.Errorf("reading file %q: %w", filePath, err)
 		}
-		return data, nil
+		// For known document formats, extract hidden injection surfaces alongside
+		// raw bytes (which the summarizer will receive as-is for text extraction).
+		surfs := extractDocumentSurfaces(filePath, data)
+		return data, surfs, nil
 	}
 	if len(args) > 0 {
-		return []byte(strings.Join(args, " ")), nil
+		return []byte(strings.Join(args, " ")), nil, nil
 	}
-	return nil, fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
+	return nil, nil, fmt.Errorf("no input: provide text via stdin, -f file, or positional argument")
 }
 
 // validateInput checks raw input bytes for binary content and whitespace-only input.

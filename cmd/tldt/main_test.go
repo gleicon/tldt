@@ -150,35 +150,41 @@ func TestValidateInput_ValidUnicode(t *testing.T) {
 // ── resolveInputBytes ─────────────────────────────────────────────────────────
 
 func TestResolveInputBytes_PositionalArgs(t *testing.T) {
-	got, err := resolveInputBytes([]string{"hello", "world"}, "", "")
+	got, hiddenSurfs, err := resolveInputBytes([]string{"hello", "world"}, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if string(got) != "hello world" {
 		t.Errorf("got %q, want %q", string(got), "hello world")
 	}
+	if hiddenSurfs != nil {
+		t.Errorf("positional args: want nil comments, got %v", hiddenSurfs)
+	}
 }
 
 func TestResolveInputBytes_FilePath(t *testing.T) {
 	path := writeTempFile(t, "file content here")
-	got, err := resolveInputBytes([]string{}, path, "")
+	got, hiddenSurfs, err := resolveInputBytes([]string{}, path, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if string(got) != "file content here" {
 		t.Errorf("got %q, want %q", string(got), "file content here")
 	}
+	if hiddenSurfs != nil {
+		t.Errorf("file path: want nil comments, got %v", hiddenSurfs)
+	}
 }
 
 func TestResolveInputBytes_FileNotFound(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt", "")
+	_, _, err := resolveInputBytes([]string{}, "/nonexistent/path/file.txt", "")
 	if err == nil {
 		t.Error("missing file: want error, got nil")
 	}
 }
 
 func TestResolveInputBytes_NoInput(t *testing.T) {
-	_, err := resolveInputBytes([]string{}, "", "")
+	_, _, err := resolveInputBytes([]string{}, "", "")
 	if err == nil {
 		t.Error("no input: want error, got nil")
 	}
@@ -205,12 +211,15 @@ func TestResolveInputBytes_Stdin(t *testing.T) {
 	}
 	_ = w.Close()
 
-	got, err := resolveInputBytes([]string{}, "", "")
+	got, hiddenSurfs, err := resolveInputBytes([]string{}, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if string(got) != "piped content here" {
 		t.Errorf("stdin: got %q, want %q", string(got), "piped content here")
+	}
+	if hiddenSurfs != nil {
+		t.Errorf("stdin: want nil comments, got %v", hiddenSurfs)
 	}
 }
 

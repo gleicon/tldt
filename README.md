@@ -189,6 +189,14 @@ tldt --url https://example.com/article --sentences 3 --format json
 
 HTML boilerplate (nav, ads, footers) is stripped using the readability algorithm. Redirects are followed automatically. Fetch errors (4xx/5xx, timeouts) exit non-zero with a message to stderr.
 
+**HTML comment injection scanning**: when `--detect-injection` is combined with `--url`, tldt also scans all `<!-- HTML comment -->` nodes from the raw HTML. Readability strips comments from visible text, making them an invisible channel for indirect prompt injection (OWASP LLM01). This scanning layer fires even on JS SPAs where readability finds no body text.
+
+```bash
+tldt --url https://example.com/page --detect-injection
+# stderr: injection-detect[html-comment 0]: WARNING — comment flagged as suspicious
+#           [pattern] social-engineering (score=0.85): You have only one attempt
+```
+
 ---
 
 ## Config file
@@ -273,10 +281,20 @@ All detection output goes to **stderr only** — stdout always contains just the
 
 | Layer | Detects |
 |-------|---------|
-| Pattern | Direct overrides (`ignore all previous instructions`), role injection, delimiter injection (`[INST]`, `<system>`), jailbreaks (DAN mode), exfiltration requests |
+| Pattern | Direct overrides (`ignore all previous instructions`), role injection, delimiter injection (`[INST]`, `<system>`), jailbreaks (DAN mode), exfiltration requests, social engineering |
+| Social engineering | Header manipulation (`append … User-Agent header`, `add a custom header`), urgency threats (`you have only one attempt`), punishment threats (`flagged as malicious`, `IP banned`) |
 | Encoding | Base64 payloads (entropy-gated), `\x`-escaped hex sequences, raw hex strings, abnormal control character density |
 | Outlier | Sentences statistically dissimilar from document neighbors (off-topic injection) — uses LexRank cosine similarity matrix |
 | Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o`, etc. — UTS#39 lookup (Unicode 17.0, ~700 entries). NFKC normalization alone cannot collapse these; they require the lookup table. |
+| HTML comments | `<!-- HTML comments -->` — stripped by readability; scanned separately on `--url` fetches |
+| HTML attributes | `placeholder`, `alt`, `aria-label`, `title`, `data-*` on any element — invisible to readability |
+| HTML meta | `<meta name/property content="">` — head tags stripped by readability |
+| HTML noscript | `<noscript>` fallback content |
+| HTML hidden inputs | `<input type="hidden" value="">` |
+| HTML textarea prefill | Pre-filled `<textarea>` content |
+| DOCX surfaces | Document properties (`dc:title`, `dc:subject`, `dc:description`, keywords), inline comments, hidden text runs (`w:hidden`), field codes (`w:instrText`) — via `-f file.docx --detect-injection` |
+| XLSX surfaces | Document properties, cell comments — via `-f file.xlsx --detect-injection` |
+| PDF surfaces | XMP metadata packet, Info dictionary (`/Title`, `/Keywords`, `/Subject`, `/Author`), JavaScript actions (`/JS`) — via `-f file.pdf --detect-injection` |
 
 Tune the outlier threshold:
 

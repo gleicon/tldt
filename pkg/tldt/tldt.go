@@ -11,7 +11,11 @@ import (
 	"github.com/gleicon/tldt/internal/htmlmd"
 	"github.com/gleicon/tldt/internal/sanitizer"
 	"github.com/gleicon/tldt/internal/summarizer"
+	"github.com/gleicon/tldt/internal/surfaces"
 )
+
+// HiddenSurface is re-exported from internal/surfaces for SDK consumers.
+type HiddenSurface = surfaces.HiddenSurface
 
 // --- Option types ---
 
@@ -97,10 +101,11 @@ type PipelineResult struct {
 // This enables middleware consumers to inspect response details without
 // re-fetching the URL.
 type FetchResult struct {
-	Text        string // Extracted article text
-	StatusCode  int    // HTTP status code (after redirects)
-	ContentType string // Response Content-Type header
-	FinalURL    string // Final URL after all redirects
+	Text           string          // Extracted article text
+	HiddenSurfaces []HiddenSurface // Non-visible HTML surfaces (comments, placeholders, meta, etc.)
+	StatusCode     int             // HTTP status code (after redirects)
+	ContentType    string          // Response Content-Type header
+	FinalURL       string          // Final URL after all redirects
 }
 
 // --- Sentinel errors re-exported for caller error checking ---
@@ -110,6 +115,9 @@ var (
 	ErrRedirectLimit = fetcher.ErrRedirectLimit
 	ErrHTTPError     = fetcher.ErrHTTPError
 	ErrNonHTML       = fetcher.ErrNonHTML
+	// ErrNoTextContent is returned when readability finds no visible text (e.g. a JS SPA).
+	// The FetchResult still carries HiddenSurfaces extracted from the raw body.
+	ErrNoTextContent = fetcher.ErrNoTextContent
 )
 
 // --- Default helpers ---
@@ -259,18 +267,19 @@ func Fetch(ctx context.Context, urlStr string, opts FetchOptions) (FetchResult, 
 	}
 
 	res, err := fetcher.Fetch(ctx, urlStr, opts.Timeout, opts.MaxBytes)
-	if err != nil {
-		// The fetcher error already wraps a sentinel (re-exported above); add
-		// call-site context and let callers match with errors.Is.
-		return FetchResult{}, fmt.Errorf("tldt.Fetch: %w", err)
+	partial := FetchResult{
+		Text:           res.Text,
+		HiddenSurfaces: res.HiddenSurfaces,
+		StatusCode:     res.StatusCode,
+		ContentType:    res.ContentType,
+		FinalURL:       res.FinalURL,
 	}
-
-	return FetchResult{
-		Text:        res.Text,
-		StatusCode:  res.StatusCode,
-		ContentType: res.ContentType,
-		FinalURL:    res.FinalURL,
-	}, nil
+	if err != nil {
+		// Thread the partial result through so callers can access HiddenSurfaces
+		// even when ErrNoTextContent fires (JS SPAs with injection in comments).
+		return partial, fmt.Errorf("tldt.Fetch: %w", err)
+	}
+	return partial, nil
 }
 
 // FetchRaw retrieves a URL with the same SSRF, redirect, and size protection as
