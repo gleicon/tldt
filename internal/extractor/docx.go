@@ -135,7 +135,8 @@ func extractWordHiddenAndFields(f *zip.File) []surfaces.HiddenSurface {
 func extractWTextNodes(r io.Reader, source string) []surfaces.HiddenSurface {
 	var found []surfaces.HiddenSurface
 	dec := xml.NewDecoder(r)
-	inText := false
+	inT := false
+	var buf strings.Builder
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -143,16 +144,20 @@ func extractWTextNodes(r io.Reader, source string) []surfaces.HiddenSurface {
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			inText = t.Name.Local == "t"
+			if t.Name.Local == "t" {
+				inT = true
+				buf.Reset()
+			}
 		case xml.CharData:
-			if inText {
-				if v := strings.TrimSpace(string(t)); v != "" {
-					found = append(found, surfaces.HiddenSurface{Source: source, Text: v})
-				}
+			if inT {
+				buf.Write(t)
 			}
 		case xml.EndElement:
 			if t.Name.Local == "t" {
-				inText = false
+				if v := strings.TrimSpace(buf.String()); v != "" {
+					found = append(found, surfaces.HiddenSurface{Source: source, Text: v})
+				}
+				inT = false
 			}
 		}
 	}
