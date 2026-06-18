@@ -24,19 +24,22 @@ type DetectFinding struct {
 	Score   float64 `json:"score,omitempty"`
 }
 
-// DetectOutput is the structured contract emitted on the
-// `--detect-only --format json` path and consumed by the OpenCode plugin.
-// Flagged is len(Findings) > 0. Findings is always a (possibly empty) array.
 type DetectOutput struct {
 	Flagged  bool            `json:"flagged"`
 	Findings []DetectFinding `json:"findings"`
 }
 
-// collectFindings runs the requested PII and injection detectors on text and
-// returns unified findings. Outlier sentences are deliberately excluded — they
-// are a summarization signal, not an injection/PII signal. A detector error is
-// propagated so callers can fail closed (no output) rather than report partial
-// findings.
+// securityOpts selects which preprocessing/advisory stages run.
+type securityOpts struct {
+	fromHTML           bool
+	sanitize           bool
+	sanitizePII        bool
+	detectPII          bool
+	detectInjection    bool
+	injectionThreshold float64
+}
+
+// collectFindings excludes outlier sentences — summarization signal, not injection.
 func collectFindings(text string, o securityOpts) ([]DetectFinding, error) {
 	var out []DetectFinding
 	if o.detectPII {
@@ -63,7 +66,7 @@ func collectFindings(text string, o securityOpts) ([]DetectFinding, error) {
 			return nil, fmt.Errorf("injection detection: %w", err)
 		}
 		for _, f := range dres.Report.Findings {
-			if f.Category == "outlier" {
+			if f.Category == tldt.CategoryOutlier {
 				continue // summarization signal, not an injection signal
 			}
 			// f.Sentence is a 0-based index, or -1 when not sentence-scoped.
@@ -85,10 +88,7 @@ func collectFindings(text string, o securityOpts) ([]DetectFinding, error) {
 	return out, nil
 }
 
-// emitDetectJSON runs detection and writes the structured DetectOutput to stdout,
-// then exits. On a detector error it exits non-zero with nothing on stdout, so a
-// machine consumer that reads stdout sees empty output and degrades silently
-// rather than mistaking an error for a finding.
+// emitDetectJSON exits non-zero with no stdout on error — machine consumers degrade silently.
 func emitDetectJSON(text string, o securityOpts) {
 	findings, err := collectFindings(text, o)
 	if err != nil {
@@ -132,13 +132,7 @@ func formatAdvisory(findings []DetectFinding) string {
 		len(findings), strings.Join(parts, "; "))
 }
 
-// runHookOutput implements the `--hook-output` mode for the Claude/Codex
-// UserPromptSubmit shell hook. It reads the hook stdin envelope ({"prompt": ...}),
-// runs injection+PII detection, and emits a hookSpecificOutput envelope carrying
-// a metadata-only advisory when the prompt is flagged. It fails safe: malformed
-// stdin, a missing/empty prompt, a detector error, or no findings all yield no
-// output and a clean exit, so the hook never injects a half-built envelope or
-// crashes the agent.
+// runHookOutput fails safe: malformed input, detector error, or no findings all yield no output.
 func runHookOutput(threshold float64) {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {

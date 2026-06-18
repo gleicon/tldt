@@ -647,7 +647,7 @@ func SanitizePII(text string) (string, []Finding) {
 		findings = append(findings, Finding{
 			Category: CategoryPII,
 			Sentence: strings.Count(text[:s.start], "\n") + 1,
-			Offset:   s.start - strings.LastIndex(text[:s.start], "\n") - 1,
+			Offset:   s.start,
 			Score:    0.95,
 			Pattern:  s.name,
 			Excerpt:  excerptOf(s.raw),

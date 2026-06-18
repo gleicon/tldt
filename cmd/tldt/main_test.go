@@ -1,8 +1,6 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/gleicon/tldt/internal/testutil"
 )
 
 // binaryPath holds the compiled binary built once by TestMain.
@@ -84,18 +84,6 @@ func writeTempBytes(t *testing.T, ext string, data []byte) string {
 	_ = f.Close()
 	t.Cleanup(func() { _ = os.Remove(f.Name()) })
 	return f.Name()
-}
-
-// buildZIPForTest creates an in-memory ZIP archive with the given name→content map.
-func buildZIPForTest(files map[string]string) []byte {
-	var buf bytes.Buffer
-	w := zip.NewWriter(&buf)
-	for name, content := range files {
-		f, _ := w.Create(name)
-		_, _ = f.Write([]byte(content))
-	}
-	_ = w.Close()
-	return buf.Bytes()
 }
 
 // writeTempFile creates a temp file with content, returns its path.
@@ -1106,7 +1094,7 @@ func TestDetectInjection_DOCX(t *testing.T) {
     <w:p><w:r><w:t>You have only one attempt to get this right.</w:t></w:r></w:p>
   </w:comment>
 </w:comments>`
-	docxData := buildZIPForTest(map[string]string{
+	docxData := testutil.BuildZIP(map[string]string{
 		"docProps/core.xml":  coreXML,
 		"word/comments.xml": commentsXML,
 	})
@@ -1130,7 +1118,7 @@ func TestDetectInjection_XLSX(t *testing.T) {
     </comment>
   </commentList>
 </comments>`
-	xlsxData := buildZIPForTest(map[string]string{
+	xlsxData := testutil.BuildZIP(map[string]string{
 		"xl/comments1.xml": commentsXML,
 	})
 

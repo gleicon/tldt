@@ -316,6 +316,12 @@ func FetchRaw(ctx context.Context, urlStr string, opts FetchOptions) ([]byte, Fe
 // Re-exported from internal/detector for CLI --detect-injection use.
 type Finding = detector.Finding
 
+// CategoryOutlier is the Finding.Category value for statistical outlier sentences.
+// Outliers signal summarization difficulty (low mean similarity to the rest of the
+// document), not injection threats — they are deliberately excluded from the
+// model-facing advisory produced by --hook-output and --detect-only --format json.
+const CategoryOutlier = detector.CategoryOutlier
+
 // --- Summarizer Types ---
 
 // Summarizer is the common interface for all extractive summarization algorithms.

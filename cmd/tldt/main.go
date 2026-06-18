@@ -25,7 +25,6 @@ import (
 var version = "dev" // set at build time via -ldflags "-X main.version=vX.Y.Z"
 
 func main() {
-	// Subcommand dispatch (tldt is otherwise flag-only).
 	if len(os.Args) > 1 && os.Args[1] == "stats" {
 		runStats(os.Args[2:])
 		return
@@ -68,11 +67,9 @@ func main() {
 	cfgPath, _ := config.ConfigPath()
 	cfg := config.Load(cfgPath)
 
-	// Detect which flags the user explicitly provided.
 	flagsSet := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { flagsSet[f.Name] = true })
 
-	// --install-skill: write skill + hook templates and patch settings.json, then exit
 	if *installSkill {
 		if err := installer.Install(installer.Options{
 			SkillDir:  *skillDir,
@@ -86,15 +83,12 @@ func main() {
 		os.Exit(0)
 	}
 
-	// --hook-output: UserPromptSubmit hook mode. Reads the {prompt} envelope from
-	// stdin (not the normal input path), runs detection, and emits a metadata-only
-	// advisory envelope when flagged. Always exits 0 — the hook is defense-in-depth.
+	// fails safe: always exits 0
 	if *hookOutput {
 		runHookOutput(*injectionThreshold)
 		return
 	}
 
-	// Resolve effective parameters: config -> level preset -> explicit flags.
 	effectiveAlgorithm, effectiveSentences, effectiveFormat := resolveSettings(
 		cfg, flagsSet, *level, *algorithm, *format, *sentences)
 
@@ -137,12 +131,8 @@ func main() {
 	if *detectOnly && effectiveFormat == "json" {
 		emitDetectJSON(text, secOpts)
 	}
-	// Human advisory: report PII/injection findings to stderr (no-op when neither
-	// detect flag is set). Runs on both the detect-only and summarize paths.
 	runDetectionStderr(text, secOpts)
 
-	// --detect-only: advisory path. Exit before summarizing so no summary is
-	// emitted and no usage line is written.
 	if *detectOnly {
 		os.Exit(0)
 	}
@@ -196,9 +186,7 @@ func main() {
 
 	writeOutput(effectiveFormat, result, meta, *paragraphs)
 
-	// Append a counts-only usage record unless disabled via [stats] enabled=false.
-	// A log-write failure must never alter stdout, the exit code, or the
-	// summarization — so errors are dropped.
+	// A log-write failure must never affect stdout or exit code — so errors are dropped.
 	if cfg.Stats.Enabled {
 		if logPath, err := usagelog.Path(); err == nil {
 			_, statErr := os.Stat(logPath)
@@ -265,15 +253,6 @@ func resolveSettings(cfg config.Config, flagsSet map[string]bool, level, algorit
 	return algo, n, outFormat
 }
 
-// securityOpts selects which preprocessing/advisory stages runSecurityStages runs.
-type securityOpts struct {
-	fromHTML           bool
-	sanitize           bool
-	sanitizePII        bool
-	detectPII          bool
-	detectInjection    bool
-	injectionThreshold float64
-}
 
 // applyMutatingStages applies the requested text-modifying stages —
 // HTML-to-Markdown conversion, Unicode sanitization, and PII redaction — in
@@ -364,7 +343,7 @@ func reportInjection(text string, threshold float64) {
 	// pattern confidence, so report them in their own block.
 	var patternFindings, outlierFindings []tldt.Finding
 	for _, f := range report.Findings {
-		if f.Category == "outlier" {
+		if f.Category == tldt.CategoryOutlier {
 			outlierFindings = append(outlierFindings, f)
 		} else {
 			patternFindings = append(patternFindings, f)
@@ -384,7 +363,7 @@ func reportInjection(text string, threshold float64) {
 	if len(outlierFindings) > 0 {
 		fmt.Fprintf(os.Stderr, "injection-detect: %d outlier sentence(s) above threshold %.2f\n", len(outlierFindings), threshold)
 		for _, f := range outlierFindings {
-			fmt.Fprintf(os.Stderr, "  [outlier] sentence %d (score=%.2f): %s\n", f.Sentence, f.Score, f.Excerpt)
+			fmt.Fprintf(os.Stderr, "  [outlier] sentence %d (score=%.2f): %s\n", f.Sentence+1, f.Score, f.Excerpt)
 		}
 	}
 }
@@ -405,7 +384,7 @@ func reportHiddenSurfaces(surfs []tldt.HiddenSurface, threshold float64) {
 		report := dresult.Report
 		var patternFindings []tldt.Finding
 		for _, f := range report.Findings {
-			if f.Category != "outlier" {
+			if f.Category != tldt.CategoryOutlier {
 				patternFindings = append(patternFindings, f)
 			}
 		}
@@ -518,7 +497,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --injection-threshold float  Outlier detection threshold (default: 0.99)")
 	fmt.Fprintln(os.Stderr, "  --detect-pii           Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, cards)")
 	fmt.Fprintln(os.Stderr, "  --sanitize-pii         Redact PII/secrets (detected patterns plus high-entropy key material)")
-	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit before summarizing (no summary, no usage log)")
+	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit before summarizing (no summary, no usage log); add --format json for structured machine-readable output")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "FORMAT OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  --format string        Output format: text (default), json, markdown")
