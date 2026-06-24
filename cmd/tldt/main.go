@@ -55,6 +55,9 @@ func main() {
 	detectPII := flag.Bool("detect-pii", false, "report PII and secret patterns (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr (advisory)")
 	sanitizePII := flag.Bool("sanitize-pii", false, "redact PII in input before summarization; reports redaction count to stderr")
 	fromHTML := flag.Bool("from-html", false, "convert HTML input to Markdown before summarization (uses readability + html-to-markdown)")
+	detectAI := flag.Bool("detect-ai", false, "score text for AI-generated content using excess-vocabulary method (Kobak et al. 2024, arXiv:2406.07016)")
+	aiLang := flag.String("lang", "en", "language for AI detection wordlist: en, pt-BR, es")
+	aiWordlistDir := flag.String("wordlist-dir", "", "directory with custom <lang>.json wordlist files (overrides embedded lists)")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -98,14 +101,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	secOpts := securityOpts{
-		fromHTML:           *fromHTML,
-		sanitize:           *sanitizeFlag,
-		sanitizePII:        *sanitizePII,
-		detectPII:          *detectPII,
-		detectInjection:    *detectInjection,
-		injectionThreshold: *injectionThreshold,
-	}
+	secOpts := resolveSecurityOpts(cfg, flagsSet,
+		*fromHTML, *sanitizeFlag, *sanitizePII, *detectPII,
+		*detectInjection, *injectionThreshold,
+		*detectAI, *aiLang, *aiWordlistDir)
 
 	// HTML comment injection check runs before the empty-text guard so that
 	// JS SPAs (no readable body text, but comments carrying injection payloads)
@@ -207,6 +206,52 @@ func main() {
 }
 
 // resolveSettings merges the effective algorithm, sentence count, and output
+// resolveSecurityOpts merges config defaults with explicit CLI flags.
+// Config values apply when the corresponding flag was not explicitly set.
+func resolveSecurityOpts(
+	cfg config.Config, flagsSet map[string]bool,
+	fromHTML, sanitize, sanitizePII, detectPII, detectInjection bool,
+	injectionThreshold float64,
+	detectAI bool, aiLang, aiWordlistDir string,
+) securityOpts {
+	o := securityOpts{
+		fromHTML:           fromHTML,
+		sanitize:           cfg.Security.Sanitize,
+		sanitizePII:        cfg.Security.SanitizePII,
+		detectPII:          cfg.Security.DetectPII,
+		detectInjection:    cfg.Security.DetectInjection,
+		injectionThreshold: cfg.Security.InjectionThreshold,
+		detectAI:           cfg.AIDetection.Enabled,
+		aiLang:             cfg.AIDetection.Lang,
+		aiWordlistDir:      cfg.AIDetection.WordlistDir,
+	}
+	if flagsSet["sanitize"] {
+		o.sanitize = sanitize
+	}
+	if flagsSet["sanitize-pii"] {
+		o.sanitizePII = sanitizePII
+	}
+	if flagsSet["detect-pii"] {
+		o.detectPII = detectPII
+	}
+	if flagsSet["detect-injection"] {
+		o.detectInjection = detectInjection
+	}
+	if flagsSet["injection-threshold"] {
+		o.injectionThreshold = injectionThreshold
+	}
+	if flagsSet["detect-ai"] {
+		o.detectAI = detectAI
+	}
+	if flagsSet["lang"] {
+		o.aiLang = aiLang
+	}
+	if flagsSet["wordlist-dir"] {
+		o.aiWordlistDir = aiWordlistDir
+	}
+	return o
+}
+
 // format from config, an optional level preset, and explicit flags (flags win).
 // It validates the result and exits the process on an unknown level/format or a
 // non-positive sentence count.
@@ -321,6 +366,30 @@ func runDetectionStderr(text string, o securityOpts) {
 	// --detect-injection: report pattern, encoding, and invisible-char findings.
 	if o.detectInjection {
 		reportInjection(text, o.injectionThreshold)
+	}
+
+	// --detect-ai: excess-vocabulary AI content scoring (Kobak et al. 2024).
+	if o.detectAI {
+		reportAIDetection(text, o.aiLang, o.aiWordlistDir)
+	}
+}
+
+// reportAIDetection runs the Kobak et al. (2024) excess-vocabulary scorer on text
+// and writes the result to stderr. Score ≥ 0.70 = likely AI, ≥ 0.40 = possibly AI.
+func reportAIDetection(text, lang, wordlistDir string) {
+	r, err := tldt.DetectAI(text, lang, wordlistDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ai-detect:", err)
+		os.Exit(1)
+	}
+	fmt.Fprintf(os.Stderr, "ai-detect: score=%.3f (density=%.3f, variety=%.3f) [%s] — %s\n",
+		r.Score, r.Density, r.Variety, r.Lang, r.Verdict())
+	if len(r.Markers) > 0 {
+		fmt.Fprintf(os.Stderr, "ai-detect: %d marker(s) found: %s\n",
+			len(r.Markers), strings.Join(r.Markers, ", "))
+	}
+	if r.Score >= 0.40 {
+		fmt.Fprintln(os.Stderr, "ai-detect: WARNING — text may be AI-generated (Kobak et al. 2024, arXiv:2406.07016)")
 	}
 }
 
@@ -483,6 +552,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  cat file.txt | tldt [options]")
 	fmt.Fprintln(os.Stderr, "  tldt -f article.txt [options]")
 	fmt.Fprintln(os.Stderr, "  tldt --url https://example.com/article [options]")
+	fmt.Fprintln(os.Stderr, "  tldt stats [--reset] [--top N]")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CORE OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  -f, -file string       Read input from file")
@@ -490,6 +560,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --algorithm string     Summarization algorithm: lexrank (default), textrank, graph, ensemble")
 	fmt.Fprintln(os.Stderr, "  --sentences int        Number of output sentences (default: 5)")
 	fmt.Fprintln(os.Stderr, "  --level string         Compression preset: aggressive (3), standard (5), lite (10)")
+	fmt.Fprintln(os.Stderr, "  --version              Print version and exit")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "SECURITY OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  --sanitize             Strip invisible Unicode characters and NFKC-normalize")
@@ -497,17 +568,33 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  --injection-threshold float  Outlier detection threshold (default: 0.99)")
 	fmt.Fprintln(os.Stderr, "  --detect-pii           Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, cards)")
 	fmt.Fprintln(os.Stderr, "  --sanitize-pii         Redact PII/secrets (detected patterns plus high-entropy key material)")
-	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit before summarizing (no summary, no usage log); add --format json for structured machine-readable output")
+	fmt.Fprintln(os.Stderr, "  --detect-only          Run detection then exit; no summary, no usage log (pair with --format json for machine output)")
+	fmt.Fprintln(os.Stderr, "  --hook-output          UserPromptSubmit hook mode: read {prompt} JSON from stdin, emit metadata-only advisory when flagged (else no output)")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "AI CONTENT DETECTION:")
+	fmt.Fprintln(os.Stderr, "  --detect-ai            Score text for AI-generated content using excess-vocabulary method")
+	fmt.Fprintln(os.Stderr, "                         (Kobak et al. 2024, arXiv:2406.07016); reports score + verdict to stderr")
+	fmt.Fprintln(os.Stderr, "  --lang string          Language for AI detection wordlist: en (default), pt-BR, es")
+	fmt.Fprintln(os.Stderr, "  --wordlist-dir string  Directory with custom <lang>.json wordlist files (overrides embedded lists)")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  Score interpretation:")
+	fmt.Fprintln(os.Stderr, "    ≥ 0.70  likely AI-generated")
+	fmt.Fprintln(os.Stderr, "    ≥ 0.40  possibly AI-generated")
+	fmt.Fprintln(os.Stderr, "    < 0.40  likely human-written")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  With --detect-only --format json: ai_detection block added to JSON output.")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "FORMAT OPTIONS:")
 	fmt.Fprintln(os.Stderr, "  --format string        Output format: text (default), json, markdown")
 	fmt.Fprintln(os.Stderr, "  --verbose              Print token statistics to stderr")
 	fmt.Fprintln(os.Stderr, "  --paragraphs int       Group output sentences into N paragraphs")
 	fmt.Fprintln(os.Stderr, "  --no-cap               Disable 2000-sentence processing limit")
+	fmt.Fprintln(os.Stderr, "  --explain              Print per-sentence scores and algorithm metrics to stderr (debug)")
+	fmt.Fprintln(os.Stderr, "  --rouge string         Path to reference summary file; prints ROUGE-1/2/L scores to stderr")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "HTML PROCESSING:")
 	fmt.Fprintln(os.Stderr, "  --from-html            Convert HTML input to Markdown before summarization")
-	fmt.Fprintln(os.Stderr, "                        (uses readability extraction + html-to-markdown)")
+	fmt.Fprintln(os.Stderr, "                         (uses readability extraction + html-to-markdown)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CONFIGURATION:")
 	fmt.Fprintln(os.Stderr, "  --install-skill        Install Claude Code skill and auto-trigger hook")
@@ -556,10 +643,35 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  tldt --url https://example.com/article --sanitize --detect-pii")
 	fmt.Fprintln(os.Stderr, "  curl -s https://example.com | tldt --from-html --sentences 3")
 	fmt.Fprintln(os.Stderr, "  tldt \"Long text to summarize\" --format json --verbose")
+	fmt.Fprintln(os.Stderr, "  cat essay.txt | tldt --detect-ai --lang en --detect-only")
+	fmt.Fprintln(os.Stderr, "  cat essay.txt | tldt --detect-ai --detect-injection --detect-pii --detect-only --format json")
+	fmt.Fprintln(os.Stderr, "  tldt stats")
+	fmt.Fprintln(os.Stderr, "  tldt stats --reset")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "CONFIG FILE:")
-	fmt.Fprintln(os.Stderr, "  ~/.tldt.toml - Default settings (algorithm, sentences, format, level)")
-	fmt.Fprintln(os.Stderr, "               - Usage logging: [stats] section with enabled = false to opt out")
+	fmt.Fprintln(os.Stderr, "CONFIG FILE (~/.tldt.toml):")
+	fmt.Fprintln(os.Stderr, "  Core defaults:")
+	fmt.Fprintln(os.Stderr, "    algorithm  = \"lexrank\"   # lexrank|textrank|graph|ensemble")
+	fmt.Fprintln(os.Stderr, "    sentences  = 5")
+	fmt.Fprintln(os.Stderr, "    format     = \"text\"      # text|json|markdown")
+	fmt.Fprintln(os.Stderr, "    level      = \"\"          # aggressive|standard|lite")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  Security defaults (all off by default):")
+	fmt.Fprintln(os.Stderr, "    [security]")
+	fmt.Fprintln(os.Stderr, "    detect_injection    = false")
+	fmt.Fprintln(os.Stderr, "    injection_threshold = 0.99")
+	fmt.Fprintln(os.Stderr, "    detect_pii          = false")
+	fmt.Fprintln(os.Stderr, "    sanitize            = false")
+	fmt.Fprintln(os.Stderr, "    sanitize_pii        = false")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  AI content detection defaults:")
+	fmt.Fprintln(os.Stderr, "    [ai_detection]")
+	fmt.Fprintln(os.Stderr, "    enabled      = false")
+	fmt.Fprintln(os.Stderr, "    lang         = \"en\"      # en|pt-BR|es")
+	fmt.Fprintln(os.Stderr, "    wordlist_dir = \"\"        # path to custom <lang>.json files")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  Usage logging:")
+	fmt.Fprintln(os.Stderr, "    [stats]")
+	fmt.Fprintln(os.Stderr, "    enabled = true          # set false to opt out; clear with: tldt stats --reset")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "For more information: https://github.com/gleicon/tldt")
 	os.Exit(0)

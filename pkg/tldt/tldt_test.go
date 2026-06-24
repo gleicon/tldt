@@ -512,3 +512,103 @@ func TestPipeline_NoPII(t *testing.T) {
 		t.Errorf("Pipeline: expected nil PIIFindings when no PII flag set, got %v", result.PIIFindings)
 	}
 }
+
+// ── DetectAI public API ───────────────────────────────────────────────────────
+
+const aiDenseArticle = `Delving into the intricate landscape of modern AI, it is crucial to leverage
+meticulous and comprehensive frameworks. This groundbreaking research showcases a multifaceted
+approach that is both robust and transformative. The synergy between these pivotal components
+underscores their invaluable contribution to the field. Moreover, the seamless integration of
+holistic methodologies fosters remarkable advancements. This testament to innovation will
+undoubtedly propel the paradigm forward, empowering practitioners to navigate the realm of
+cutting-edge solutions with unparalleled expertise.`
+
+func TestDetectAI_AITextScoresAboveThreshold(t *testing.T) {
+	r, err := DetectAI(aiDenseArticle, "en", "")
+	if err != nil {
+		t.Fatalf("DetectAI: %v", err)
+	}
+	if r.Score < 0.40 {
+		t.Errorf("AI text: want score ≥ 0.40, got %.3f", r.Score)
+	}
+	if len(r.Markers) == 0 {
+		t.Error("AI text: expected at least one marker")
+	}
+}
+
+func TestDetectAI_HumanTextLowScore(t *testing.T) {
+	human := "The cat sat on the mat. She read a book in the afternoon. The bus arrived late."
+	r, err := DetectAI(human, "en", "")
+	if err != nil {
+		t.Fatalf("DetectAI: %v", err)
+	}
+	if r.Score >= 0.30 {
+		t.Errorf("human text: want score < 0.30, got %.3f (markers=%v)", r.Score, r.Markers)
+	}
+}
+
+func TestDetectAI_EmptyText(t *testing.T) {
+	r, err := DetectAI("", "en", "")
+	if err != nil {
+		t.Fatalf("DetectAI(empty): %v", err)
+	}
+	if r.Score != 0 {
+		t.Errorf("empty text: want score=0, got %.4f", r.Score)
+	}
+	if r.Sentences != 0 {
+		t.Errorf("empty text: want Sentences=0, got %d", r.Sentences)
+	}
+}
+
+func TestDetectAI_DefaultLangIsEnglish(t *testing.T) {
+	r, err := DetectAI(aiDenseArticle, "", "")
+	if err != nil {
+		t.Fatalf("DetectAI(empty lang): %v", err)
+	}
+	if r.Lang != "en" {
+		t.Errorf("default lang: want 'en', got %q", r.Lang)
+	}
+}
+
+func TestDetectAI_UnsupportedLangWrapsError(t *testing.T) {
+	_, err := DetectAI("some text", "fr", "")
+	if err == nil {
+		t.Fatal("expected error for unsupported lang 'fr'")
+	}
+	if !strings.Contains(err.Error(), "tldt.DetectAI") {
+		t.Errorf("error not wrapped with tldt.DetectAI prefix: %v", err)
+	}
+}
+
+func TestDetectAI_ScoreFormulaPinned(t *testing.T) {
+	r, err := DetectAI(aiDenseArticle, "en", "")
+	if err != nil {
+		t.Fatalf("DetectAI: %v", err)
+	}
+	want := 0.6*r.Density + 0.4*r.Variety
+	const epsilon = 1e-9
+	if diff := r.Score - want; diff > epsilon || diff < -epsilon {
+		t.Errorf("score %.10f ≠ 0.6*density + 0.4*variety = %.10f", r.Score, want)
+	}
+}
+
+func TestDetectAI_VerdictNotEmpty(t *testing.T) {
+	r, err := DetectAI(aiDenseArticle, "en", "")
+	if err != nil {
+		t.Fatalf("DetectAI: %v", err)
+	}
+	if r.Verdict() == "" {
+		t.Error("Verdict() must not return empty string")
+	}
+}
+
+func TestDetectAI_SupportedLangsListNonEmpty(t *testing.T) {
+	if len(SupportedAIDetectLangs) == 0 {
+		t.Fatal("SupportedAIDetectLangs must not be empty")
+	}
+	for _, lang := range SupportedAIDetectLangs {
+		if lang == "" {
+			t.Error("SupportedAIDetectLangs contains empty string")
+		}
+	}
+}

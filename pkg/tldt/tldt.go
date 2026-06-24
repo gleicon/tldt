@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gleicon/tldt/internal/aidetect"
 	"github.com/gleicon/tldt/internal/detector"
 	"github.com/gleicon/tldt/internal/fetcher"
 	"github.com/gleicon/tldt/internal/htmlmd"
@@ -436,6 +437,30 @@ func ConvertHTML(html string, opts HTMLConvertOptions) (string, error) {
 // invisible content.
 func ReportInvisibles(text string) []InvisibleReport {
 	return sanitizer.ReportInvisibles(text)
+}
+
+// AIDetectResult holds the result of AI-generated content detection using the
+// excess-vocabulary method from Kobak et al. (2024) arXiv:2406.07016.
+//
+// Score is a composite [0,1]: 0.6*Density + 0.4*Variety.
+// Thresholds: ≥0.70 likely AI, ≥0.40 possibly AI, <0.40 likely human.
+type AIDetectResult = aidetect.Result
+
+// SupportedAIDetectLangs lists languages with embedded excess-vocabulary wordlists.
+var SupportedAIDetectLangs = aidetect.SupportedLangs
+
+// DetectAI scores text for AI-generated content using the excess-vocabulary method
+// from Kobak et al. (2024) "Delving into ChatGPT usage in academic writing through
+// excess vocabulary" (arXiv:2406.07016).
+//
+// lang must be one of "en", "pt-BR", "es"; empty defaults to "en".
+// wordlistDir overrides the embedded wordlists; empty string uses built-in lists.
+func DetectAI(text, lang, wordlistDir string) (AIDetectResult, error) {
+	r, err := aidetect.Detect(text, lang, wordlistDir)
+	if err != nil {
+		return AIDetectResult{}, fmt.Errorf("tldt.DetectAI: %w", err)
+	}
+	return r, nil
 }
 
 // Pipeline runs the full sanitize -> detect -> summarize flow in one call.

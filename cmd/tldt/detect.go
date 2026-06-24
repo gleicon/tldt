@@ -10,6 +10,17 @@ import (
 	tldt "github.com/gleicon/tldt/pkg/tldt"
 )
 
+// AIDetectJSON is the "ai_detection" block in --detect-only --format json output.
+type AIDetectJSON struct {
+	Score    float64  `json:"score"`
+	Density  float64  `json:"density"`
+	Variety  float64  `json:"variety"`
+	Verdict  string   `json:"verdict"`
+	Lang     string   `json:"lang"`
+	Markers  []string `json:"markers"`
+}
+
+
 // DetectFinding is one machine-readable detection result. Kind is one of
 // "pii", "injection", or "invisible". Excerpt carries the matched text for
 // human/CLI consumers; it is NEVER placed into the model-facing hook advisory.
@@ -25,8 +36,9 @@ type DetectFinding struct {
 }
 
 type DetectOutput struct {
-	Flagged  bool            `json:"flagged"`
-	Findings []DetectFinding `json:"findings"`
+	Flagged     bool           `json:"flagged"`
+	Findings    []DetectFinding `json:"findings"`
+	AIDetection *AIDetectJSON  `json:"ai_detection,omitempty"`
 }
 
 // securityOpts selects which preprocessing/advisory stages run.
@@ -37,6 +49,9 @@ type securityOpts struct {
 	detectPII          bool
 	detectInjection    bool
 	injectionThreshold float64
+	detectAI           bool
+	aiLang             string // "en", "pt-BR", "es"
+	aiWordlistDir      string // optional override directory
 }
 
 // collectFindings excludes outlier sentences — summarization signal, not injection.
@@ -88,6 +103,30 @@ func collectFindings(text string, o securityOpts) ([]DetectFinding, error) {
 	return out, nil
 }
 
+// collectAIDetection runs AI content detection when o.detectAI is set.
+// Returns nil when disabled, an error when detection fails.
+func collectAIDetection(text string, o securityOpts) (*AIDetectJSON, error) {
+	if !o.detectAI {
+		return nil, nil
+	}
+	r, err := tldt.DetectAI(text, o.aiLang, o.aiWordlistDir)
+	if err != nil {
+		return nil, err
+	}
+	markers := r.Markers
+	if markers == nil {
+		markers = []string{}
+	}
+	return &AIDetectJSON{
+		Score:   r.Score,
+		Density: r.Density,
+		Variety: r.Variety,
+		Verdict: r.Verdict(),
+		Lang:    r.Lang,
+		Markers: markers,
+	}, nil
+}
+
 // emitDetectJSON exits non-zero with no stdout on error — machine consumers degrade silently.
 func emitDetectJSON(text string, o securityOpts) {
 	findings, err := collectFindings(text, o)
@@ -98,7 +137,13 @@ func emitDetectJSON(text string, o securityOpts) {
 	if findings == nil {
 		findings = []DetectFinding{}
 	}
-	enc, err := json.Marshal(DetectOutput{Flagged: len(findings) > 0, Findings: findings})
+	aiDet, err := collectAIDetection(text, o)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "detect ai:", err)
+		os.Exit(1)
+	}
+	flagged := len(findings) > 0 || (aiDet != nil && aiDet.Score >= 0.40)
+	enc, err := json.Marshal(DetectOutput{Flagged: flagged, Findings: findings, AIDetection: aiDet})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "detect: marshal:", err)
 		os.Exit(1)

@@ -205,3 +205,160 @@ func TestMain_HookOutput_EmptyPromptEmitsNothing(t *testing.T) {
 		t.Errorf("empty prompt: want no output, got %q", stdout)
 	}
 }
+
+// ── --detect-ai ───────────────────────────────────────────────────────────────
+
+const aiDenseText = "Delving into the intricate landscape of AI, it is crucial to leverage " +
+	"meticulous and comprehensive frameworks. This groundbreaking research showcases a multifaceted " +
+	"approach that is both robust and transformative. The synergy between these pivotal components " +
+	"underscores their invaluable contribution. Moreover, seamless integration of holistic methodologies " +
+	"fosters remarkable advancements. This testament to innovation will propel the paradigm forward."
+
+const plainHumanText = "The cat sat on the mat. It looked out the window at the rain. " +
+	"Three birds flew past the tree. She read a book in the afternoon. " +
+	"The bus arrived late, so they walked home instead."
+
+func TestMain_DetectAI_AITextFlaggedOnStderr(t *testing.T) {
+	_, stderr, ok := run(t, aiDenseText, "--detect-ai", "--detect-only")
+	if !ok {
+		t.Fatal("--detect-ai (AI text): want exit 0")
+	}
+	if !strings.Contains(stderr, "ai-detect:") {
+		t.Errorf("AI text: want ai-detect output on stderr, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "WARNING") {
+		t.Errorf("AI text: want WARNING on stderr, got %q", stderr)
+	}
+}
+
+func TestMain_DetectAI_HumanTextNoWarning(t *testing.T) {
+	_, stderr, ok := run(t, plainHumanText, "--detect-ai", "--detect-only")
+	if !ok {
+		t.Fatal("--detect-ai (human text): want exit 0")
+	}
+	if strings.Contains(stderr, "WARNING") {
+		t.Errorf("human text: want no WARNING on stderr, got %q", stderr)
+	}
+}
+
+func TestMain_DetectAI_JSONOutputHasAIDetectionBlock(t *testing.T) {
+	stdout, _, ok := run(t, aiDenseText, "--detect-ai", "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("--detect-ai json: want exit 0")
+	}
+	var out DetectOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("stdout is not valid DetectOutput JSON: %v\n%q", err, stdout)
+	}
+	if out.AIDetection == nil {
+		t.Fatal("ai_detection block must be present when --detect-ai is set")
+	}
+	if out.AIDetection.Score <= 0 {
+		t.Errorf("AI text: want ai_detection.score > 0, got %.4f", out.AIDetection.Score)
+	}
+	if out.AIDetection.Verdict == "" {
+		t.Error("ai_detection.verdict must not be empty")
+	}
+	if out.AIDetection.Lang != "en" {
+		t.Errorf("ai_detection.lang: want 'en', got %q", out.AIDetection.Lang)
+	}
+	if !out.Flagged {
+		t.Error("AI text: want flagged=true in json output")
+	}
+}
+
+func TestMain_DetectAI_JSONAbsentWithoutFlag(t *testing.T) {
+	stdout, _, ok := run(t, aiDenseText, "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("detect-only json (no --detect-ai): want exit 0")
+	}
+	var out DetectOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("stdout not valid DetectOutput JSON: %v\n%q", err, stdout)
+	}
+	if out.AIDetection != nil {
+		t.Errorf("ai_detection must be absent when --detect-ai is not set, got %+v", out.AIDetection)
+	}
+}
+
+func TestMain_DetectAI_LangFlag(t *testing.T) {
+	stdout, _, ok := run(t, aiDenseText, "--detect-ai", "--lang", "pt-BR", "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("--detect-ai --lang pt-BR: want exit 0")
+	}
+	var out DetectOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("stdout not valid DetectOutput JSON: %v\n%q", err, stdout)
+	}
+	if out.AIDetection == nil {
+		t.Fatal("ai_detection must be present")
+	}
+	if out.AIDetection.Lang != "pt-BR" {
+		t.Errorf("lang: want 'pt-BR', got %q", out.AIDetection.Lang)
+	}
+}
+
+func TestMain_DetectAI_SpanishLang(t *testing.T) {
+	esText := "Al profundizar en el intrincado panorama, es crucial aprovechar marcos meticulosos y holísticos. " +
+		"Esta investigación innovadora muestra un enfoque multifacético y robusto. " +
+		"La sinergia entre estos componentes pivotales resalta su contribución invaluable."
+	_, stderr, ok := run(t, esText, "--detect-ai", "--lang", "es", "--detect-only")
+	if !ok {
+		t.Fatal("--detect-ai --lang es: want exit 0")
+	}
+	if !strings.Contains(stderr, "[es]") {
+		t.Errorf("stderr should identify language es: %q", stderr)
+	}
+}
+
+// TestMain_DetectAI_MarkersEmptyArrayNotNull pins that ai_detection.markers is
+// always a JSON array (possibly empty), never null, when --detect-ai is set.
+func TestMain_DetectAI_MarkersEmptyArrayNotNull(t *testing.T) {
+	stdout, _, ok := run(t, plainHumanText, "--detect-ai", "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("--detect-ai (human text json): want exit 0")
+	}
+	// markers must appear as [] not missing or null.
+	if !strings.Contains(stdout, `"markers":[]`) {
+		t.Errorf("human text: want markers:[], got %q", stdout)
+	}
+}
+
+// TestMain_DetectAI_ScoreFormulaInJSON verifies the JSON output satisfies
+// score ≈ 0.6*density + 0.4*variety.
+func TestMain_DetectAI_ScoreFormulaInJSON(t *testing.T) {
+	stdout, _, ok := run(t, aiDenseText, "--detect-ai", "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("--detect-ai json formula: want exit 0")
+	}
+	var out DetectOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("json unmarshal: %v\n%q", err, stdout)
+	}
+	if out.AIDetection == nil {
+		t.Fatal("ai_detection block missing")
+	}
+	ai := out.AIDetection
+	want := 0.6*ai.Density + 0.4*ai.Variety
+	const epsilon = 1e-6
+	if diff := ai.Score - want; diff > epsilon || diff < -epsilon {
+		t.Errorf("score %.8f ≠ 0.6*density(%.8f)+0.4*variety(%.8f) = %.8f",
+			ai.Score, ai.Density, ai.Variety, want)
+	}
+}
+
+// TestMain_DetectAI_VerdictPresentInJSON pins that verdict is always a non-empty
+// string in the JSON output.
+func TestMain_DetectAI_VerdictPresentInJSON(t *testing.T) {
+	stdout, _, ok := run(t, aiDenseText, "--detect-ai", "--detect-only", "--format", "json")
+	if !ok {
+		t.Fatal("--detect-ai json verdict: want exit 0")
+	}
+	var out DetectOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("json unmarshal: %v", err)
+	}
+	if out.AIDetection == nil || out.AIDetection.Verdict == "" {
+		t.Errorf("verdict must be non-empty in JSON output; got ai_detection=%+v", out.AIDetection)
+	}
+}
