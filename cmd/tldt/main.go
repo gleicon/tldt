@@ -374,22 +374,28 @@ func runDetectionStderr(text string, o securityOpts) {
 	}
 }
 
-// reportAIDetection runs the Kobak et al. (2024) excess-vocabulary scorer on text
-// and writes the result to stderr. Score ≥ 0.70 = likely AI, ≥ 0.40 = possibly AI.
+// reportAIDetection scores text for AI-generated content and writes to stderr.
 func reportAIDetection(text, lang, wordlistDir string) {
 	r, err := tldt.DetectAI(text, lang, wordlistDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ai-detect:", err)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stderr, "ai-detect: score=%.3f (density=%.3f, variety=%.3f) [%s] — %s\n",
-		r.Score, r.Density, r.Variety, r.Lang, r.Verdict())
+	combined := r.CombinedScore()
+	fmt.Fprintf(os.Stderr, "ai-detect: score=%.3f (kobak=%.3f, linguistic=%.3f) [%s] — %s\n",
+		combined, r.Score, r.Linguistic.Score, r.Lang, r.Verdict())
+	if r.Sentences >= 3 {
+		ling := r.Linguistic
+		fmt.Fprintf(os.Stderr, "ai-detect: linguistic: cv=%.3f comp=%.3f disc=%.3f ttr=%.3f hapax=%.3f\n",
+			ling.SentenceLengthCV, ling.CompressionRatio, ling.DiscourseDensity,
+			ling.TypeTokenRatio, ling.HapaxRatio)
+	}
 	if len(r.Markers) > 0 {
-		fmt.Fprintf(os.Stderr, "ai-detect: %d marker(s) found: %s\n",
+		fmt.Fprintf(os.Stderr, "ai-detect: %d excess-vocabulary marker(s): %s\n",
 			len(r.Markers), strings.Join(r.Markers, ", "))
 	}
-	if r.Score >= 0.40 {
-		fmt.Fprintln(os.Stderr, "ai-detect: WARNING — text may be AI-generated (Kobak et al. 2024, arXiv:2406.07016)")
+	if combined >= 0.40 {
+		fmt.Fprintln(os.Stderr, "ai-detect: WARNING — text may be AI-generated")
 	}
 }
 

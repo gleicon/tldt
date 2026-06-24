@@ -324,9 +324,9 @@ func TestMain_DetectAI_MarkersEmptyArrayNotNull(t *testing.T) {
 	}
 }
 
-// TestMain_DetectAI_ScoreFormulaInJSON verifies the JSON output satisfies
-// score ≈ 0.6*density + 0.4*variety.
-func TestMain_DetectAI_ScoreFormulaInJSON(t *testing.T) {
+// TestMain_DetectAI_KobakFormulaInJSON pins kobak_score = 0.6*density + 0.4*variety.
+// The top-level score field is the combined (Kobak + linguistic) score.
+func TestMain_DetectAI_KobakFormulaInJSON(t *testing.T) {
 	stdout, _, ok := run(t, aiDenseText, "--detect-ai", "--detect-only", "--format", "json")
 	if !ok {
 		t.Fatal("--detect-ai json formula: want exit 0")
@@ -341,9 +341,13 @@ func TestMain_DetectAI_ScoreFormulaInJSON(t *testing.T) {
 	ai := out.AIDetection
 	want := 0.6*ai.Density + 0.4*ai.Variety
 	const epsilon = 1e-6
-	if diff := ai.Score - want; diff > epsilon || diff < -epsilon {
-		t.Errorf("score %.8f ≠ 0.6*density(%.8f)+0.4*variety(%.8f) = %.8f",
-			ai.Score, ai.Density, ai.Variety, want)
+	if diff := ai.KobakScore - want; diff > epsilon || diff < -epsilon {
+		t.Errorf("kobak_score %.8f ≠ 0.6*density(%.8f)+0.4*variety(%.8f) = %.8f",
+			ai.KobakScore, ai.Density, ai.Variety, want)
+	}
+	// Combined score must differ from Kobak when linguistic signals are present.
+	if ai.Score == ai.KobakScore && ai.Linguistic != nil {
+		t.Errorf("combined score equals kobak_score even with linguistic block populated")
 	}
 }
 

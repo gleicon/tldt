@@ -1,22 +1,28 @@
-// Package aidetect implements AI-generated content detection using the
-// excess-vocabulary method from:
+// Package aidetect implements AI-generated content detection combining two
+// complementary approaches:
 //
-//	Kobak et al. (2024). "Delving into ChatGPT usage in academic writing
-//	through excess vocabulary." arXiv:2406.07016.
+//  1. Excess-vocabulary method (Kobak et al. 2024, arXiv:2406.07016):
+//     detects words statistically overrepresented in LLM output vs. human text.
+//     density  = fraction of sentences containing ≥1 excess marker
+//     variety  = fraction of the marker vocabulary observed in the text
+//     score    = 0.6*density + 0.4*variety
 //
-// The method computes two signals over a tokenized text:
+//  2. Linguistic/stylometric signals (classical NLP + stylometry literature,
+//     complementing neural approaches reviewed in arXiv:2402.14873):
+//     - Sentence length regularity (coefficient of variation)
+//     - Compression ratio (gzip; model-free perplexity proxy)
+//     - Discourse connector density (sentence-initial transition phrases)
+//     - Type-token ratio (vocabulary diversity)
+//     - Hapax ratio (rare word fraction)
 //
-//	density  = fraction of sentences containing ≥1 excess marker
-//	variety  = fraction of the marker vocabulary observed in the text
-//	score    = 0.6*density + 0.4*variety
+// The CombinedScore() method blends both layers when ≥5 sentences are present.
+// Thresholds apply to CombinedScore (and to Score when sentences < 5):
 //
-// Thresholds (calibrated on academic English in the paper):
+//	≥ 0.70  → likely AI-generated
+//	≥ 0.40  → possibly AI-generated
+//	< 0.40  → likely human-written
 //
-//	score ≥ 0.70  → likely AI-generated
-//	score ≥ 0.40  → possibly AI-generated
-//	score < 0.40  → likely human-written
-//
-// The wordlists are language-specific JSON files embedded into the binary.
+// Wordlists are language-specific JSON files embedded into the binary.
 // Supported languages: "en", "pt-BR", "es".
 package aidetect
 
@@ -27,20 +33,32 @@ import (
 
 // Result holds the output of AI content detection for one text.
 type Result struct {
-	Score     float64  // composite [0,1]: 0.6*density + 0.4*variety
-	Density   float64  // fraction of sentences with ≥1 marker
-	Variety   float64  // fraction of marker vocabulary used
-	Markers   []string // unique markers found, sorted
-	Lang      string   // language code used
-	Sentences int      // total sentences analysed
+	Score      float64          // Kobak excess-vocabulary score: 0.6*density + 0.4*variety
+	Density    float64          // fraction of sentences with ≥1 marker
+	Variety    float64          // fraction of marker vocabulary used
+	Markers    []string         // unique markers found, sorted
+	Lang       string           // language code used
+	Sentences  int              // total sentences analysed
+	Linguistic LinguisticSignals // structural/stylometric signals (populated when Sentences ≥ 3)
 }
 
-// Verdict returns a human-readable interpretation of the score.
+// CombinedScore blends the Kobak excess-vocabulary score with structural
+// linguistic signals when at least 5 sentences are present. Below that
+// threshold the linguistic signals are statistically unreliable, so the
+// Kobak score is returned unchanged.
+func (r Result) CombinedScore() float64 {
+	if r.Sentences < 5 {
+		return r.Score
+	}
+	return 0.65*r.Score + 0.35*r.Linguistic.Score
+}
+
+// Verdict returns a human-readable interpretation of CombinedScore.
 func (r Result) Verdict() string {
-	switch {
-	case r.Score >= 0.70:
+	switch s := r.CombinedScore(); {
+	case s >= 0.70:
 		return "likely AI-generated"
-	case r.Score >= 0.40:
+	case s >= 0.40:
 		return "possibly AI-generated"
 	default:
 		return "likely human-written"
@@ -102,12 +120,13 @@ func Detect(text, lang, overrideDir string) (Result, error) {
 	sortStrings(markers)
 
 	return Result{
-		Score:     score,
-		Density:   density,
-		Variety:   variety,
-		Markers:   markers,
-		Lang:      lang,
-		Sentences: len(sentences),
+		Score:      score,
+		Density:    density,
+		Variety:    variety,
+		Markers:    markers,
+		Lang:       lang,
+		Sentences:  len(sentences),
+		Linguistic: computeLinguistic(text, sentences),
 	}, nil
 }
 
