@@ -304,6 +304,97 @@ cat doc.txt | tldt --detect-injection --injection-threshold 0.90   # stricter
 
 ---
 
+## AI-generated content detection
+
+tldt can score text for likely AI authorship using two complementary, zero-dependency statistical layers — no model inference, no API calls, no GPU.
+
+```bash
+cat essay.txt | tldt --detect-ai                         # advisory to stderr
+cat essay.txt | tldt --detect-ai --lang pt-BR            # Portuguese wordlist
+cat essay.txt | tldt --detect-ai --detect-only --format json   # machine-readable
+```
+
+**Score interpretation** (applies to the combined score):
+
+| Score | Verdict |
+|-------|---------|
+| ≥ 0.70 | likely AI-generated |
+| ≥ 0.40 | possibly AI-generated |
+| < 0.40 | likely human-written |
+
+**Detection layers:**
+
+**Layer 1 — Excess-vocabulary (Kobak et al. 2024)**
+
+Words statistically overrepresented in LLM output vs. human writing. Two signals are combined:
+
+- `density` — fraction of sentences containing ≥1 excess marker
+- `variety` — fraction of the marker vocabulary observed in the text
+- `kobak_score = 0.6 × density + 0.4 × variety`
+
+Wordlists (embedded, no download required): English (130+ markers), Portuguese-BR, Spanish. Custom wordlists can be supplied with `--wordlist-dir`.
+
+Reference: Kobak D, González-Márquez R, Horvát E-Á, Lause J. *Delving into ChatGPT usage in academic writing through excess vocabulary.* arXiv:2406.07016, 2024.
+
+**Layer 2 — Linguistic/stylometric signals**
+
+Structural features of text that differ between human and LLM authors, computed without any lexicon:
+
+| Signal | What it measures | AI pattern |
+|--------|-----------------|------------|
+| Sentence length CV | σ/μ of per-sentence word counts | LLMs produce more uniform sentence lengths |
+| Compression ratio | `gzip(text) / len(text)` — model-free perplexity proxy | LLM text is more predictable → more compressible |
+| Discourse density | Fraction of sentences starting with transition phrases (`Furthermore,`, `In conclusion,` …) | LLMs overuse discourse connectors for artificial flow |
+| Type-token ratio | `unique_words / total_words` | LLMs recycle a narrower vocabulary per passage |
+| Hapax ratio | `words_once / unique_words` | Human text has more rare one-off words |
+
+The linguistic layer activates when ≥5 sentences are present; shorter texts fall back to the Kobak score alone.
+
+For context on neural AI-detection approaches and the difficulty of the problem, see: Dugan L et al. *RAID: A Shared Benchmark for Robust Evaluation of Machine-Generated Text Detectors.* arXiv:2402.14873, 2024.
+
+**Combined score:**
+
+```
+combined_score = 0.65 × kobak_score + 0.35 × linguistic_score   (when sentences ≥ 5)
+combined_score = kobak_score                                      (when sentences < 5)
+```
+
+**JSON output** (`--detect-only --format json`) includes the full breakdown:
+
+```json
+{
+  "flagged": true,
+  "findings": [],
+  "ai_detection": {
+    "score": 0.512,
+    "kobak_score": 0.635,
+    "density": 1.0,
+    "variety": 0.088,
+    "verdict": "possibly AI-generated",
+    "lang": "en",
+    "markers": ["comprehensive", "crucial", "delving", "groundbreaking", "..."],
+    "linguistic": {
+      "sentence_length_cv": 0.21,
+      "compression_ratio": 0.48,
+      "discourse_density": 0.20,
+      "type_token_ratio": 0.62,
+      "hapax_ratio": 0.44,
+      "score": 0.31
+    }
+  }
+}
+```
+
+**Config file** (`~/.tldt.toml`) — enable AI detection globally:
+
+```toml
+[ai_detection]
+enabled = true
+lang    = "en"
+```
+
+---
+
 ## Security
 
 tldt's architecture provides structural immunity to three OWASP LLM Top 10 2025 categories:

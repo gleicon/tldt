@@ -229,3 +229,211 @@ func TestConfigPath(t *testing.T) {
 		t.Errorf("ConfigPath() = %q, want path ending in \".tldt.toml\"", path)
 	}
 }
+
+// ── [security] section ────────────────────────────────────────────────────────
+
+func TestDefaultConfig_SecurityDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Security.DetectInjection {
+		t.Error("default detect_injection must be false")
+	}
+	if cfg.Security.DetectPII {
+		t.Error("default detect_pii must be false")
+	}
+	if cfg.Security.Sanitize {
+		t.Error("default sanitize must be false")
+	}
+	if cfg.Security.SanitizePII {
+		t.Error("default sanitize_pii must be false")
+	}
+	if cfg.Security.InjectionThreshold != 0.99 {
+		t.Errorf("default injection_threshold = %.2f, want 0.99", cfg.Security.InjectionThreshold)
+	}
+}
+
+func TestLoad_SecuritySection(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-security-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("[security]\ndetect_injection = true\ndetect_pii = true\ninjection_threshold = 0.85\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if !cfg.Security.DetectInjection {
+		t.Error("detect_injection: want true")
+	}
+	if !cfg.Security.DetectPII {
+		t.Error("detect_pii: want true")
+	}
+	if cfg.Security.InjectionThreshold != 0.85 {
+		t.Errorf("injection_threshold: want 0.85, got %.2f", cfg.Security.InjectionThreshold)
+	}
+}
+
+func TestLoad_SecuritySection_ZeroThresholdFallsBack(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-threshold-zero-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("[security]\ninjection_threshold = 0\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.Security.InjectionThreshold <= 0 {
+		t.Errorf("zero threshold must fall back to default, got %.2f", cfg.Security.InjectionThreshold)
+	}
+}
+
+func TestLoad_AbsentSecuritySectionKeepsDefaults(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-no-security-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("sentences = 3\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.Security.DetectInjection || cfg.Security.DetectPII {
+		t.Error("absent [security]: detection flags must remain false")
+	}
+	if cfg.Security.InjectionThreshold != 0.99 {
+		t.Errorf("absent [security]: threshold = %.2f, want 0.99", cfg.Security.InjectionThreshold)
+	}
+}
+
+// ── [ai_detection] section ────────────────────────────────────────────────────
+
+func TestDefaultConfig_AIDetectionDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.AIDetection.Enabled {
+		t.Error("default ai_detection.enabled must be false")
+	}
+	if cfg.AIDetection.Lang != "en" {
+		t.Errorf("default ai_detection.lang = %q, want 'en'", cfg.AIDetection.Lang)
+	}
+	if cfg.AIDetection.WordlistDir != "" {
+		t.Errorf("default ai_detection.wordlist_dir = %q, want ''", cfg.AIDetection.WordlistDir)
+	}
+}
+
+func TestLoad_AIDetectionSection(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-aidetect-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("[ai_detection]\nenabled = true\nlang = \"pt-BR\"\nwordlist_dir = \"/custom/lists\"\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if !cfg.AIDetection.Enabled {
+		t.Error("ai_detection.enabled: want true")
+	}
+	if cfg.AIDetection.Lang != "pt-BR" {
+		t.Errorf("ai_detection.lang: want 'pt-BR', got %q", cfg.AIDetection.Lang)
+	}
+	if cfg.AIDetection.WordlistDir != "/custom/lists" {
+		t.Errorf("ai_detection.wordlist_dir: want '/custom/lists', got %q", cfg.AIDetection.WordlistDir)
+	}
+}
+
+func TestLoad_AIDetectionLangEmpty_FallsBack(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-aidetect-nolang-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("[ai_detection]\nenabled = true\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.AIDetection.Lang != "en" {
+		t.Errorf("empty lang must fall back to 'en', got %q", cfg.AIDetection.Lang)
+	}
+}
+
+func TestLoad_AbsentAIDetectionSectionKeepsDefaults(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-no-aidetect-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString("sentences = 3\n")
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.AIDetection.Enabled {
+		t.Error("absent [ai_detection]: enabled must remain false")
+	}
+	if cfg.AIDetection.Lang != "en" {
+		t.Errorf("absent [ai_detection]: lang = %q, want 'en'", cfg.AIDetection.Lang)
+	}
+}
+
+func TestLoad_FullConfig(t *testing.T) {
+	f, err := os.CreateTemp("", "tldt-full-*.toml")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	_, _ = f.WriteString(strings.Join([]string{
+		`algorithm = "textrank"`,
+		`sentences = 8`,
+		`format = "json"`,
+		`[stats]`,
+		`enabled = false`,
+		`[security]`,
+		`detect_injection = true`,
+		`injection_threshold = 0.95`,
+		`detect_pii = true`,
+		`sanitize = true`,
+		`sanitize_pii = false`,
+		`[ai_detection]`,
+		`enabled = true`,
+		`lang = "es"`,
+		`wordlist_dir = "/my/lists"`,
+	}, "\n"))
+	_ = f.Close()
+
+	cfg := Load(f.Name())
+	if cfg.Algorithm != "textrank" {
+		t.Errorf("algorithm: want textrank, got %q", cfg.Algorithm)
+	}
+	if cfg.Sentences != 8 {
+		t.Errorf("sentences: want 8, got %d", cfg.Sentences)
+	}
+	if cfg.Format != "json" {
+		t.Errorf("format: want json, got %q", cfg.Format)
+	}
+	if cfg.Stats.Enabled {
+		t.Error("stats.enabled: want false")
+	}
+	if !cfg.Security.DetectInjection {
+		t.Error("security.detect_injection: want true")
+	}
+	if cfg.Security.InjectionThreshold != 0.95 {
+		t.Errorf("security.injection_threshold: want 0.95, got %.2f", cfg.Security.InjectionThreshold)
+	}
+	if !cfg.Security.DetectPII {
+		t.Error("security.detect_pii: want true")
+	}
+	if !cfg.Security.Sanitize {
+		t.Error("security.sanitize: want true")
+	}
+	if cfg.Security.SanitizePII {
+		t.Error("security.sanitize_pii: want false")
+	}
+	if !cfg.AIDetection.Enabled {
+		t.Error("ai_detection.enabled: want true")
+	}
+	if cfg.AIDetection.Lang != "es" {
+		t.Errorf("ai_detection.lang: want 'es', got %q", cfg.AIDetection.Lang)
+	}
+	if cfg.AIDetection.WordlistDir != "/my/lists" {
+		t.Errorf("ai_detection.wordlist_dir: want '/my/lists', got %q", cfg.AIDetection.WordlistDir)
+	}
+}

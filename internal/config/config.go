@@ -15,13 +15,32 @@ type StatsConfig struct {
 	Enabled bool `toml:"enabled"`
 }
 
+// SecurityConfig holds default flags for the security detection pipeline.
+// All fields default to off; set to true to enable without a CLI flag.
+type SecurityConfig struct {
+	DetectInjection    bool    `toml:"detect_injection"`
+	InjectionThreshold float64 `toml:"injection_threshold"`
+	DetectPII          bool    `toml:"detect_pii"`
+	Sanitize           bool    `toml:"sanitize"`
+	SanitizePII        bool    `toml:"sanitize_pii"`
+}
+
+// AIDetectionConfig holds defaults for --detect-ai.
+type AIDetectionConfig struct {
+	Enabled     bool   `toml:"enabled"`
+	Lang        string `toml:"lang"`
+	WordlistDir string `toml:"wordlist_dir"`
+}
+
 // Config holds per-user default flags loaded from ~/.tldt.toml.
 type Config struct {
-	Algorithm string      `toml:"algorithm"`
-	Sentences int         `toml:"sentences"`
-	Format    string      `toml:"format"`
-	Level     string      `toml:"level"`
-	Stats     StatsConfig `toml:"stats"`
+	Algorithm   string            `toml:"algorithm"`
+	Sentences   int               `toml:"sentences"`
+	Format      string            `toml:"format"`
+	Level       string            `toml:"level"`
+	Stats       StatsConfig       `toml:"stats"`
+	Security    SecurityConfig    `toml:"security"`
+	AIDetection AIDetectionConfig `toml:"ai_detection"`
 }
 
 // DefaultConfig returns the built-in default configuration.
@@ -33,6 +52,12 @@ func DefaultConfig() Config {
 		Level:     "",
 		Stats: StatsConfig{
 			Enabled: true,
+		},
+		Security: SecurityConfig{
+			InjectionThreshold: 0.99,
+		},
+		AIDetection: AIDetectionConfig{
+			Lang: "en",
 		},
 	}
 }
@@ -55,9 +80,14 @@ func Load(cfgPath string) Config {
 	if err != nil {
 		return DefaultConfig()
 	}
-	// Guard: zero/negative sentences in config file falls back to default
 	if cfg.Sentences <= 0 {
 		cfg.Sentences = DefaultConfig().Sentences
+	}
+	if cfg.Security.InjectionThreshold <= 0 {
+		cfg.Security.InjectionThreshold = DefaultConfig().Security.InjectionThreshold
+	}
+	if cfg.AIDetection.Lang == "" {
+		cfg.AIDetection.Lang = DefaultConfig().AIDetection.Lang
 	}
 	return cfg
 }
