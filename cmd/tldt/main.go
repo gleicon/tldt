@@ -419,6 +419,10 @@ func reportAIDetection(text, lang, wordlistDir string) {
 		fmt.Fprintf(os.Stderr, "ai-detect: %d excess-vocabulary marker(s): %s\n",
 			len(r.Markers), strings.Join(r.Markers, ", "))
 	}
+	if len(r.Phrases) > 0 {
+		fmt.Fprintf(os.Stderr, "ai-detect: %d phrase/template tell(s) (+%.2f signal): %s\n",
+			len(r.Phrases), r.PhraseSignal, strings.Join(r.Phrases, " | "))
+	}
 	if combined >= 0.40 {
 		fmt.Fprintln(os.Stderr, "ai-detect: WARNING — text may be AI-generated")
 	}

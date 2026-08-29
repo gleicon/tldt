@@ -381,9 +381,30 @@ Words statistically overrepresented in LLM output vs. human writing. Two signals
 - `variety` — fraction of the marker vocabulary observed in the text
 - `kobak_score = 0.6 × density + 0.4 × variety`
 
-Wordlists (embedded, no download required): English (130+ markers), Portuguese-BR, Spanish. Custom wordlists can be supplied with `--wordlist-dir`.
+Wordlists (embedded, no download required): English (300+ markers), Portuguese-BR, Spanish. Custom wordlists can be supplied with `--wordlist-dir`.
 
 Reference: Kobak D, González-Márquez R, Horvát E-Á, Lause J. *Delving into ChatGPT usage in academic writing through excess vocabulary.* arXiv:2406.07016, 2024.
+
+**Layer 1b — Phrase & template tells**
+
+Single-word markers miss the strongest signals, which are multi-word: fixed phrases the word tokenizer can't reconstruct (`it's important to note` — apostrophes and spaces are stripped) and structural tics with variable slots (`not just X, but Y`, reported at ~6% of all AI messages in one dataset). Each wordlist carries a `phrases` list (literal, case-insensitive substrings) and a `templates` list (regex patterns matched against the raw text).
+
+The phrase signal is **strictly additive and monotonic**: word `density`/`variety` are computed exactly as before, and phrase/template hits only *raise* the score. Word-only text scores identically to previous versions — a matched tell is pure extra evidence, never a penalty.
+
+```
+phrase_signal  = min(0.35, 0.12 × distinct_phrases + 0.25 × distinct_templates)
+kobak_score    = min(1.0, 0.6 × density + 0.4 × variety + phrase_signal)
+```
+
+Templates weigh more than fixed phrases because a structural tic is a stronger single marker. Matched phrases are reported with the actual matched text (`not just fast but reliable`), not the pattern. Examples per language:
+
+| Lang | Phrase | Template |
+|------|--------|----------|
+| en | `it's important to note`, `in the ever-evolving landscape`, `dive into`, `when it comes to` | `not just X, but Y`; `it's not X, it's Y`; `ever-evolving landscape/world/field` |
+| pt-BR | `vale ressaltar que`, `em suma`, `no cenário atual`, `desempenha um papel crucial` | `não apenas X mas Y`; `não é X, mas Y`; `em constante evolução/mudança` |
+| es | `es importante señalar`, `cada vez más`, `sumérgete en` | `no solo X sino Y`; `en constante evolución/cambio` |
+
+New single-word markers added from 2025–2026 studies and community lists (postdating the Kobak academic corpus): `load-bearing`, `scaffolding`, `boast`, `primarily`, `surpass`, `elevate`, `compelling`, `unwavering`, `garner`, `broader`; pt-BR gains `aprimorar` ("o verbo preferido do ChatGPT"), `mergulhar`, `panorama`, `cenário`, `otimizar`.
 
 **Layer 2 — Linguistic/stylometric signals**
 

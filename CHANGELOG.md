@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.1] - 2026-08-29
+
+### Added
+
+- **Phrase and template layer for AI-generated-content detection**: the excess-vocabulary detector now catches multi-word tells that single-token matching cannot, which are among the strongest signals in current research. Two new per-language wordlist fields:
+  - `phrases`: literal, case-insensitive substrings matched against the raw text (`it's important to note`, `in the ever-evolving landscape`, `dive into`) — the word tokenizer strips apostrophes and spaces, so these are unreachable as tokens.
+  - `templates`: regex patterns for structural tics with variable slots (`not just X, but Y`; `it's not X, it's Y`; pt-BR `não apenas X mas Y`). The `not just X, but Y` construction alone appears in roughly 6% of AI messages in one dataset.
+- The phrase signal is strictly additive and monotonic: word `density`/`variety` are unchanged, so word-only text scores identically to prior versions and a matched phrase only raises the score (`phrase_signal = min(0.35, 0.12*phrases + 0.25*templates)`; templates weigh more). Matched tells are reported with the actual matched text, not the pattern.
+- `Result` gains `Phrases`, `PhraseSignal`; the `--detect-only --format json` `ai_detection` object gains `phrases` and `phrase_signal`.
+- New single-word markers from 2025-2026 studies and community lists, postdating the Kobak academic corpus: English `load-bearing`, `scaffolding`, `boast`, `primarily`, `surpass`, `elevate`, `compelling`, `unwavering`, `garner`, `broader`; Brazilian Portuguese `aprimorar`, `mergulhar`, `panorama`, `cenário`, `otimizar`; plus phrase/template sets for `en`, `pt-BR`, and `es`.
+
 ## [1.4.0] - 2026-08-29
 
 ### Added

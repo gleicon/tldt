@@ -24,14 +24,16 @@ type AIDetectLinguisticJSON struct {
 // Score is the combined (Kobak + linguistic) score. KobakScore is the
 // excess-vocabulary score alone (0.6*density + 0.4*variety).
 type AIDetectJSON struct {
-	Score      float64                 `json:"score"`
-	KobakScore float64                 `json:"kobak_score"`
-	Density    float64                 `json:"density"`
-	Variety    float64                 `json:"variety"`
-	Verdict    string                  `json:"verdict"`
-	Lang       string                  `json:"lang"`
-	Markers    []string                `json:"markers"`
-	Linguistic *AIDetectLinguisticJSON `json:"linguistic,omitempty"`
+	Score        float64                 `json:"score"`
+	KobakScore   float64                 `json:"kobak_score"`
+	Density      float64                 `json:"density"`
+	Variety      float64                 `json:"variety"`
+	Verdict      string                  `json:"verdict"`
+	Lang         string                  `json:"lang"`
+	Markers      []string                `json:"markers"`
+	Phrases      []string                `json:"phrases,omitempty"`
+	PhraseSignal float64                 `json:"phrase_signal"`
+	Linguistic   *AIDetectLinguisticJSON `json:"linguistic,omitempty"`
 }
 
 // DetectFinding is one machine-readable detection result. Kind is one of
@@ -168,13 +170,15 @@ func collectAIDetection(text string, o securityOpts) (*AIDetectJSON, error) {
 		markers = []string{}
 	}
 	out := &AIDetectJSON{
-		Score:      r.CombinedScore(),
-		KobakScore: r.Score,
-		Density:    r.Density,
-		Variety:    r.Variety,
-		Verdict:    r.Verdict(),
-		Lang:       r.Lang,
-		Markers:    markers,
+		Score:        r.CombinedScore(),
+		KobakScore:   r.Score,
+		Density:      r.Density,
+		Variety:      r.Variety,
+		Verdict:      r.Verdict(),
+		Lang:         r.Lang,
+		Markers:      markers,
+		Phrases:      r.Phrases,
+		PhraseSignal: r.PhraseSignal,
 	}
 	if r.Sentences >= 3 {
 		ling := r.Linguistic

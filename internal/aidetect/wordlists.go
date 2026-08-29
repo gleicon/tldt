@@ -20,11 +20,20 @@ var ptBRJSON []byte
 var esJSON []byte
 
 // wordlist holds a language's marker sets.
+//
+// Rare/Common are single-token vocabulary markers (Kobak et al. method).
+// Phrases are literal, case-insensitive multi-word tells matched against the raw
+// text ("it's important to note"), which the word tokenizer cannot catch because
+// it splits on apostrophes and spaces. Templates are regex patterns for
+// structural tics with variable slots ("not just X, but Y"), matched
+// case-insensitively.
 type wordlist struct {
-	Lang   string   `json:"lang"`
-	Source string   `json:"source"`
-	Rare   []string `json:"rare"`
-	Common []string `json:"common"`
+	Lang      string   `json:"lang"`
+	Source    string   `json:"source"`
+	Rare      []string `json:"rare"`
+	Common    []string `json:"common"`
+	Phrases   []string `json:"phrases"`
+	Templates []string `json:"templates"`
 }
 
 // SupportedLangs lists the languages with embedded wordlists.
