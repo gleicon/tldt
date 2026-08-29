@@ -23,6 +23,13 @@ type SecurityConfig struct {
 	DetectPII          bool    `toml:"detect_pii"`
 	Sanitize           bool    `toml:"sanitize"`
 	SanitizePII        bool    `toml:"sanitize_pii"`
+
+	// Weak-prior and flag-gated layers, off by default. Enabling one here is the
+	// config equivalent of passing the matching --detect-* flag.
+	DetectExfil      bool `toml:"detect_exfil"`
+	DetectPositional bool `toml:"detect_positional"`
+	DetectScript     bool `toml:"detect_script_mismatch"`
+	FoldObfuscation  bool `toml:"fold_obfuscation"`
 }
 
 // AIDetectionConfig holds defaults for --detect-ai.

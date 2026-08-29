@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.0] - 2026-08-29
+
+### Added
+
+- **Payload decoding**: the injection detector now decodes obfuscated payloads and re-runs pattern/PII detection on the recovered plaintext, reporting the decoded content and the encoding chain (`Provenance`) rather than only flagging that something is encoded. Supported: standard/URL-safe/unpadded base64, base32, hex, `\x`/`\u` escapes, percent-encoding, HTML entities, Unicode Tags block, zero-width binary, ROT13, and reversal. Chains compose up to depth 3, bounded to 10x expansion, 1 MB per chain, and 4 MB per document.
+- Closed the short-payload blind spot: encoded tokens under 23 characters, previously unreachable behind the entropy gate, are now decoded and matched (gate retained on the PII path).
+- **Role/chat-template markers**: detects `<|im_start|>`, `[INST]`, `### Human:`, `</system>`, fabricated `<function_calls>` blocks, and forged conversation turns.
+- **Obfuscation folding**: matches injection phrases through leetspeak/character substitution (`1gn0r3 4ll pr3v10us`), match-time only, scored below a literal match, under the `obfuscated` category.
+- **Markdown exfiltration detection**: flags links/images whose URL carries encoded or templated data; keyed on link structure, not a host allowlist.
+- **Positional heuristics**: instructions after a whitespace gap, in the document tail, or many-shot forged turns (weak prior).
+- **Unicode script-mismatch detection**: sentences whose dominant script differs from the document (script analysis, not language identification; weak prior).
+- **Layer corroboration**: two distinct weak layers each scoring >= 0.50 mark input suspicious even when neither crosses the 0.70 threshold; same-layer findings never corroborate. Exposed as `CorroborationFloor` and `Report.CorroboratingLayers`.
+- **Detection profiles**: `tldt.HookLayers()` (high-precision subset for the UserPromptSubmit hook) and `tldt.DefaultLayers()` (full CLI set), selectable via `DetectOptions.Layers`, CLI flags, and `~/.tldt.toml` `[security]` keys.
+- New CLI flags: `--detect-exfil`, `--detect-positional`, `--detect-script-mismatch`, `--fold-obfuscation`.
+- **Document surface extraction** deepened and extended: PDF annotations, AcroForm field values, and white/sub-4pt content-stream text; DOCX footnotes/endnotes, headers/footers, textboxes, tracked-change deletions, and `custom.xml`; XLSX hidden/`veryHidden` sheets and defined names; PPTX speaker notes; HTML CSS-hidden text, JSON-LD, and a differential pass that reports any text present in the raw file but absent from the reader path. New formats: `.ipynb`, Markdown, EPUB, `.eml`, SVG, and image EXIF/IPTC captions.
+- New library example `examples/detection` demonstrating detection profiles, decoded-payload provenance, and the corroboration verdict.
+
+### Changed
+
+- Detection now runs on the original input bytes, ahead of all mutating stages (`--sanitize`, `--sanitize-pii`, `--from-html`), so sanitization can no longer destroy a payload before the detector reads it.
+- The pattern pass is anchor-prefiltered and folds case once instead of per pattern: on text carrying no injection anchor it skips the regex stage entirely (~3.4 ms vs ~98 ms for a 256 KB input on an Apple M5).
+- The statistical outlier pass is capped at 250 sentences with even-spaced sampling to bound its O(n^2) cost; `DetectResult.OutlierScope` reports whether sampling occurred.
+
+### Performance
+
+- Full detection over a 256 KB input (Apple M5): ~133 ms on the hook profile (within the 150 ms budget), ~200 ms with every weak-prior layer enabled.
+
 ## [1.0.0] - 2026-05-06
 
 ### Added

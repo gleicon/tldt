@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/gleicon/tldt/internal/surfaces"
@@ -33,6 +34,15 @@ func ExtractDOCX(data []byte) []surfaces.HiddenSurface {
 			found = append(found, extractWordComments(f)...)
 		case f.Name == "word/document.xml":
 			found = append(found, extractWordHiddenAndFields(f)...)
+			found = append(found, extractTextboxes(f)...)
+			found = append(found, extractTrackedDeletions(f)...)
+		case f.Name == "word/footnotes.xml" || f.Name == "word/endnotes.xml":
+			found = append(found, openAnd(f, surfaces.SourceDOCXFootnote)...)
+		case strings.HasPrefix(f.Name, "word/header") && strings.HasSuffix(f.Name, ".xml"),
+			strings.HasPrefix(f.Name, "word/footer") && strings.HasSuffix(f.Name, ".xml"):
+			found = append(found, openAnd(f, surfaces.SourceDOCXHeader)...)
+		case f.Name == "docProps/custom.xml":
+			found = append(found, openAnd(f, surfaces.SourceDOCXCustomXML)...)
 		}
 	}
 	return found
@@ -250,4 +260,64 @@ func extractFieldCodes(data []byte) []surfaces.HiddenSurface {
 		}
 	}
 	return found
+}
+
+// openAnd opens a ZIP entry and extracts every w:t / <t> text node under source.
+// Footnotes, headers, footers, and custom properties are all plain w:t-bearing
+// parts, so the shared node walker handles them without per-part parsing.
+func openAnd(f *zip.File, source string) []surfaces.HiddenSurface {
+	rc, err := f.Open()
+	if err != nil {
+		return nil
+	}
+	defer rc.Close()
+	return extractWTextNodes(rc, source)
+}
+
+// txbxContentRE isolates the body of each w:txbxContent (drawing textbox) so its
+// text is attributed to the textbox surface rather than the main document body.
+var txbxContentRE = regexp.MustCompile(`(?s)<w:txbxContent>(.*?)</w:txbxContent>`)
+
+func extractTextboxes(f *zip.File) []surfaces.HiddenSurface {
+	data, err := readZipEntry(f)
+	if err != nil {
+		return nil
+	}
+	var found []surfaces.HiddenSurface
+	for _, m := range txbxContentRE.FindAllSubmatch(data, -1) {
+		found = append(found, extractWTextNodes(bytes.NewReader(m[1]), surfaces.SourceDOCXTextbox)...)
+	}
+	return found
+}
+
+// delRE isolates w:del tracked-change deletions. Deleted text is stored in w:delText
+// runs and is invisible in the accepted-changes view a converter produces, but a
+// model reading the raw part sees it.
+var delRE = regexp.MustCompile(`(?s)<w:del\b.*?</w:del>`)
+var delTextRE = regexp.MustCompile(`(?s)<w:delText[^>]*>(.*?)</w:delText>`)
+
+func extractTrackedDeletions(f *zip.File) []surfaces.HiddenSurface {
+	data, err := readZipEntry(f)
+	if err != nil {
+		return nil
+	}
+	var found []surfaces.HiddenSurface
+	for _, block := range delRE.FindAll(data, -1) {
+		for _, m := range delTextRE.FindAllSubmatch(block, -1) {
+			if v := strings.TrimSpace(string(m[1])); v != "" {
+				found = append(found, surfaces.HiddenSurface{Source: surfaces.SourceDOCXTracked, Text: v})
+			}
+		}
+	}
+	return found
+}
+
+// readZipEntry reads a ZIP entry fully into memory.
+func readZipEntry(f *zip.File) ([]byte, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
 }

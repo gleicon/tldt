@@ -229,6 +229,7 @@ func Fetch(ctx context.Context, rawURL string, timeout time.Duration, maxBytes i
 
 	// Extract all non-visible HTML surfaces before readability discards them.
 	hiddenSurfaces := extractor.ExtractHTML(bodyBytes)
+	hiddenSurfaces = append(hiddenSurfaces, extractor.DifferentialHTML(bodyBytes)...)
 
 	// Extract article text — strips nav/ads/footers via Readability scoring.
 	// Use FromReader, NOT FromURL: FromURL bypasses our size cap and client.

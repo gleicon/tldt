@@ -33,7 +33,21 @@ const DefaultOutlierThreshold = detector.DefaultOutlierThreshold
 // DetectOptions controls detection behavior.
 type DetectOptions struct {
 	OutlierThreshold float64 // default: 0.99 (DefaultOutlierThreshold)
+
+	// Layers selects which detection layers run. The zero value is treated as
+	// DefaultLayers so existing callers keep full coverage; pass HookLayers for
+	// the high-precision subset.
+	Layers *Layers
 }
+
+// Layers selects which detection layers run. Re-exported from internal/detector.
+type Layers = detector.Layers
+
+// DefaultLayers enables every detection layer (CLI default).
+func DefaultLayers() Layers { return detector.DefaultLayers() }
+
+// HookLayers enables only the high-precision layers (UserPromptSubmit default).
+func HookLayers() Layers { return detector.HookLayers() }
 
 // FetchOptions controls URL fetching behavior.
 type FetchOptions struct {
@@ -64,6 +78,18 @@ type Result struct {
 type DetectResult struct {
 	Report   detector.Report
 	Warnings []string // human-readable WARNING lines (same format as CLI stderr)
+
+	// OutlierScope records how much of the document the outlier pass covered.
+	OutlierScope OutlierScope
+}
+
+// OutlierScope reports the coverage of the O(n²) outlier pass, which is capped at
+// detector.MaxOutlierSentences. Callers that need to know whether a verdict is
+// based on the whole document or a sample read this.
+type OutlierScope struct {
+	TotalSentences    int  // sentences in the input
+	AnalyzedSentences int  // sentences actually fed to the similarity matrix
+	Sampled           bool // true when AnalyzedSentences < TotalSentences
 }
 
 // SanitizeReport is the output metadata from Sanitize.
@@ -196,14 +222,40 @@ func Summarize(text string, opts SummarizeOptions) (Result, error) {
 // Returns the findings plus human-readable warning lines. An error is returned
 // only if the similarity matrix cannot be built.
 func Detect(text string, opts DetectOptions) (DetectResult, error) {
-	report := detector.Analyze(text)
+	layers := detector.DefaultLayers()
+	if opts.Layers != nil {
+		layers = *opts.Layers
+	}
+	report := detector.AnalyzeWith(text, layers)
 
 	threshold := opts.OutlierThreshold
 	if threshold <= 0 {
 		threshold = DefaultOutlierThreshold
 	}
 	sentences := summarizer.TokenizeSentences(text)
+	scope := OutlierScope{TotalSentences: len(sentences)}
+
+	// Script mismatch is sentence-scoped, so it runs here rather than in
+	// AnalyzeWith, which has no sentence split.
+	if layers.Script && len(sentences) > 0 {
+		report.Findings = append(report.Findings,
+			detector.DetectScriptMismatch(sentences, text)...)
+		report.Recompute()
+	}
+
 	if len(sentences) > 0 {
+		// The similarity matrix is O(n²) in sentence count, so the outlier pass
+		// runs over a bounded sample rather than the whole document. Findings are
+		// mapped back to original sentence indices before being reported.
+		sample, originalIndex := detector.SampleSentences(sentences)
+		scope.AnalyzedSentences = len(sample)
+		scope.Sampled = len(sample) < len(sentences)
+
+		subject := text
+		if scope.Sampled {
+			subject = strings.Join(sample, " ")
+		}
+
 		lr, err := summarizer.New("lexrank")
 		if err != nil {
 			return DetectResult{}, fmt.Errorf("tldt.Detect: %w", err)
@@ -212,18 +264,33 @@ func Detect(text string, opts DetectOptions) (DetectResult, error) {
 		if !ok {
 			return DetectResult{}, fmt.Errorf("tldt.Detect: lexrank does not provide a similarity matrix")
 		}
-		_, matrix, err := ms.SummarizeWithMatrix(text, len(sentences))
+		_, matrix, err := ms.SummarizeWithMatrix(subject, len(sample))
 		if err != nil {
 			return DetectResult{}, fmt.Errorf("tldt.Detect: outlier matrix: %w", err)
 		}
-		report.Findings = append(report.Findings, detector.DetectOutliers(sentences, matrix, threshold)...)
+		// A re-tokenized sample can yield a different sentence count than the
+		// slice we sampled; trust the matrix dimension and only map indices we
+		// actually have.
+		outliers := detector.DetectOutliers(sample, matrix, threshold)
+		for i := range outliers {
+			if outliers[i].Sentence >= 0 && outliers[i].Sentence < len(originalIndex) {
+				outliers[i].Sentence = originalIndex[outliers[i].Sentence]
+			}
+		}
+		report.Findings = append(report.Findings, outliers...)
+		report.Recompute()
 	}
 
 	var warnings []string
 	if report.Suspicious {
 		warnings = append(warnings, "injection-detect: WARNING -- input flagged as suspicious")
 	}
-	return DetectResult{Report: report, Warnings: warnings}, nil
+	if scope.Sampled {
+		warnings = append(warnings, fmt.Sprintf(
+			"injection-detect: outlier pass sampled %d of %d sentences (cap %d)",
+			scope.AnalyzedSentences, scope.TotalSentences, detector.MaxOutlierSentences))
+	}
+	return DetectResult{Report: report, Warnings: warnings, OutlierScope: scope}, nil
 }
 
 // Sanitize strips invisible Unicode characters and applies NFKC normalization.
@@ -511,3 +578,39 @@ func Pipeline(text string, opts PipelineOptions) (PipelineResult, error) {
 		PIIFindings:       piiFindings,
 	}, nil
 }
+
+// --- Layer re-exports for CLI and library consumers ---
+
+// Detection categories, re-exported from internal/detector so consumers can
+// switch on Finding.Category without importing an internal package.
+// CategoryOutlier is declared separately above, with its own caveat.
+const (
+	CategoryPattern    = detector.CategoryPattern
+	CategoryEncoding   = detector.CategoryEncoding
+	CategoryPII        = detector.CategoryPII
+	CategoryObfuscated = detector.CategoryObfuscated
+	CategoryRole       = detector.CategoryRole
+	CategoryExfil      = detector.CategoryExfil
+	CategoryPositional = detector.CategoryPositional
+	CategoryScript     = detector.CategoryScript
+)
+
+// CorroborationFloor is the score at which a finding counts as corroborating
+// evidence from its layer. Two distinct layers at or above it mark a report
+// suspicious even when neither crosses DefaultDetectionThreshold.
+const CorroborationFloor = detector.CorroborationFloor
+
+// DefaultDetectionThreshold is the score above which a single finding marks a
+// report suspicious on its own.
+const DefaultDetectionThreshold = detector.DefaultDetectionThreshold
+
+// MaxOutlierSentences is the cap on sentences fed to the O(n²) outlier pass.
+const MaxOutlierSentences = detector.MaxOutlierSentences
+
+// DecodeChainProvenance describes the encoding chain that recovered a finding's
+// text, for example "base64" or "base64>hex". Empty when the text was matched
+// directly against the input.
+//
+// Deprecated marker: read Finding.Provenance instead. Retained as documentation
+// of the format only.
+type DecodeChainProvenance = string

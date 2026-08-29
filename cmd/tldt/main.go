@@ -58,6 +58,10 @@ func main() {
 	detectAI := flag.Bool("detect-ai", false, "score text for AI-generated content using excess-vocabulary method (Kobak et al. 2024, arXiv:2406.07016)")
 	aiLang := flag.String("lang", "en", "language for AI detection wordlist: en, pt-BR, es")
 	aiWordlistDir := flag.String("wordlist-dir", "", "directory with custom <lang>.json wordlist files (overrides embedded lists)")
+	detectExfil := flag.Bool("detect-exfil", false, "report Markdown links and images shaped to carry data outward (advisory)")
+	detectPositional := flag.Bool("detect-positional", false, "report instructions placed after whitespace gaps or in the document tail (weak-prior, advisory)")
+	detectScript := flag.Bool("detect-script-mismatch", false, "report sentences whose dominant Unicode script differs from the document (weak-prior, advisory)")
+	foldObfuscation := flag.Bool("fold-obfuscation", false, "match injection phrases through leetspeak and character substitutions (advisory)")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -105,12 +109,24 @@ func main() {
 		*fromHTML, *sanitizeFlag, *sanitizePII, *detectPII,
 		*detectInjection, *injectionThreshold,
 		*detectAI, *aiLang, *aiWordlistDir)
+	if flagsSet["detect-exfil"] {
+		secOpts.detectExfil = *detectExfil
+	}
+	if flagsSet["detect-positional"] {
+		secOpts.detectPositional = *detectPositional
+	}
+	if flagsSet["detect-script-mismatch"] {
+		secOpts.detectScript = *detectScript
+	}
+	if flagsSet["fold-obfuscation"] {
+		secOpts.foldObfuscation = *foldObfuscation
+	}
 
 	// HTML comment injection check runs before the empty-text guard so that
 	// JS SPAs (no readable body text, but comments carrying injection payloads)
 	// still get scanned when --detect-injection is set.
 	if secOpts.detectInjection && len(hiddenSurfaces) > 0 {
-		reportHiddenSurfaces(hiddenSurfaces, secOpts.injectionThreshold)
+		reportHiddenSurfaces(hiddenSurfaces, secOpts)
 	}
 
 	text, isEmpty, err := validateInput(rawBytes)
@@ -122,10 +138,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	text = applyMutatingStages(text, secOpts)
-
-	// --detect-only --format json: emit the structured detection contract to
-	// stdout and exit. Machine consumers (the OpenCode plugin) read this instead
+	// Detection runs on the original bytes, before any mutating stage. A
+	// sanitizer that strips zero-width characters or the Unicode Tags block would
+	// otherwise destroy exactly the payload the decoder is meant to reconstruct,
+	// and redaction would erase spans the detectors need to see. Mutation is a
+	// separate concern on the path to the summarizer.
+	//
+	// --detect-only --format json emits the structured detection contract to
+	// stdout and exits. Machine consumers (the OpenCode plugin) read this instead
 	// of parsing stderr prose.
 	if *detectOnly && effectiveFormat == "json" {
 		emitDetectJSON(text, secOpts)
@@ -135,6 +155,8 @@ func main() {
 	if *detectOnly {
 		os.Exit(0)
 	}
+
+	text = applyMutatingStages(text, secOpts)
 
 	const defaultSentenceCap = 2000
 	if !*noCap {
@@ -224,6 +246,10 @@ func resolveSecurityOpts(
 		detectAI:           cfg.AIDetection.Enabled,
 		aiLang:             cfg.AIDetection.Lang,
 		aiWordlistDir:      cfg.AIDetection.WordlistDir,
+		detectExfil:        cfg.Security.DetectExfil,
+		detectPositional:   cfg.Security.DetectPositional,
+		detectScript:       cfg.Security.DetectScript,
+		foldObfuscation:    cfg.Security.FoldObfuscation,
 	}
 	if flagsSet["sanitize"] {
 		o.sanitize = sanitize
@@ -298,7 +324,6 @@ func resolveSettings(cfg config.Config, flagsSet map[string]bool, level, algorit
 	return algo, n, outFormat
 }
 
-
 // applyMutatingStages applies the requested text-modifying stages —
 // HTML-to-Markdown conversion, Unicode sanitization, and PII redaction — in
 // order, reporting each to stderr, and returns the possibly-modified text.
@@ -365,7 +390,7 @@ func runDetectionStderr(text string, o securityOpts) {
 
 	// --detect-injection: report pattern, encoding, and invisible-char findings.
 	if o.detectInjection {
-		reportInjection(text, o.injectionThreshold)
+		reportInjection(text, o)
 	}
 
 	// --detect-ai: excess-vocabulary AI content scoring (Kobak et al. 2024).
@@ -401,14 +426,16 @@ func reportAIDetection(text, lang, wordlistDir string) {
 
 // reportInjection runs invisible-character and Detect analysis on text and writes
 // the findings to stderr, splitting pattern findings from outlier sentences.
-func reportInjection(text string, threshold float64) {
+func reportInjection(text string, o securityOpts) {
+	threshold := o.injectionThreshold
 	if inv := tldt.ReportInvisibles(text); len(inv) > 0 {
 		fmt.Fprintf(os.Stderr, "injection-detect: %d invisible Unicode codepoint(s) found\n", len(inv))
 		for _, r := range inv {
 			fmt.Fprintf(os.Stderr, "  offset %d: U+%04X %s (%s)\n", r.Offset, r.Rune, r.Name, r.Category)
 		}
 	}
-	dresult, err := tldt.Detect(text, tldt.DetectOptions{OutlierThreshold: threshold})
+	layers := o.resolveLayers()
+	dresult, err := tldt.Detect(text, tldt.DetectOptions{OutlierThreshold: threshold, Layers: &layers})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "detection error:", err)
 		os.Exit(1)
@@ -448,10 +475,12 @@ func reportInjection(text string, threshold float64) {
 // (readability, document converters) but present in raw HTML/PDF/DOCX/XLSX and
 // readable by LLMs — this is the dedicated scan for that blind spot.
 // Each surface is scanned individually; findings are labeled with source and index.
-func reportHiddenSurfaces(surfs []tldt.HiddenSurface, threshold float64) {
+func reportHiddenSurfaces(surfs []tldt.HiddenSurface, o securityOpts) {
+	threshold := o.injectionThreshold
+	layers := o.resolveLayers()
 	var totalFindings int
 	for i, s := range surfs {
-		dresult, err := tldt.Detect(s.Text, tldt.DetectOptions{OutlierThreshold: threshold})
+		dresult, err := tldt.Detect(s.Text, tldt.DetectOptions{OutlierThreshold: threshold, Layers: &layers})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "injection-detect[%s:%d]: detection error: %v\n", s.Source, i, err)
 			continue
@@ -492,6 +521,25 @@ func extractDocumentSurfaces(filePath string, data []byte) []tldt.HiddenSurface 
 		return extractor.ExtractXLSX(data)
 	case strings.HasSuffix(lower, ".pdf"):
 		return extractor.ExtractPDF(data)
+	case strings.HasSuffix(lower, ".pptx"):
+		return extractor.ExtractPPTX(data)
+	case strings.HasSuffix(lower, ".ipynb"):
+		return extractor.ExtractIPYNB(data)
+	case strings.HasSuffix(lower, ".md"), strings.HasSuffix(lower, ".markdown"):
+		return extractor.ExtractMarkdown(data)
+	case strings.HasSuffix(lower, ".epub"):
+		return extractor.ExtractEPUB(data)
+	case strings.HasSuffix(lower, ".eml"):
+		return extractor.ExtractEML(data)
+	case strings.HasSuffix(lower, ".svg"):
+		return extractor.ExtractSVG(data)
+	case strings.HasSuffix(lower, ".jpg"), strings.HasSuffix(lower, ".jpeg"),
+		strings.HasSuffix(lower, ".png"), strings.HasSuffix(lower, ".tiff"),
+		strings.HasSuffix(lower, ".webp"):
+		return extractor.ExtractImageMetadata(data)
+	case strings.HasSuffix(lower, ".html"), strings.HasSuffix(lower, ".htm"):
+		surfs := extractor.ExtractHTML(data)
+		return append(surfs, extractor.DifferentialHTML(data)...)
 	}
 	return nil
 }

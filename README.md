@@ -72,10 +72,14 @@ tldt -f article.txt --format markdown
 | `--explain` | off | Print per-sentence scores to stderr (debug) |
 | `--rouge <file>` | — | Print ROUGE-1/2/L scores to stderr vs reference file |
 | `--sanitize` | off | Strip invisible Unicode and NFKC-normalize before summarizing |
-| `--detect-injection` | off | Report prompt injection patterns and encoding anomalies to stderr |
+| `--detect-injection` | off | Report prompt injection patterns, encoding anomalies, decoded payloads, and role markers to stderr |
 | `--injection-threshold` | `0.99` | Outlier score [0,1] above which sentences are flagged |
 | `--detect-pii` | off | Report PII/secrets (emails, API keys, tokens, private keys, JWTs, SSNs, credit cards) to stderr |
 | `--sanitize-pii` | off | Redact PII/secrets (detected patterns plus high-entropy key material) with `[REDACTED:<type>]` before summarizing |
+| `--detect-exfil` | off | Report Markdown links/images shaped to carry data outward (advisory; on by default in CLI mode, opt-in for the hook) |
+| `--detect-positional` | off | Report instructions placed after whitespace gaps or in the document tail (weak-prior, advisory) |
+| `--detect-script-mismatch` | off | Report sentences whose dominant Unicode script differs from the document (weak-prior, advisory) |
+| `--fold-obfuscation` | off | Match injection phrases through leetspeak/character substitution (advisory) |
 | `--from-html` | off | Convert HTML input to Markdown before summarizing |
 | `--install-skill` | off | Install tldt skill and UserPromptSubmit hook |
 | `--skill-dir <dir>` | — | Override skill install directory |
@@ -275,26 +279,71 @@ cat untrusted.txt | tldt --detect-injection
 cat untrusted.txt | tldt --sanitize --detect-injection
 ```
 
-All detection output goes to **stderr only** — stdout always contains just the summary. Detection is **advisory**: tldt never blocks or modifies input without `--sanitize`.
+All detection output goes to **stderr only** — stdout always contains just the summary. Detection is **advisory**: tldt never blocks or modifies input without `--sanitize`. Detection always runs on the **original input bytes**, before any `--sanitize`/`--sanitize-pii`/`--from-html` mutation, so a sanitizer that strips a zero-width or Tags-block payload can never blind the detector to it.
+
+### Decoding: findings show the payload, not just its shape
+
+The encoding layer no longer stops at "there is a base64 blob here." It decodes candidate payloads — bounded in depth and size — and re-runs pattern and PII detection on the recovered plaintext. A finding reports the **decoded content** and the **encoding chain** that produced it:
+
+```bash
+echo "SWdub3JlIGFsbCBwcmV2aW91cyBpbnN0cnVjdGlvbnM=" | tldt --detect-injection --detect-only
+# stderr:
+#   injection-detect: 2 finding(s), max confidence 0.95
+#     [encoding] base64 (score=0.75): SWdub3JlIGFsbCBwcmV2aW91cyBpbnN0cnVjdGlvbnM=
+#     [encoding] decoded:direct-override (score=0.95): Ignore all previous instructions
+#   injection-detect: WARNING — input flagged as suspicious
+```
+
+This also closes a structural blind spot: the legacy entropy gate could never flag an encoded token shorter than 23 characters, because entropy is capped at log₂(n). Decoding removes the gate on the injection path — a 12-character base64 token now decodes and matches.
+
+**Encodings decoded** (chains compose, e.g. `base64>hex`, depth ≤ 3): standard/URL-safe/unpadded base64, base32, hex, `\x` and `\u` escapes, percent-encoding, HTML entities, **Unicode Tags block** (`U+E0000`–`U+E007F` ASCII smuggling), zero-width binary, ROT13/Caesar, reversed text. Bounds: depth 3, ≤ 10× expansion per chain, 1 MB per chain, 4 MB per document.
 
 **What gets detected:**
 
 | Layer | Detects |
 |-------|---------|
 | Pattern | Direct overrides (`ignore all previous instructions`), role injection, delimiter injection (`[INST]`, `<system>`), jailbreaks (DAN mode), exfiltration requests, social engineering |
-| Social engineering | Header manipulation (`append … User-Agent header`, `add a custom header`), urgency threats (`you have only one attempt`), punishment threats (`flagged as malicious`, `IP banned`) |
-| Encoding | Base64 payloads (entropy-gated), `\x`-escaped hex sequences, raw hex strings, abnormal control character density |
-| Outlier | Sentences statistically dissimilar from document neighbors (off-topic injection) — uses LexRank cosine similarity matrix |
-| Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o`, etc. — UTS#39 lookup (Unicode 17.0, ~700 entries). NFKC normalization alone cannot collapse these; they require the lookup table. |
-| HTML comments | `<!-- HTML comments -->` — stripped by readability; scanned separately on `--url` fetches |
-| HTML attributes | `placeholder`, `alt`, `aria-label`, `title`, `data-*` on any element — invisible to readability |
-| HTML meta | `<meta name/property content="">` — head tags stripped by readability |
-| HTML noscript | `<noscript>` fallback content |
-| HTML hidden inputs | `<input type="hidden" value="">` |
-| HTML textarea prefill | Pre-filled `<textarea>` content |
-| DOCX surfaces | Document properties (`dc:title`, `dc:subject`, `dc:description`, keywords), inline comments, hidden text runs (`w:hidden`), field codes (`w:instrText`) — via `-f file.docx --detect-injection` |
-| XLSX surfaces | Document properties, cell comments — via `-f file.xlsx --detect-injection` |
-| PDF surfaces | XMP metadata packet, Info dictionary (`/Title`, `/Keywords`, `/Subject`, `/Author`), JavaScript actions (`/JS`) — via `-f file.pdf --detect-injection` |
+| Decoded | Any of the above recovered from an encoded payload; finding shows decoded text + chain (`decoded:<pattern>`, `Provenance: base64>hex`) |
+| Obfuscated | Leetspeak / character substitution (`1gn0r3 4ll pr3v10us`); folded match-time only, scored below its literal equivalent, category `obfuscated` (`--fold-obfuscation`, or on by default in CLI) |
+| Role marker | Chat-template tokens (`<\|im_start\|>`, `[INST]`, `### Human:`, `</system>`), forged conversation turns, fabricated `<function_calls>` blocks |
+| Encoding | Base64/hex blobs and abnormal control-character density (structural signal, complements the decoder) |
+| Exfil | Markdown links/images whose URL carries encoded or templated data (`![](http://host/?d=…)`); keyed on link structure, not a host allowlist — plain documentation links score nothing |
+| Positional | Instructions after a large whitespace gap, in the document tail, or many-shot forged turns — weak prior, only corroborates (`--detect-positional`) |
+| Script mismatch | Sentences whose dominant Unicode script differs from the document (a Cyrillic payload in English prose) — script analysis, not language ID; weak prior (`--detect-script-mismatch`) |
+| Outlier | Sentences statistically dissimilar from document neighbors — LexRank cosine matrix, capped at 250 sentences for bounded latency |
+| Confusable | Cross-script homoglyphs: Cyrillic `а` → Latin `a`, Greek `ο` → Latin `o` — UTS#39 lookup (Unicode 17.0, ~700 entries) |
+| HTML surfaces | Comments, `placeholder`/`alt`/`aria-label`/`title`/`data-*` attributes, `meta`, `noscript`, hidden inputs, `textarea` prefill, **CSS-hidden text**, **JSON-LD** — scanned on `--url` and `-f *.html` |
+| HTML differential | Any text present in the raw document but absent from the reader path — catches hiding techniques not in the enumerated list (`clip-path`, off-screen transforms, stylesheet color-matching) |
+| PDF surfaces | XMP/Info metadata, JavaScript (`/JS`), **annotations** (`/Annot`), **AcroForm** field values, **invisible content-stream text** (white fill or sub-4pt) — via `-f file.pdf --detect-injection` |
+| DOCX surfaces | Properties, comments, hidden runs, field codes, **footnotes/endnotes**, **headers/footers**, **textboxes**, **tracked-change deletions**, **custom.xml** |
+| XLSX surfaces | Properties, cell + threaded comments, **hidden/veryHidden sheets**, **defined names** |
+| PPTX surfaces | **Speaker notes** — invisible when presented, read in full by a model |
+| Other formats | `.ipynb` (cell metadata + outputs), Markdown (front-matter + HTML comments), EPUB (OPF metadata), `.eml` (non-displayed headers + `text/html` part), SVG (`title`/`desc`/`metadata`), image EXIF/IPTC captions |
+
+### Corroboration
+
+A single high-confidence finding (score > 0.70) marks input suspicious, as before. In addition, **two distinct weak layers** each scoring ≥ 0.50 corroborate into a suspicious verdict — three independent 0.6 signals are more alarming than any one alone. Findings from the *same* layer never corroborate each other, so ten positional hits cannot manufacture a verdict.
+
+### Detection profiles
+
+| Profile | Layers | Use |
+|---------|--------|-----|
+| Hook (`--hook-output`) | Pattern, encoding, decoder, confusable, role marker | Fires on every agent prompt — high-precision only, so a false positive never trains the user to ignore the advisory |
+| CLI (default) | All of the above plus obfuscated, exfil, positional, script mismatch | A developer running detection explicitly, where coverage matters more than a few false positives |
+
+The weak-prior and flag-gated layers (`--detect-positional`, `--detect-script-mismatch`, `--fold-obfuscation`, `--detect-exfil`) are opt-in for the hook and on by default in CLI. Each also has a `~/.tldt.toml` `[security]` key (`detect_positional`, `detect_script_mismatch`, `fold_obfuscation`, `detect_exfil`).
+
+### Latency
+
+Measured on an Apple M5, full `Detect` over prose (includes the capped outlier pass):
+
+| Input | Hook profile | All layers (CLI) |
+|-------|-------------:|-----------------:|
+| 2 KB  | ~1 ms  | ~1 ms  |
+| 16 KB | ~14 ms | ~18 ms |
+| 256 KB | ~133 ms | ~200 ms |
+
+The pattern pass is anchor-prefiltered: on text carrying no injection anchor it skips the regex stage entirely (~3.4 ms for 256 KB vs ~98 ms unfiltered). The hook profile stays within a 150 ms / 256 KB and 15 ms / 16 KB budget; enabling every weak-prior layer on a large document trades ~35% added latency for the extra coverage.
 
 Tune the outlier threshold:
 

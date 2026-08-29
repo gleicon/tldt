@@ -38,17 +38,116 @@ type Finding struct {
 	Score    float64 // 0.0–1.0 confidence estimate
 	Pattern  string  // pattern/detector name that triggered
 	Excerpt  string  // up to 80 chars of matched/suspicious content
+
+	// Provenance records how the matched text was recovered when it was not
+	// present literally in the input: an encoding chain such as "base64" or
+	// "percent>base64", or a hidden-surface source such as "pdf:annotation".
+	// Empty for findings matched directly against the caller's text.
+	Provenance string
 }
 
 // Report aggregates all findings from a full analysis pass.
 type Report struct {
-	Findings   []Finding
-	MaxScore   float64
-	Suspicious bool // MaxScore > DefaultDetectionThreshold
+	Findings []Finding
+	MaxScore float64
+
+	// CorroboratingLayers counts distinct detection categories that produced a
+	// finding at or above CorroborationFloor. Two or more is sufficient for
+	// Suspicious on its own.
+	CorroboratingLayers int
+
+	// Suspicious is true when MaxScore exceeds DefaultDetectionThreshold, or when
+	// CorroboratingLayers is at least 2.
+	Suspicious bool
 }
 
 // DefaultDetectionThreshold is the score above which a report is marked Suspicious.
 const DefaultDetectionThreshold = 0.70
+
+// CorroborationFloor is the score at which a finding counts as corroborating
+// evidence. Two findings from *distinct* layers at or above this floor mark a
+// report suspicious even when neither reaches DefaultDetectionThreshold.
+//
+// Rationale: a pure max is sound only while every layer is high-precision. Once
+// weak-prior layers exist (positional placement, script mismatch, obfuscated
+// matches), three independent 0.6 signals are far more alarming than any one of
+// them, yet max would report 0.6 and leave the verdict clean. Restricting
+// compounding to distinct layers stops ten findings from a single weak layer
+// manufacturing a verdict on their own.
+//
+// The value is calibrated against the false-positive corpus by
+// TestCorroborationFloorCalibration rather than asserted here.
+const CorroborationFloor = 0.5
+
+// Recompute refreshes MaxScore and Suspicious from the current Findings slice.
+// Callers that append findings after Analyze (notably the outlier pass, which
+// needs a similarity matrix Analyze does not build) must call this to keep the
+// verdict consistent with the evidence.
+func (r *Report) Recompute() {
+	var maxScore float64
+	layers := make(map[Category]bool)
+	for _, f := range r.Findings {
+		// Outlier scores are a dissimilarity metric on a different scale — a
+		// normal sentence scores ~0.97 — so they never contribute to MaxScore or
+		// to corroboration. Including them would mark every document suspicious.
+		if f.Category == CategoryOutlier {
+			continue
+		}
+		if f.Score > maxScore {
+			maxScore = f.Score
+		}
+		if f.Score >= CorroborationFloor {
+			layers[f.Category] = true
+		}
+	}
+	r.MaxScore = maxScore
+	r.CorroboratingLayers = len(layers)
+	r.Suspicious = maxScore > DefaultDetectionThreshold || len(layers) >= 2
+}
+
+// MaxOutlierSentences caps the number of sentences fed to the outlier pass.
+//
+// Outlier detection consumes an n×n LexRank similarity matrix, so its cost is
+// quadratic in sentence count. Measured on an Apple M5, the uncapped pipeline ran
+// 57.6 ms at 32 KB, 199 ms at 64 KB and 2873 ms at 256 KB — doubling ratios of
+// 3.4–3.9x.
+//
+// The value is set from measurement rather than intuition: 208 sentences costs
+// ~43 ms, and quadratic scaling puts 400 sentences at ~160 ms, which alone
+// exceeds the whole-pipeline budget. 250 sentences costs ~62 ms and leaves room
+// for the rest of the pipeline.
+//
+// This is unrelated to the CLI's 2000-sentence input cap, which bounds
+// summarization rather than detection. 2000 sentences is 4M similarity
+// computations and was never a latency bound for this pass.
+const MaxOutlierSentences = 250
+
+// SampleSentences reduces sentences to at most MaxOutlierSentences by taking an
+// evenly spaced sample, and returns the sample alongside the original index of
+// each retained sentence. Even spacing rather than truncation keeps coverage
+// across the whole document: an injection planted in the final paragraph of a long
+// file is exactly the case truncation would miss.
+func SampleSentences(sentences []string) (sample []string, originalIndex []int) {
+	if len(sentences) <= MaxOutlierSentences {
+		idx := make([]int, len(sentences))
+		for i := range sentences {
+			idx[i] = i
+		}
+		return sentences, idx
+	}
+	sample = make([]string, 0, MaxOutlierSentences)
+	originalIndex = make([]int, 0, MaxOutlierSentences)
+	step := float64(len(sentences)) / float64(MaxOutlierSentences)
+	for i := 0; i < MaxOutlierSentences; i++ {
+		j := int(float64(i) * step)
+		if j >= len(sentences) {
+			j = len(sentences) - 1
+		}
+		sample = append(sample, sentences[j])
+		originalIndex = append(originalIndex, j)
+	}
+	return sample, originalIndex
+}
 
 // DefaultOutlierThreshold is the outlier_score above which a sentence is flagged.
 // outlier_score(i) = 1 - mean(sim[i][j] for j ≠ i).
@@ -63,10 +162,112 @@ const DefaultOutlierThreshold = 0.99
 // --- Pattern detection ---
 
 // patternDef pairs a human-readable name with a compiled regex and confidence score.
+//
+// anchors is a conjunction of disjunctions: every group must contribute at least
+// one literal present in the input before re is executed. Anchors are necessary
+// conditions for a match, never sufficient ones — a pattern whose anchors all hit
+// still has to match its regex. Getting an anchor wrong in the other direction
+// (listing a literal the regex does not require) silently disables the pattern,
+// which is why TestPatternAnchorCoverage asserts every pattern against a known
+// matching sample.
 type patternDef struct {
 	name       string
 	re         *regexp.Regexp
 	confidence float64
+	anchors    [][]string
+}
+
+// preparedPattern resolves case folding once at init. Patterns written with the
+// (?i) flag are recompiled without it and matched against an ASCII-lowercased copy
+// of the input; case-sensitive patterns keep their original regex and match the
+// original bytes. Folding once for the whole set costs one pass over the input
+// instead of one per pattern.
+type preparedPattern struct {
+	patternDef
+	folded bool // match against the lowercased copy rather than the original
+}
+
+// preparedPatterns is injectionPatterns with (?i) hoisted out of each regex.
+var preparedPatterns = preparePatterns(injectionPatterns)
+
+func preparePatterns(defs []patternDef) []preparedPattern {
+	out := make([]preparedPattern, 0, len(defs))
+	for _, d := range defs {
+		src := d.re.String()
+		if rest, ok := strings.CutPrefix(src, "(?i)"); ok {
+			if c, bad := uppercaseLiteral(rest); bad {
+				// Hoisting (?i) makes the pattern case-sensitive against
+				// lowercased text, so an uppercase literal would silently stop
+				// matching. Fail at init rather than lose a detector quietly.
+				panic("detector: case-insensitive pattern " + d.name +
+					" contains uppercase literal " + string(c) + "; write it lowercase")
+			}
+			d.re = regexp.MustCompile(rest)
+			out = append(out, preparedPattern{patternDef: d, folded: true})
+			continue
+		}
+		out = append(out, preparedPattern{patternDef: d})
+	}
+	return out
+}
+
+// uppercaseLiteral reports the first uppercase ASCII letter in a regex source
+// that is not part of an escape sequence. Escapes are skipped because \\W, \\S and
+// \\B mean the opposite of their lowercase forms.
+func uppercaseLiteral(src string) (byte, bool) {
+	for i := 0; i < len(src); i++ {
+		if src[i] == '\\' {
+			i++ // skip the escaped character, whatever its case
+			continue
+		}
+		if src[i] >= 'A' && src[i] <= 'Z' {
+			return src[i], true
+		}
+	}
+	return 0, false
+}
+
+// asciiLower lowercases A-Z and leaves every other byte untouched. Unlike
+// strings.ToLower it is length-preserving, so byte offsets into the result index
+// the original text exactly — required because findings must report offsets into
+// the caller's input (see FR-9). Every injection pattern is ASCII, so restricting
+// the fold to ASCII loses nothing.
+func asciiLower(s string) string {
+	hasUpper := false
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' && s[i] <= 'Z' {
+			hasUpper = true
+			break
+		}
+	}
+	if !hasUpper {
+		return s
+	}
+	b := []byte(s)
+	for i := range b {
+		if b[i] >= 'A' && b[i] <= 'Z' {
+			b[i] += 'a' - 'A'
+		}
+	}
+	return string(b)
+}
+
+// anchorsPresent reports whether every anchor group has at least one literal in
+// lower. An empty anchor set means the pattern always runs.
+func anchorsPresent(lower string, anchors [][]string) bool {
+	for _, group := range anchors {
+		hit := false
+		for _, lit := range group {
+			if strings.Contains(lower, lit) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
 }
 
 // injectionPatterns is the canonical set of known injection patterns.
@@ -78,96 +279,116 @@ var injectionPatterns = []patternDef{
 		name:       "direct-override",
 		re:         regexp.MustCompile(`(?i)ignore\s+(all\s+)?(previous|prior|above)\s+instructions?`),
 		confidence: 0.95,
+		anchors:    [][]string{{"ignore"}, {"instruction"}},
 	},
 	{
 		name:       "direct-override",
 		re:         regexp.MustCompile(`(?i)disregard\s+(all\s+)?(the\s+)?(previous|prior|above|following)`),
 		confidence: 0.90,
+		anchors:    [][]string{{"disregard"}},
 	},
 	{
 		name:       "direct-override",
 		re:         regexp.MustCompile(`(?i)forget\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|context|conversation)`),
 		confidence: 0.90,
+		anchors:    [][]string{{"forget"}},
 	},
 	// Role injection
 	{
 		name:       "role-injection",
 		re:         regexp.MustCompile(`(?i)you\s+are\s+now\s+(a|an)\s+\w+`),
 		confidence: 0.80,
+		anchors:    [][]string{{"you"}, {"are"}, {"now"}},
 	},
 	{
 		name:       "role-injection",
 		re:         regexp.MustCompile(`(?i)(act|behave|pretend|respond)\s+as\s+(if\s+)?(you\s+(are|were|have|had))`),
 		confidence: 0.75,
+		anchors:    [][]string{{"act", "behave", "pretend", "respond"}, {"as"}, {"you"}},
 	},
 	{
 		name:       "role-injection",
 		re:         regexp.MustCompile(`(?i)your\s+(new\s+)?(role|persona|character|identity)\s+is`),
 		confidence: 0.80,
+		anchors:    [][]string{{"your"}, {"role", "persona", "character", "identity"}, {"is"}},
 	},
 	// Delimiter injection (model-specific special tokens)
 	{
 		name:       "delimiter-injection",
 		re:         regexp.MustCompile(`(?i)<\s*/?\s*(system|instructions?|prompt|context)\s*>`),
 		confidence: 0.85,
+		anchors:    [][]string{{"<"}, {"system", "instruction", "prompt", "context"}},
 	},
 	{
 		name:       "delimiter-injection",
 		re:         regexp.MustCompile(`(?i)---+\s*(begin|end|start)\s+(system\s+)?prompt\s*---+`),
 		confidence: 0.90,
+		anchors:    [][]string{{"---"}, {"begin", "end", "start"}, {"prompt"}},
 	},
 	{
 		name:       "delimiter-injection",
 		re:         regexp.MustCompile(`\[/?INST\]`),
 		confidence: 0.85,
+		anchors:    [][]string{{"inst]"}},
 	},
 	{
 		name:       "delimiter-injection",
 		re:         regexp.MustCompile(`\|im_(start|end)\|`),
 		confidence: 0.90,
+		anchors:    [][]string{{"|im_"}},
 	},
 	{
 		name:       "delimiter-injection",
 		re:         regexp.MustCompile(`(?i)###\s*(instruction|system|prompt|context|task)`),
 		confidence: 0.80,
+		anchors:    [][]string{{"###"}, {"instruction", "system", "prompt", "context", "task"}},
 	},
 	// Conversational role prefixes (context-dependent — moderate confidence)
 	{
 		name:       "role-prefix",
 		re:         regexp.MustCompile(`(?m)^(System|Assistant|Human|User)\s*:\s*.{10,}`),
 		confidence: 0.65,
+		anchors:    [][]string{{"system", "assistant", "human", "user"}},
 	},
 	// Jailbreak patterns
 	{
-		name:       "jailbreak",
-		re:         regexp.MustCompile(`(?i)\bDAN\b.{0,30}(mode|enabled|activated|persona)`),
+		name: "jailbreak",
+		// Literal is written lowercase because (?i) is hoisted out at init and
+		// the regex runs against an ASCII-lowercased copy; see preparePatterns.
+		re:         regexp.MustCompile(`(?i)\bdan\b.{0,30}(mode|enabled|activated|persona)`),
 		confidence: 0.85,
+		anchors:    [][]string{{"dan"}, {"mode", "enabled", "activated", "persona"}},
 	},
 	{
 		name:       "jailbreak",
 		re:         regexp.MustCompile(`(?i)(developer|jailbreak|unrestricted|unfiltered)\s+mode`),
 		confidence: 0.80,
+		anchors:    [][]string{{"developer", "jailbreak", "unrestricted", "unfiltered"}, {"mode"}},
 	},
 	{
 		name:       "jailbreak",
 		re:         regexp.MustCompile(`(?i)pretend\s+(you\s+have\s+no|there\s+are\s+no)\s+(restrictions?|guidelines?|rules?|limits?)`),
 		confidence: 0.85,
+		anchors:    [][]string{{"pretend"}, {"no"}, {"restriction", "guideline", "rule", "limit"}},
 	},
 	// Exfiltration patterns
 	{
 		name:       "exfiltration",
 		re:         regexp.MustCompile(`(?i)(repeat|print|output|reveal|show|display)\s+(everything|all(thing)?s?)?\s*(above|before|prior|from\s+the\s+(beginning|start))`),
 		confidence: 0.80,
+		anchors:    [][]string{{"repeat", "print", "output", "reveal", "show", "display"}, {"above", "before", "prior", "beginning", "start"}},
 	},
 	{
 		name:       "exfiltration",
 		re:         regexp.MustCompile(`(?i)(what\s+(are|were)\s+your\s+(instructions?|system\s+prompt|guidelines?))`),
 		confidence: 0.75,
+		anchors:    [][]string{{"what"}, {"your"}, {"instruction", "system", "guideline"}},
 	},
 	{
 		name:       "exfiltration",
 		re:         regexp.MustCompile(`(?i)(print|output|show|display|repeat|reveal)\s+your\s+(system\s+)?(prompt|instructions?)`),
 		confidence: 0.85,
+		anchors:    [][]string{{"print", "output", "show", "display", "repeat", "reveal"}, {"your"}, {"prompt", "instruction"}},
 	},
 	// Social engineering — behavioral manipulation via urgency, threats, or
 	// covert instruction injection (e.g. hidden in HTML comments or metadata).
@@ -177,38 +398,63 @@ var injectionPatterns = []patternDef{
 		name:       "social-engineering",
 		re:         regexp.MustCompile(`(?i)(append|add)\s+.{0,60}(user.?agent|custom\s+header)`),
 		confidence: 0.75,
+		anchors:    [][]string{{"append", "add"}, {"agent", "header"}},
 	},
 	{
 		// Matches "you have only one attempt", "you only have one chance", etc.
 		name:       "social-engineering",
 		re:         regexp.MustCompile(`(?i)you\s+(have\s+only|only\s+have)\s+(one|1|a\s+single)\s+(attempt|chance|try|shot)`),
 		confidence: 0.85,
+		anchors:    [][]string{{"you"}, {"only"}, {"attempt", "chance", "try", "shot"}},
 	},
 	{
 		// Matches "flagged as malicious", "IP banned", "have your IP banned", etc.
 		name:       "social-engineering",
 		re:         regexp.MustCompile(`(?i)(flagged?\s+as\s+malicious|ip\s+ban(ned)?|have\s+your\s+ip\s+ban)`),
 		confidence: 0.80,
+		anchors:    [][]string{{"malicious", "ban"}},
 	},
 }
 
 // DetectPatterns scans text for known injection phrases.
 // Returns one Finding per pattern match. Text is not modified.
+//
+// The input is ASCII-lowercased once and each pattern is gated behind a literal
+// anchor check before its regex runs. On text containing no anchor the regex pass
+// is skipped entirely; see BenchmarkPatternPass for the measured effect.
 func DetectPatterns(text string) []Finding {
+	return detectPatternsIn(text, "")
+}
+
+// detectPatternsIn is DetectPatterns with optional provenance stamped onto every
+// finding. provenance is empty for direct scans and carries an encoding chain
+// (for example "base64") when the text was recovered by the decoder.
+func detectPatternsIn(text, provenance string) []Finding {
+	return detectPatternsWithLower(text, asciiLower(text), provenance)
+}
+
+func detectPatternsWithLower(text, lower, provenance string) []Finding {
 	var findings []Finding
-	for _, p := range injectionPatterns {
-		matches := p.re.FindAllStringIndex(text, -1)
-		for _, loc := range matches {
+	for _, p := range preparedPatterns {
+		if !anchorsPresent(lower, p.anchors) {
+			continue
+		}
+		subject := text
+		if p.folded {
+			subject = lower
+		}
+		for _, loc := range p.re.FindAllStringIndex(subject, -1) {
 			start, end := loc[0], loc[1]
-			excerpt := text[start:end]
-			excerpt = truncateExcerpt(excerpt, 80, "…")
+			// Excerpt always quotes the original bytes, never the folded copy.
+			excerpt := truncateExcerpt(text[start:end], 80, "…")
 			findings = append(findings, Finding{
-				Category: CategoryPattern,
-				Sentence: -1,
-				Offset:   start,
-				Score:    p.confidence,
-				Pattern:  p.name,
-				Excerpt:  excerpt,
+				Category:   CategoryPattern,
+				Sentence:   -1,
+				Offset:     start,
+				Score:      p.confidence,
+				Pattern:    p.name,
+				Excerpt:    excerpt,
+				Provenance: provenance,
 			})
 		}
 	}
@@ -662,23 +908,89 @@ func SanitizePII(text string) (string, []Finding) {
 // Analyze runs pattern, encoding, and confusable-homoglyph detectors against text
 // and returns a combined Report. Outlier detection requires a precomputed similarity
 // matrix and is handled separately (DetectOutliers) because it requires the LexRank matrix.
+// Layers selects which detection layers run. The zero value runs nothing; use
+// DefaultLayers or HookLayers rather than constructing one field by field.
+type Layers struct {
+	Patterns    bool
+	Encoding    bool
+	Confusables bool
+	Decode      bool
+	Role        bool
+	Obfuscated  bool
+	Exfil       bool
+	Positional  bool
+	Script      bool
+}
+
+// DefaultLayers enables every layer. This is the CLI default: a developer running
+// tldt over a document explicitly is paying attention to the output, so breadth is
+// worth more than precision.
+func DefaultLayers() Layers {
+	return Layers{
+		Patterns: true, Encoding: true, Confusables: true, Decode: true,
+		Role: true, Obfuscated: true, Exfil: true, Positional: true, Script: true,
+	}
+}
+
+// HookLayers enables only the high-precision layers.
+//
+// Hook mode fires on every agent prompt, so a false positive injects an advisory
+// into a real user's turn again and again. That cost is paid constantly while the
+// false-negative cost is paid rarely, and a noisy advisory is one the user learns
+// to ignore — which would cost the precise layers their value too. The weak-prior
+// layers (positional placement, script mismatch, obfuscation folding) and the
+// flag-gated exfil layer stay off unless explicitly enabled.
+func HookLayers() Layers {
+	return Layers{
+		Patterns: true, Encoding: true, Confusables: true, Decode: true, Role: true,
+	}
+}
+
+// Analyze runs every detection layer over text. Equivalent to
+// AnalyzeWith(text, DefaultLayers()).
 func Analyze(text string) Report {
+	return AnalyzeWith(text, DefaultLayers())
+}
+
+// AnalyzeWith runs the selected detection layers over text.
+//
+// Sentence-scoped layers are not run here: the outlier pass needs a similarity
+// matrix and script mismatch needs a sentence split, both of which live above this
+// package. See tldt.Detect.
+func AnalyzeWith(text string, layers Layers) Report {
 	var allFindings []Finding
 
-	allFindings = append(allFindings, DetectPatterns(text)...)
-	allFindings = append(allFindings, DetectEncoding(text)...)
-	allFindings = append(allFindings, DetectConfusables(text)...)
+	// The ASCII-lowercased copy is shared across every layer that needs it.
+	// Computing it once rather than per layer removes several 256 KB allocations
+	// per call — measured ~44 ms of GC churn at 256 KB with all layers enabled.
+	lower := asciiLower(text)
 
-	var maxScore float64
-	for _, f := range allFindings {
-		if f.Score > maxScore {
-			maxScore = f.Score
-		}
+	if layers.Patterns {
+		allFindings = append(allFindings, detectPatternsWithLower(text, lower, "")...)
+	}
+	if layers.Encoding {
+		allFindings = append(allFindings, DetectEncoding(text)...)
+	}
+	if layers.Confusables {
+		allFindings = append(allFindings, DetectConfusables(text)...)
+	}
+	if layers.Decode {
+		allFindings = append(allFindings, DetectDecoded(text)...)
+	}
+	if layers.Role {
+		allFindings = append(allFindings, detectRoleMarkersIn(text, lower)...)
+	}
+	if layers.Obfuscated {
+		allFindings = append(allFindings, detectObfuscatedIn(text, lower)...)
+	}
+	if layers.Exfil {
+		allFindings = append(allFindings, DetectExfil(text)...)
+	}
+	if layers.Positional {
+		allFindings = append(allFindings, detectPositionalIn(text, lower)...)
 	}
 
-	return Report{
-		Findings:   allFindings,
-		MaxScore:   maxScore,
-		Suspicious: maxScore > DefaultDetectionThreshold,
-	}
+	report := Report{Findings: allFindings}
+	report.Recompute()
+	return report
 }

@@ -24,16 +24,15 @@ type AIDetectLinguisticJSON struct {
 // Score is the combined (Kobak + linguistic) score. KobakScore is the
 // excess-vocabulary score alone (0.6*density + 0.4*variety).
 type AIDetectJSON struct {
-	Score      float64                `json:"score"`
-	KobakScore float64                `json:"kobak_score"`
-	Density    float64                `json:"density"`
-	Variety    float64                `json:"variety"`
-	Verdict    string                 `json:"verdict"`
-	Lang       string                 `json:"lang"`
-	Markers    []string               `json:"markers"`
+	Score      float64                 `json:"score"`
+	KobakScore float64                 `json:"kobak_score"`
+	Density    float64                 `json:"density"`
+	Variety    float64                 `json:"variety"`
+	Verdict    string                  `json:"verdict"`
+	Lang       string                  `json:"lang"`
+	Markers    []string                `json:"markers"`
 	Linguistic *AIDetectLinguisticJSON `json:"linguistic,omitempty"`
 }
-
 
 // DetectFinding is one machine-readable detection result. Kind is one of
 // "pii", "injection", or "invisible". Excerpt carries the matched text for
@@ -50,9 +49,9 @@ type DetectFinding struct {
 }
 
 type DetectOutput struct {
-	Flagged     bool           `json:"flagged"`
+	Flagged     bool            `json:"flagged"`
 	Findings    []DetectFinding `json:"findings"`
-	AIDetection *AIDetectJSON  `json:"ai_detection,omitempty"`
+	AIDetection *AIDetectJSON   `json:"ai_detection,omitempty"`
 }
 
 // securityOpts selects which preprocessing/advisory stages run.
@@ -66,6 +65,39 @@ type securityOpts struct {
 	detectAI           bool
 	aiLang             string // "en", "pt-BR", "es"
 	aiWordlistDir      string // optional override directory
+
+	// layers selects the detection layers. nil means the full CLI default set;
+	// hook mode passes the high-precision subset. The opt-in weak-prior layers
+	// below flip individual bits on top of whichever base set is chosen.
+	layers           *tldt.Layers
+	detectExfil      bool
+	detectPositional bool
+	detectScript     bool
+	foldObfuscation  bool
+}
+
+// resolveLayers builds the layer set for a run: a base set (full for CLI, the
+// high-precision subset for hook mode) with the opt-in weak-prior layers turned on
+// individually. Keeping the opt-ins additive means enabling one never silently
+// disables a default layer.
+func (o securityOpts) resolveLayers() tldt.Layers {
+	base := tldt.DefaultLayers()
+	if o.layers != nil {
+		base = *o.layers
+	}
+	if o.detectExfil {
+		base.Exfil = true
+	}
+	if o.detectPositional {
+		base.Positional = true
+	}
+	if o.detectScript {
+		base.Script = true
+	}
+	if o.foldObfuscation {
+		base.Obfuscated = true
+	}
+	return base
 }
 
 // collectFindings excludes outlier sentences — summarization signal, not injection.
@@ -90,7 +122,11 @@ func collectFindings(text string, o securityOpts) ([]DetectFinding, error) {
 				Line:    r.Offset,
 			})
 		}
-		dres, err := tldt.Detect(text, tldt.DetectOptions{OutlierThreshold: o.injectionThreshold})
+		layers := o.resolveLayers()
+		dres, err := tldt.Detect(text, tldt.DetectOptions{
+			OutlierThreshold: o.injectionThreshold,
+			Layers:           &layers,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("injection detection: %w", err)
 		}
@@ -220,10 +256,12 @@ func runHookOutput(threshold float64) {
 	if prompt == "" {
 		return
 	}
+	hookLayers := tldt.HookLayers()
 	findings, err := collectFindings(prompt, securityOpts{
 		detectPII:          true,
 		detectInjection:    true,
 		injectionThreshold: threshold,
+		layers:             &hookLayers,
 	})
 	if err != nil || len(findings) == 0 {
 		return

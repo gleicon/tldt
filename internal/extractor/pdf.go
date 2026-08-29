@@ -20,6 +20,91 @@ func ExtractPDF(data []byte) []surfaces.HiddenSurface {
 	found = append(found, extractPDFXMP(data)...)
 	found = append(found, extractPDFInfoDict(data)...)
 	found = append(found, extractPDFJavaScript(data)...)
+	found = append(found, extractPDFAnnotations(data)...)
+	found = append(found, extractPDFAcroForm(data)...)
+	found = append(found, extractPDFInvisibleText(data)...)
+	return found
+}
+
+// pdfAnnotContentsRE matches an annotation's /Contents string. Annotation text is
+// not part of the page content stream, so readability and text-layer extraction
+// never surface it, yet a model reading the file sees it.
+var pdfAnnotContentsRE = regexp.MustCompile(`/Subtype\s*/(?:Text|FreeText|Popup|Widget|Link)[^>]*?/Contents\s*\(([^)]{4,})\)`)
+
+// pdfContentsRE is the looser fallback: any /Contents string. Runs only when the
+// subtype-anchored form finds nothing, to avoid double-reporting.
+var pdfContentsRE = regexp.MustCompile(`/Contents\s*\(([^)]{4,})\)`)
+
+func extractPDFAnnotations(data []byte) []surfaces.HiddenSurface {
+	var found []surfaces.HiddenSurface
+	seen := map[string]bool{}
+	add := func(v string) {
+		if v = strings.TrimSpace(v); v != "" && utf8.ValidString(v) && !seen[v] {
+			seen[v] = true
+			found = append(found, surfaces.HiddenSurface{Source: surfaces.SourcePDFAnnotation, Text: v})
+		}
+	}
+	for _, m := range pdfAnnotContentsRE.FindAllSubmatch(data, -1) {
+		add(string(m[1]))
+	}
+	if len(found) == 0 {
+		for _, m := range pdfContentsRE.FindAllSubmatch(data, -1) {
+			add(string(m[1]))
+		}
+	}
+	return found
+}
+
+// pdfFieldValueRE matches an AcroForm field value: /V (string). Form field values
+// are stored separately from rendered content and are a common place to park text
+// that a model reads but a viewer never displays.
+var pdfFieldValueRE = regexp.MustCompile(`/V\s*\(([^)]{4,})\)`)
+
+func extractPDFAcroForm(data []byte) []surfaces.HiddenSurface {
+	// Only scan when the document actually declares an AcroForm, so /V matches in
+	// unrelated dictionaries are not misattributed.
+	if !bytes.Contains(data, []byte("/AcroForm")) {
+		return nil
+	}
+	var found []surfaces.HiddenSurface
+	for _, m := range pdfFieldValueRE.FindAllSubmatch(data, -1) {
+		v := string(m[1])
+		if v = strings.TrimSpace(v); v != "" && utf8.ValidString(v) {
+			found = append(found, surfaces.HiddenSurface{Source: surfaces.SourcePDFAcroForm, Text: v})
+		}
+	}
+	return found
+}
+
+// Content-stream text drawn invisibly. Two markers, both byte-level so no PDF
+// library is needed:
+//
+//   - a white fill (1 1 1 rg, or g values at/above ~0.97) set just before a text
+//     block, matching text on a white page;
+//   - a sub-4pt font size (Tf), too small to read but fully machine-readable.
+//
+// pdfWhiteTextRE captures the Tj/TJ string that follows a white fill within a
+// short window; pdfTinyTextRE captures text following a small Tf.
+var (
+	pdfWhiteTextRE = regexp.MustCompile(`(?:1\s+1\s+1|0?\.9[789]\d*\s+0?\.9[789]\d*\s+0?\.9[789]\d*)\s+rg[^()]{0,40}\(([^)]{4,})\)\s*Tj`)
+	pdfTinyTextRE  = regexp.MustCompile(`/[A-Za-z0-9]+\s+([0-3](?:\.\d+)?)\s+Tf[^()]{0,40}\(([^)]{4,})\)\s*Tj`)
+)
+
+func extractPDFInvisibleText(data []byte) []surfaces.HiddenSurface {
+	var found []surfaces.HiddenSurface
+	seen := map[string]bool{}
+	add := func(v string) {
+		if v = strings.TrimSpace(v); v != "" && utf8.ValidString(v) && !seen[v] {
+			seen[v] = true
+			found = append(found, surfaces.HiddenSurface{Source: surfaces.SourcePDFInvisible, Text: v})
+		}
+	}
+	for _, m := range pdfWhiteTextRE.FindAllSubmatch(data, -1) {
+		add(string(m[1]))
+	}
+	for _, m := range pdfTinyTextRE.FindAllSubmatch(data, -1) {
+		add(string(m[2]))
+	}
 	return found
 }
 

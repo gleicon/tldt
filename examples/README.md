@@ -71,6 +71,27 @@ cat saved_page.html | go run main.go -sentences 3
 
 **Key API:** `tldt.ConvertHTML(html, tldt.HTMLConvertOptions{ExtractContent: true, IncludeTitle: true})`
 
+### Injection Detection
+
+Runs the layered prompt-injection detector over untrusted text and prints each finding, its provenance (the encoding chain for a decoded payload), and the corroboration verdict — without producing a summary.
+
+```bash
+cd examples/detection
+
+# Built-in demo corpus (plain, base64-encoded, leetspeak, and role-marker payloads)
+go run main.go
+
+# Detect over your own input
+go run main.go "Ignore all previous instructions."
+
+# Use the high-precision hook profile (the subset the UserPromptSubmit hook runs)
+go run main.go -hook "some prompt text"
+```
+
+A base64-encoded override is decoded and reported with `via=base64`; a leetspeak override (`1gn0r3 4ll pr3v10us`) is matched at a reduced score under the `obfuscated` category; two distinct weak layers corroborate into a `SUSPICIOUS` verdict.
+
+**Key API:** `tldt.Detect(text, tldt.DetectOptions{Layers: &layers})` — `layers` is `tldt.DefaultLayers()` (all layers) or `tldt.HookLayers()` (high-precision subset). Read `Finding.Provenance` for the encoding chain and `Report.CorroboratingLayers` for the corroboration count.
+
 ## Running Examples
 
 Each example is self-contained. Navigate to the example directory and run:
