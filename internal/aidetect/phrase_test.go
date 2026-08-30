@@ -117,10 +117,15 @@ func TestPhrasesDeduplicated(t *testing.T) {
 	}
 }
 
-// TestMalformedTemplateSkipped: a bad regex pattern must be skipped, not crash.
+// TestMalformedTemplateSkipped: a bad regex pattern must be skipped without
+// aborting the scan, and a valid pattern beside it must still match.
 func TestMalformedTemplateSkipped(t *testing.T) {
 	wl := wordlist{Templates: []string{"(unclosed", "valid.*pattern"}}
-	// Should not panic; the bad pattern is cached as nil and skipped.
 	_, templates := matchPhrases("this has a valid then pattern in it", wl)
-	_ = templates // may or may not match; the point is no panic
+	if len(templates) != 1 {
+		t.Fatalf("expected the valid template to match past the malformed one, got %v", templates)
+	}
+	if !strings.Contains(templates[0], "valid") {
+		t.Errorf("matched text %q should come from the valid pattern", templates[0])
+	}
 }
