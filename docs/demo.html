@@ -552,6 +552,30 @@
           </div>
         </div>
 
+        <!-- AI-detection Panel -->
+        <div class="panel" id="aiPanel" style="display: none;">
+          <div class="panel-header">
+            <span class="panel-title">AI-generated content</span>
+          </div>
+          <div id="aiBody" style="padding: 12px 16px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+              <span id="aiVerdict" style="font-weight:600;"></span>
+              <span id="aiScore" style="font-variant-numeric:tabular-nums; opacity:0.8;"></span>
+            </div>
+            <div style="height:8px; border-radius:4px; background:rgba(127,127,127,0.2); overflow:hidden; margin-bottom:12px;">
+              <div id="aiScoreBar" style="height:100%; width:0%;"></div>
+            </div>
+            <div id="aiPhrasesWrap" style="display:none; margin-bottom:10px;">
+              <div style="font-size:0.8em; opacity:0.7; margin-bottom:4px;">Phrase &amp; template tells</div>
+              <div id="aiPhrases"></div>
+            </div>
+            <div id="aiMarkersWrap" style="display:none;">
+              <div style="font-size:0.8em; opacity:0.7; margin-bottom:4px;">Excess-vocabulary markers</div>
+              <div id="aiMarkers"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Metrics -->
         <div class="metrics" id="metricsBar" style="display: none;">
           <div class="metric">
@@ -616,7 +640,20 @@
                 <input type="checkbox" id="detectPII" checked>
                 <span>Detect PII/secrets</span>
               </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="detectAI">
+                <span>Detect AI-generated text</span>
+              </label>
             </div>
+          </div>
+
+          <div class="settings-group">
+            <label class="settings-label">AI-detection language</label>
+            <select id="aiLang">
+              <option value="en" selected>English</option>
+              <option value="pt-BR">Português (BR)</option>
+              <option value="es">Español</option>
+            </select>
           </div>
 
           <div class="settings-group">

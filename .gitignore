@@ -12,3 +12,8 @@ examples/*/tldt-example-*
 CLAUDE.md
 AGENTS.md
 .audit-baseline/
+
+# WASM demo build artifacts — rebuild with `make demo-build`, not tracked
+# (removed from history in 206f5bd; deploy rebuilds them)
+docs/tldt.wasm
+docs/wasm_exec.js

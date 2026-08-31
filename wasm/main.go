@@ -18,7 +18,17 @@ type JSResult struct {
 	RawOutput  string           `json:"rawOutput"`
 	Metrics    *Metrics         `json:"metrics,omitempty"`
 	Detections []DetectionAlert `json:"detections"`
+	AI         *AIResult        `json:"ai,omitempty"`
 	Error      string           `json:"error,omitempty"`
+}
+
+// AIResult holds the AI-generated-content detection summary for the demo UI.
+type AIResult struct {
+	Score   float64  `json:"score"`   // combined score, 0..1
+	Verdict string   `json:"verdict"` // human-readable band
+	Lang    string   `json:"lang"`    // wordlist language used
+	Markers []string `json:"markers"` // single-word excess-vocabulary hits
+	Phrases []string `json:"phrases"` // multi-word phrase/template tells
 }
 
 type Metrics struct {
@@ -31,9 +41,10 @@ type Metrics struct {
 }
 
 type DetectionAlert struct {
-	Type     string `json:"type"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
+	Type       string `json:"type"`
+	Severity   string `json:"severity"`
+	Message    string `json:"message"`
+	Provenance string `json:"provenance,omitempty"` // encoding chain for a decoded payload, e.g. "base64>hex"
 }
 
 func main() {
@@ -60,13 +71,18 @@ func summarizeWrapper(this js.Value, args []js.Value) interface{} {
 	sanitize := config.Get("sanitize").Bool()
 	detectInjection := config.Get("detectInjection").Bool()
 	detectPII := config.Get("detectPII").Bool()
+	detectAI := config.Get("detectAI").Bool()
+	lang := config.Get("lang").String()
+	if lang == "" {
+		lang = "en"
+	}
 	format := config.Get("format").String()
 	if format == "" {
 		format = "text"
 	}
 	verbose := config.Get("verbose").Bool()
 
-	result := runSummarize(text, algorithm, sentences, sanitize, detectInjection, detectPII, format, verbose)
+	result := runSummarize(text, algorithm, sentences, sanitize, detectInjection, detectPII, detectAI, lang, format, verbose)
 	return toJSValue(result)
 }
 
@@ -75,7 +91,7 @@ func toJSValue(result JSResult) js.Value {
 	return js.Global().Get("JSON").Call("parse", string(jsonBytes))
 }
 
-func runSummarize(text, algorithm string, sentences int, sanitize, detectInjection, detectPII bool, format string, verbose bool) JSResult {
+func runSummarize(text, algorithm string, sentences int, sanitize, detectInjection, detectPII, detectAI bool, lang, format string, verbose bool) JSResult {
 	result := JSResult{
 		Detections: []DetectionAlert{},
 	}
@@ -113,14 +129,23 @@ func runSummarize(text, algorithm string, sentences int, sanitize, detectInjecti
 			return result
 		}
 		for _, finding := range detectResult.Report.Findings {
-			severity := "medium"
-			if finding.Category == "pattern" {
-				severity = "high"
+			// Outlier findings are a summarization signal on a different scale,
+			// not an injection threat — keep them out of the demo alert list.
+			if finding.Category == tldt.CategoryOutlier {
+				continue
 			}
 			result.Detections = append(result.Detections, DetectionAlert{
+				Type:       "injection",
+				Severity:   severityFor(finding.Category, finding.Score),
+				Message:    fmt.Sprintf("%s: %s", categoryLabel(finding.Category), finding.Excerpt),
+				Provenance: finding.Provenance,
+			})
+		}
+		if detectResult.Report.Suspicious {
+			result.Detections = append(result.Detections, DetectionAlert{
 				Type:     "injection",
-				Severity: severity,
-				Message:  fmt.Sprintf("%s: %s", finding.Category, finding.Excerpt),
+				Severity: "high",
+				Message:  "input flagged as suspicious",
 			})
 		}
 	}
@@ -134,6 +159,19 @@ func runSummarize(text, algorithm string, sentences int, sanitize, detectInjecti
 				Severity: "high",
 				Message:  fmt.Sprintf("%s: %s (line %d)", f.Pattern, f.Excerpt, f.Line),
 			})
+		}
+	}
+
+	// Run AI-generated-content detection if requested
+	if detectAI {
+		if r, err := tldt.DetectAI(processedText, lang, ""); err == nil {
+			result.AI = &AIResult{
+				Score:   r.CombinedScore(),
+				Verdict: r.Verdict(),
+				Lang:    r.Lang,
+				Markers: r.Markers,
+				Phrases: r.Phrases,
+			}
 		}
 	}
 
@@ -164,6 +202,43 @@ func runSummarize(text, algorithm string, sentences int, sanitize, detectInjecti
 	}
 
 	return result
+}
+
+// severityFor maps a finding category and score to a demo severity band.
+func severityFor(category tldt.Category, score float64) string {
+	switch category {
+	case tldt.CategoryPattern, tldt.CategoryRole, tldt.CategoryEncoding:
+		if score >= 0.85 {
+			return "high"
+		}
+		return "medium"
+	case tldt.CategoryExfil:
+		return "high"
+	default:
+		return "medium"
+	}
+}
+
+// categoryLabel gives the demo a human-readable name for each finding category.
+func categoryLabel(category tldt.Category) string {
+	switch category {
+	case tldt.CategoryPattern:
+		return "injection pattern"
+	case tldt.CategoryEncoding:
+		return "encoded payload"
+	case tldt.CategoryRole:
+		return "role marker"
+	case tldt.CategoryObfuscated:
+		return "obfuscated phrase"
+	case tldt.CategoryExfil:
+		return "exfiltration link"
+	case tldt.CategoryPositional:
+		return "positional signal"
+	case tldt.CategoryScript:
+		return "script mismatch"
+	default:
+		return string(category)
+	}
 }
 
 func formatOutput(summary string, format string) string {

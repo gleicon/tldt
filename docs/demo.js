@@ -97,6 +97,8 @@ function runSummarize() {
         sanitize: document.getElementById('sanitize').checked,
         detectInjection: document.getElementById('detectInjection').checked,
         detectPII: document.getElementById('detectPII').checked,
+        detectAI: document.getElementById('detectAI').checked,
+        lang: document.getElementById('aiLang').value,
         format: document.querySelector('input[name="format"]:checked').value,
         verbose: document.getElementById('verbose').checked
     };
@@ -122,6 +124,7 @@ function displayResult(result) {
     if (result.error) {
         document.getElementById('outputText').value = `Error: ${result.error}`;
         document.getElementById('copyBtn').disabled = true;
+        document.getElementById('aiPanel').style.display = 'none';
         hideMetrics();
         return;
     }
@@ -138,7 +141,7 @@ function displayResult(result) {
         detectionsList.innerHTML = result.detections.map(d => `
             <div class="detection ${d.type} ${d.severity}">
                 <span class="detection-icon">${getDetectionIcon(d.type, d.severity)}</span>
-                <span class="detection-message">${escapeHtml(d.message)}</span>
+                <span class="detection-message">${escapeHtml(d.message)}${d.provenance ? ` <span class="detection-type" title="encoding chain">via ${escapeHtml(d.provenance)}</span>` : ''}</span>
                 <span class="detection-type">${d.type}</span>
             </div>
         `).join('');
@@ -146,6 +149,9 @@ function displayResult(result) {
     } else {
         detectionsPanel.style.display = 'none';
     }
+
+    // AI-generated content panel
+    renderAI(result.ai);
 
     // Metrics
     if (result.metrics) {
@@ -158,6 +164,40 @@ function displayResult(result) {
     } else {
         hideMetrics();
     }
+}
+
+function renderAI(ai) {
+    const panel = document.getElementById('aiPanel');
+    if (!ai) {
+        panel.style.display = 'none';
+        return;
+    }
+    const pct = Math.round(ai.score * 100);
+    document.getElementById('aiVerdict').textContent = ai.verdict;
+    document.getElementById('aiScore').textContent = `score ${ai.score.toFixed(2)} · ${ai.lang}`;
+    const bar = document.getElementById('aiScoreBar');
+    bar.style.width = pct + '%';
+    // Colour by band: >=0.70 red, >=0.40 amber, else green.
+    bar.style.background = ai.score >= 0.70 ? '#e5484d' : (ai.score >= 0.40 ? '#f5a623' : '#30a46c');
+
+    const phrasesWrap = document.getElementById('aiPhrasesWrap');
+    const phrases = document.getElementById('aiPhrases');
+    if (ai.phrases && ai.phrases.length > 0) {
+        phrases.innerHTML = ai.phrases.map(p => `<span class="detection-type" style="margin:2px;">${escapeHtml(p)}</span>`).join(' ');
+        phrasesWrap.style.display = 'block';
+    } else {
+        phrasesWrap.style.display = 'none';
+    }
+
+    const markersWrap = document.getElementById('aiMarkersWrap');
+    const markers = document.getElementById('aiMarkers');
+    if (ai.markers && ai.markers.length > 0) {
+        markers.innerHTML = ai.markers.map(m => `<span class="detection-type" style="margin:2px; opacity:0.75;">${escapeHtml(m)}</span>`).join(' ');
+        markersWrap.style.display = 'block';
+    } else {
+        markersWrap.style.display = 'none';
+    }
+    panel.style.display = 'block';
 }
 
 function hideMetrics() {
