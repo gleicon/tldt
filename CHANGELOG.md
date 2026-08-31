@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.2] - 2026-08-31
+
+### Added
+
+- Exported `tldt.Category` type alias so consumers can switch on `Finding.Category` without importing the internal detector package.
+
+### Changed
+
+- WASM browser demo and website now surface the current detection surface: AI-generated-content detection (score, verdict, per-language markers, and phrase/template tells), decoded-payload provenance on injection findings (a base64 blob shows the recovered instruction and its encoding chain), category labels, and the suspicious verdict. Landing page rewritten for the 10 detection layers with a payload-decoding example and an AI-detection tab.
+
 ## [1.4.1] - 2026-08-29
 
 ### Added
